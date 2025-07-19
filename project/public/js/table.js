@@ -1,3 +1,4 @@
+
 /**
  * Professional Table View with Permission-Aware Features
  */
@@ -16,6 +17,7 @@ let frozenColumns = 0;
 let columnWidths = {};
 let visibleColumns = new Set();
 let currentUser = null;
+let currentFormIndex = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication
@@ -310,9 +312,9 @@ function renderTable() {
     // Create table header
     const headerRow = document.createElement('tr');
     
-    // Row selector column
+    // Row selector column (never frozen)
     const selectorHeader = document.createElement('th');
-    selectorHeader.className = 'row-selector frozen';
+    selectorHeader.className = 'row-selector';
     selectorHeader.innerHTML = `
         <input type="checkbox" onchange="toggleSelectAll(this)" title="Select all">
     `;
@@ -322,9 +324,15 @@ function renderTable() {
     visibleFields.forEach((field, index) => {
         const th = document.createElement('th');
         th.className = 'sortable';
-        if (index < frozenColumns) {
+        if (frozenColumns > 0 && index < frozenColumns) {
             th.classList.add('frozen');
-            th.style.left = `${40 + (index * 150)}px`; // Adjust for row selector
+            // Add shadow to last frozen column
+            if (index === frozenColumns - 1) th.classList.add('frozen-shadow');
+            else th.classList.remove('frozen-shadow');
+        } else {
+            th.classList.remove('frozen');
+            th.classList.remove('frozen-shadow');
+            th.style.left = '';
         }
         
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
@@ -393,9 +401,9 @@ function renderTable() {
             row.classList.add('selected');
         }
         
-        // Row selector
+        // Row selector (never frozen)
         const selectorCell = document.createElement('td');
-        selectorCell.className = 'row-selector frozen';
+        selectorCell.className = 'row-selector';
         selectorCell.innerHTML = `
             <input type="checkbox" ${selectedRows.has(record.id) ? 'checked' : ''} 
                    onchange="toggleRowSelection('${record.id}', this.checked)">
@@ -405,9 +413,15 @@ function renderTable() {
         // Data cells
         visibleFields.forEach((field, colIndex) => {
             const td = document.createElement('td');
-            if (colIndex < frozenColumns) {
+            if (frozenColumns > 0 && colIndex < frozenColumns) {
                 td.classList.add('frozen');
-                td.style.left = `${40 + (colIndex * 150)}px`;
+                // Add shadow to last frozen column
+                if (colIndex === frozenColumns - 1) td.classList.add('frozen-shadow');
+                else td.classList.remove('frozen-shadow');
+            } else {
+                td.classList.remove('frozen');
+                td.classList.remove('frozen-shadow');
+                td.style.left = '';
             }
             
             const value = record.fields[field.name];
@@ -441,9 +455,59 @@ function renderTable() {
         
         tableBody.appendChild(row);
     });
-    
+    updateFrozenColumnOffsets();
     updatePagination();
 }
+
+function updateFrozenColumnOffsets() {
+    const table = document.getElementById('dataTable');
+    if (!table) return;
+    const headerCells = table.querySelectorAll('thead th');
+    let leftOffsets = [];
+    let left = 0;
+    // Calculate left offsets for the first N frozen columns (skip selector at index 0)
+    for (let i = 1; i <= frozenColumns; i++) {
+        const th = headerCells[i];
+        if (th) {
+            leftOffsets[i] = left;
+            left += th.offsetWidth;
+        }
+    }
+    // Set left for header
+    for (let i = 1; i < headerCells.length; i++) {
+        const th = headerCells[i];
+        if (th && th.classList.contains('frozen')) {
+            th.style.left = leftOffsets[i] + 'px';
+            th.style.position = 'sticky';
+            th.style.zIndex = 11;
+        } else {
+            th.style.left = '';
+            th.style.position = '';
+            th.style.zIndex = '';
+        }
+    }
+    // Set left for each row's frozen cells (skip selector)
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        for (let i = 1; i < cells.length; i++) {
+            const td = cells[i];
+            if (td && td.classList.contains('frozen')) {
+                td.style.left = leftOffsets[i] + 'px';
+                td.style.position = 'sticky';
+                td.style.zIndex = 10;
+            } else {
+                td.style.left = '';
+                td.style.position = '';
+                td.style.zIndex = '';
+            }
+        }
+    });
+}
+
+window.addEventListener('resize', () => {
+    updateFrozenColumnOffsets();
+});
 
 function getFieldTypeIcon(type) {
     const icons = {
@@ -790,20 +854,79 @@ function toggleRowSelection(recordId, selected) {
     updateSelectionInfo();
 }
 
+// Show/hide Batch Edit button based on selection
+function updateBatchEditButton() {
+    const btn = document.getElementById('batchEditBtn');
+    if (!btn) return;
+    btn.style.display = selectedRows.size > 1 ? 'inline-block' : 'none';
+}
+// Call updateBatchEditButton in updateSelectionInfo
 function updateSelectionInfo() {
     const count = selectedRows.size;
     const info = document.getElementById('selectionInfo');
-    const badge = document.getElementById('selectedCount');
-    
-    if (count > 0) {
-        info.textContent = `${count} record${count === 1 ? '' : 's'} selected`;
-        badge.textContent = `${count} selected`;
-        badge.style.display = 'inline-block';
-    } else {
+    if (count === 0) {
         info.textContent = 'No selection';
-        badge.style.display = 'none';
+    } else {
+        info.textContent = `${count} record${count > 1 ? 's' : ''} selected`;
+    }
+    updateBatchEditButton();
+}
+// Batch Edit Modal logic
+function showBatchEditModal() {
+    const fieldsContainer = document.getElementById('batchEditFields');
+    if (!fieldsContainer) return;
+    let html = '<form id="batchEditForm" class="p-2">';
+    currentTableFields.forEach(field => {
+        const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
+        if (permission === 'edit') {
+            html += `
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">${field.name}</label>
+                    ${getFieldInput(field, '')}
+                </div>
+            `;
+        }
+    });
+    html += '</form>';
+    fieldsContainer.innerHTML = html;
+    const modal = new bootstrap.Modal(document.getElementById('batchEditModal'));
+    modal.show();
+}
+async function saveBatchEdit() {
+    const form = document.getElementById('batchEditForm');
+    if (!form) return;
+    const tableId = document.getElementById('tableSelector').value;
+    const updates = {};
+    currentTableFields.forEach(field => {
+        const input = document.getElementById(`field_${field.name}`);
+        if (input && input.value !== '') {
+            if (field.type === 'boolean') {
+                updates[field.name] = input.value === 'true';
+            } else if (field.type === 'number') {
+                updates[field.name] = input.value === '' ? null : Number(input.value);
+            } else {
+                updates[field.name] = input.value;
+            }
+        }
+    });
+    if (Object.keys(updates).length === 0) {
+        showError('Please fill in at least one field to update.');
+        return;
+    }
+    try {
+        for (const recordId of selectedRows) {
+            await window.teableAPI.updateRecord(tableId, recordId, updates);
+        }
+        await loadTableData();
+        showSuccess('Batch update successful!');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('batchEditModal'));
+        if (modal) modal.hide();
+    } catch (error) {
+        showError('Batch update failed: ' + error.message);
     }
 }
+window.showBatchEditModal = showBatchEditModal;
+window.saveBatchEdit = saveBatchEdit;
 
 // Pagination
 function updatePagination() {
@@ -992,12 +1115,9 @@ function showContextMenu(event) {
     const menu = document.getElementById('contextMenu');
     const row = event.target.closest('tr');
     const recordId = row?.dataset.recordId;
-    
     let menuItems = [];
-    
     if (recordId) {
         const canEdit = hasEditPermissions();
-        
         menuItems = [
             { icon: 'fas fa-eye', text: 'View Record', action: () => viewRecord(recordId) },
             ...(canEdit ? [
@@ -1015,27 +1135,41 @@ function showContextMenu(event) {
             { icon: 'fas fa-sync', text: 'Refresh Table', action: () => refreshTable() }
         ];
     }
-    
     menu.innerHTML = menuItems.map(item => {
         if (item.divider) {
             return '<div class="context-menu-divider"></div>';
         }
         return `
-            <div class="context-menu-item ${item.class || ''}" onclick="${item.action.name}('${recordId || ''}')">
+            <div class="context-menu-item ${item.class || ''}">
                 <i class="${item.icon}"></i>
                 <span>${item.text}</span>
             </div>
         `;
     }).join('');
-    
+    // Attach event handlers in JS
+    const menuItemEls = menu.querySelectorAll('.context-menu-item');
+    let elIdx = 0;
+    menuItems.forEach(item => {
+        if (!item.divider) {
+            menuItemEls[elIdx].onclick = item.action;
+            elIdx++;
+        }
+    });
     menu.style.display = 'block';
     menu.style.left = event.pageX + 'px';
     menu.style.top = event.pageY + 'px';
 }
+// Make showRowContextMenu global and call showContextMenu
+function showRowContextMenu(event, recordId) {
+    showContextMenu(event);
+}
+window.showRowContextMenu = showRowContextMenu;
 
 function hideContextMenu() {
-    document.getElementById('contextMenu').style.display = 'none';
+    const menu = document.getElementById('contextMenu');
+    if (menu) menu.style.display = 'none';
 }
+window.hideContextMenu = hideContextMenu;
 
 // Record Management
 async function addNewRecord() {
@@ -1157,8 +1291,24 @@ function showRecordModal(recordId = null) {
     // Store record ID for saving
     modal.setAttribute('data-record-id', recordId || '');
     
+    // Clear any previous validation states
+    const inputs = modal.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.classList.remove('is-invalid');
+    });
+    
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
+    
+    // Focus on first input for new records
+    if (!recordId) {
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input, select, textarea');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 300);
+    }
 }
 
 function getFieldInput(field, value) {
@@ -1168,23 +1318,39 @@ function getFieldInput(field, value) {
         case 'boolean':
             return `
                 <select class="form-select" id="${inputId}">
-                    <option value="true" ${value ? 'selected' : ''}>True</option>
-                    <option value="false" ${!value ? 'selected' : ''}>False</option>
+                    <option value="">-- Select --</option>
+                    <option value="true" ${value === true ? 'selected' : ''}>True</option>
+                    <option value="false" ${value === false ? 'selected' : ''}>False</option>
                 </select>
             `;
         case 'date':
-            const dateValue = value ? new Date(value).toISOString().split('T')[0] : '';
+            let dateValue = '';
+            if (value) {
+                try {
+                    const date = new Date(value);
+                    if (!isNaN(date.getTime())) {
+                        dateValue = date.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    console.warn('Invalid date value:', value);
+                }
+            }
             return `<input type="date" class="form-control" id="${inputId}" value="${dateValue}">`;
         case 'number':
-            return `<input type="number" class="form-control" id="${inputId}" value="${value}">`;
+            let numValue = '';
+            if (value !== null && value !== undefined && value !== '') {
+                numValue = Number(value);
+                if (isNaN(numValue)) numValue = '';
+            }
+            return `<input type="number" class="form-control" id="${inputId}" value="${numValue}" step="any">`;
         case 'email':
-            return `<input type="email" class="form-control" id="${inputId}" value="${value}">`;
+            return `<input type="email" class="form-control" id="${inputId}" value="${value || ''}" placeholder="Enter email address">`;
         case 'url':
-            return `<input type="url" class="form-control" id="${inputId}" value="${value}">`;
+            return `<input type="url" class="form-control" id="${inputId}" value="${value || ''}" placeholder="Enter URL">`;
         case 'longText':
-            return `<textarea class="form-control" id="${inputId}" rows="4">${value}</textarea>`;
+            return `<textarea class="form-control" id="${inputId}" rows="4" placeholder="Enter text">${value || ''}</textarea>`;
         default:
-            return `<input type="text" class="form-control" id="${inputId}" value="${value}">`;
+            return `<input type="text" class="form-control" id="${inputId}" value="${value || ''}" placeholder="Enter ${field.name}">`;
     }
 }
 
@@ -1194,42 +1360,134 @@ async function saveRecord() {
         const recordId = modal.getAttribute('data-record-id');
         const tableId = document.getElementById('tableSelector').value;
         
-        // Collect field values
+        if (!tableId) {
+            showError('No table selected. Please select a table first.');
+            return;
+        }
+        
+        // Collect field values with validation
         const recordData = {};
+        let hasValidData = false;
+        
         currentTableFields.forEach(field => {
             const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
             if (permission === 'edit') {
                 const input = document.getElementById(`field_${field.name}`);
                 if (input) {
+                    let value = input.value;
+                    
+                    // Convert value based on field type
                     if (field.type === 'boolean') {
-                        recordData[field.name] = input.value === 'true';
-                    } else {
-                        recordData[field.name] = input.value;
+                        value = value === 'true';
+                    } else if (field.type === 'number') {
+                        value = value === '' ? null : Number(value);
+                        if (isNaN(value)) {
+                            showError(`Invalid number value for field: ${field.name}`);
+                            return;
+                        }
+                    } else if (field.type === 'date') {
+                        if (value && !isNaN(new Date(value).getTime())) {
+                            value = new Date(value).toISOString();
+                        } else if (value) {
+                            showError(`Invalid date value for field: ${field.name}`);
+                            return;
+                        }
+                    }
+                    
+                    // Only add non-empty values (except for booleans and numbers which can be false/0)
+                    if (value !== '' && value !== null && value !== undefined) {
+                        recordData[field.name] = value;
+                        hasValidData = true;
                     }
                 }
             }
         });
 
+        // Validate that we have at least some data
+        if (!hasValidData) {
+            showError('Please fill in at least one field before saving.');
+            return;
+        }
+
+        console.log('Saving record data:', {
+            tableId,
+            recordId,
+            recordData,
+            isUpdate: !!recordId
+        });
+
+        let result;
         if (recordId) {
             // Update existing record
-            await window.teableAPI.updateRecord(tableId, recordId, recordData);
+            result = await window.teableAPI.updateRecord(tableId, recordId, recordData);
+            console.log('Update result:', result);
         } else {
             // Create new record
-            await window.teableAPI.createRecord(tableId, recordData);
+            result = await window.teableAPI.createRecord(tableId, recordData);
+            console.log('Create result:', result);
+        }
+
+        // Validate the API response
+        if (!result) {
+            throw new Error('No response received from API');
+        }
+
+        // Check if the record was actually created/updated
+        if (result.records && result.records.length > 0) {
+            const savedRecord = result.records[0];
+            console.log('Record saved successfully:', savedRecord);
+        } else if (result.record) {
+            console.log('Record saved successfully:', result.record);
+        } else {
+            console.warn('API response does not contain expected record data:', result);
         }
 
         // Close modal
         const bootstrapModal = bootstrap.Modal.getInstance(modal);
-        bootstrapModal.hide();
+        if (bootstrapModal) {
+            bootstrapModal.hide();
+        }
 
-        // Reload table data
+        // Reload table data to show the new/updated record
         await loadTableData();
+        
+        // Verify the record was actually saved
+        if (!recordId) {
+            // For new records, check if they appear in the data
+            const newRecordId = result.records?.[0]?.id || result.record?.id;
+            if (newRecordId) {
+                const savedRecord = currentTableData.find(r => r.id === newRecordId);
+                if (!savedRecord) {
+                    console.warn('Record was created but not found in table data after reload');
+                    showError('Record was created but may not be visible. Please refresh the table.');
+                    return;
+                }
+                console.log('✅ Record verified in table data:', savedRecord);
+            }
+        }
         
         showSuccess(recordId ? 'Record updated successfully!' : 'Record created successfully!');
 
     } catch (error) {
         console.error('Error saving record:', error);
-        showError('Failed to save record: ' + error.message);
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to save record: ';
+        if (error.message.includes('API Error: 400')) {
+            errorMessage += 'Invalid data format. Please check your input values.';
+        } else if (error.message.includes('API Error: 401')) {
+            errorMessage += 'Authentication failed. Please log in again.';
+        } else if (error.message.includes('API Error: 403')) {
+            errorMessage += 'You do not have permission to save records.';
+        } else if (error.message.includes('API Error: 404')) {
+            errorMessage += 'Table not found. Please select a valid table.';
+        } else if (error.message.includes('API Error: 422')) {
+            errorMessage += 'Validation error. Please check your field values.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showError(errorMessage);
     }
 }
 
@@ -1309,8 +1567,19 @@ function updateTableStats() {
 }
 
 function switchViewMode(mode) {
-    // Future implementation for form view
-    console.log('Switching to view mode:', mode);
+    // Show/hide grid and form containers
+    const grid = document.getElementById('dataGrid');
+    const form = document.getElementById('formViewContainer');
+    if (mode === 'form') {
+        if (grid) grid.style.display = 'none';
+        if (form) {
+            form.style.display = 'block';
+            renderFormView();
+        }
+    } else {
+        if (grid) grid.style.display = 'block';
+        if (form) form.style.display = 'none';
+    }
 }
 
 function handleKeyboardShortcuts(event) {
@@ -1336,28 +1605,33 @@ async function exportTableData() {
     try {
         const tableId = document.getElementById('tableSelector').value;
         if (!tableId) return;
-
-        const data = {
-            table: tableId,
-            records: filteredData,
-            fields: currentTableFields,
-            permissions: currentTablePermissions,
-            userRole: currentUser.role,
-            exportDate: new Date().toISOString()
-        };
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        // Prepare CSV header
+        const fields = currentTableFields.map(f => f.name);
+        let csv = fields.join(',') + '\n';
+        // Prepare CSV rows
+        filteredData.forEach(record => {
+            const row = fields.map(field => {
+                let value = record.fields[field];
+                if (value === null || value === undefined) return '';
+                // Escape quotes and commas
+                if (typeof value === 'string') {
+                    value = '"' + value.replace(/"/g, '""') + '"';
+                }
+                return value;
+            });
+            csv += row.join(',') + '\n';
+        });
+        // Download CSV
+        const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `table_export_${tableId}_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `table_export_${tableId}_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-
-        showSuccess('Table data exported successfully!');
-
+        showSuccess('Table data exported as CSV successfully!');
     } catch (error) {
         console.error('Error exporting table:', error);
         showError('Failed to export table: ' + error.message);
@@ -1412,6 +1686,120 @@ function showAlert(type, message) {
         }
     }, 5000);
 }
+
+function renderFormView() {
+    const formContainer = document.getElementById('formViewContainer');
+    if (!formContainer) return;
+    if (!filteredData || filteredData.length === 0) {
+        formContainer.innerHTML = '<div class="alert alert-info m-3">No records to display.</div>';
+        return;
+    }
+    // Clamp index
+    if (currentFormIndex < 0) currentFormIndex = 0;
+    if (currentFormIndex >= filteredData.length) currentFormIndex = filteredData.length - 1;
+    const record = filteredData[currentFormIndex];
+    let html = `<form id="formViewForm" class="p-3">`;
+    currentTableFields.forEach(field => {
+        const value = record.fields[field.name] || '';
+        html += `
+            <div class="mb-3">
+                <label class="form-label fw-semibold">${field.name}</label>
+                ${getFieldInput(field, value)}
+            </div>
+        `;
+    });
+    html += `
+        <div class="d-flex justify-content-between mt-4">
+            <button type="button" class="btn btn-secondary" id="prevRecordBtn">&laquo; Previous</button>
+            <div>
+                <button type="button" class="btn btn-primary me-2" id="saveFormBtn">Save</button>
+                <button type="button" class="btn btn-secondary" id="nextRecordBtn">Next &raquo;</button>
+            </div>
+        </div>
+    </form>`;
+    formContainer.innerHTML = html;
+    // Event handlers
+    document.getElementById('prevRecordBtn').onclick = () => {
+        if (currentFormIndex > 0) {
+            currentFormIndex--;
+            renderFormView();
+        }
+    };
+    document.getElementById('nextRecordBtn').onclick = () => {
+        if (currentFormIndex < filteredData.length - 1) {
+            currentFormIndex++;
+            renderFormView();
+        }
+    };
+    document.getElementById('saveFormBtn').onclick = async () => {
+        await saveFormViewRecord();
+    };
+}
+
+async function saveFormViewRecord() {
+    const record = filteredData[currentFormIndex];
+    const tableId = document.getElementById('tableSelector').value;
+    const form = document.getElementById('formViewForm');
+    if (!form) return;
+    const recordData = {};
+    currentTableFields.forEach(field => {
+        const input = document.getElementById(`field_${field.name}`);
+        if (input) {
+            if (field.type === 'boolean') {
+                recordData[field.name] = input.value === 'true';
+            } else if (field.type === 'number') {
+                recordData[field.name] = input.value === '' ? null : Number(input.value);
+            } else {
+                recordData[field.name] = input.value;
+            }
+        }
+    });
+    try {
+        await window.teableAPI.updateRecord(tableId, record.id, recordData);
+        await loadTableData();
+        showSuccess('Record updated successfully!');
+    } catch (error) {
+        showError('Failed to update record: ' + error.message);
+    }
+}
+
+// Debug function to help troubleshoot issues
+async function debugTableData() {
+    const tableId = document.getElementById('tableSelector').value;
+    if (!tableId) {
+        console.log('No table selected');
+        return;
+    }
+    
+    console.log('=== DEBUG TABLE DATA ===');
+    console.log('Table ID:', tableId);
+    console.log('Current user:', currentUser);
+    console.log('Table fields:', currentTableFields);
+    console.log('Table permissions:', currentTablePermissions);
+    console.log('Current table data count:', currentTableData.length);
+    console.log('Filtered data count:', filteredData.length);
+    console.log('Sample record:', currentTableData[0]);
+    
+    try {
+        // Test API connection
+        console.log('Testing API connection...');
+        const tables = await window.teableAPI.getTables();
+        console.log('Available tables:', tables);
+        
+        // Test getting records
+        console.log('Testing record retrieval...');
+        const records = await window.teableAPI.getRecords(tableId, { limit: 5 });
+        console.log('Recent records:', records);
+        
+    } catch (error) {
+        console.error('API test failed:', error);
+    }
+    
+    console.log('=== END DEBUG ===');
+}
+
+// Add debug function to window for console access
+window.debugTableData = debugTableData;
 
 // Make functions globally available
 window.loadTableData = loadTableData;
