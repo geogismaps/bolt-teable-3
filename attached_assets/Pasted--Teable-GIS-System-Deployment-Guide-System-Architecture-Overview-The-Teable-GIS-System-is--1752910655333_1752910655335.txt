@@ -1,0 +1,73 @@
+# Teable GIS System Deployment Guide
+
+## System Architecture Overview
+
+The Teable GIS System is a comprehensive web application that provides geospatial data management capabilities integrated with Teable.io. The system features a mixed authentication model supporting both Teable.io space owners and application-specific users.
+
+### Key Components:
+
+1. **Frontend**: Pure HTML/CSS/JavaScript application using Bootstrap 5 for UI components and Font Awesome for icons
+2. **Data Storage**: Uses Teable.io as the backend database service
+3. **Authentication**: Dual authentication system supporting both Teable.io API tokens and local user accounts
+4. **GIS Capabilities**: Integrates Leaflet.js for interactive mapping and geospatial visualization
+5. **Permission System**: Granular field-level permissions based on Teable.io's role system
+
+## Pages Overview
+
+1. **Configuration Page** (`config.html`): Super admin setup for Teable.io integration
+2. **Login Page** (`login.html`): Mixed authentication login interface
+3. **Dashboard** (`dashboard.html`): Main navigation hub with statistics and quick actions
+4. **User Management** (`users.html`): User administration with Teable.io synchronization
+5. **Field Permissions** (`permissions.html`): Granular field-level access control
+6. **Table View** (`table.html`): Advanced data grid with permission-aware editing
+7. **Map Configuration** (`map-config.html`): Configure public map settings and layers
+8. **Map View** (`map.html`): Interactive GIS map with advanced features
+9. **Public Map** (`public-map.html`): Public-facing map view without authentication
+10. **Data Change Logs** (`logs.html`): Audit trail for data modifications
+
+## JavaScript Files
+
+1. **auth.js**: Authentication system with dual support for Teable.io and local users
+2. **teable-api.js**: API integration with Teable.io services
+3. **dashboard.js**: Dashboard functionality and statistics
+4. **users.js**: User management operations
+5. **user-sync.js**: Synchronization between Teable.io and local users
+6. **permissions.js**: Field-level permission management
+7. **table.js**: Advanced data grid functionality
+8. **map.js**: Interactive map functionality for the admin interface
+9. **map-config.js**: Map configuration management
+10. **public-map.js**: Public map view functionality
+11. **logs.js**: Data change logging and audit trail
+12. **config.js**: System configuration management
+
+## Dependencies
+
+### Frontend Libraries:
+- Bootstrap 5.1.3: UI framework
+- Font Awesome 6.0.0: Icon library
+- Leaflet 1.9.4: Interactive maps
+- Leaflet.markercluster 1.5.3: Marker clustering for maps
+- Leaflet-draw 1.0.4: Drawing tools for maps
+- SortableJS 1.15.0: Drag-and-drop sorting functionality
+
+### Development Dependencies:
+- Vite 5.4.2: Build tool and development server
+- React 18.3.1: Used for the entry point application
+- TypeScript 5.5.3: Type checking
+- Tailwind CSS 3.4.1: Utility-first CSS framework
+- ESLint 9.9.1: Code linting
+
+## Deployment Instructions
+
+1. **Server Requirements**:
+   - Node.js 18+ runtime
+   - Nginx or Apache web server
+   - HTTPS certificate (recommended for production)
+
+2. **Build Process**:
+   ```bash
+   # Install dependencies
+   npm install
+   
+   # Build for production
+   npm run build

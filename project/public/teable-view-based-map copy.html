@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teable View-Based GIS Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 350px;
+            background: #2c3e50;
+            color: white;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .sidebar.collapsed {
+            width: 60px;
+        }
+        
+        .sidebar-header {
+            padding: 15px;
+            background: #34495e;
+            border-bottom: 1px solid #445566;
+        }
+        
+        .sidebar-content {
+            padding: 10px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: #34495e;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .section-content {
+            padding: 15px;
+            display: none;
+        }
+        
+        .section.active .section-content {
+            display: block;
+        }
+        
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Controls */
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .control-btn {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #34495e;
+            color: white;
+            border-color: #445566;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        /* User Info Panel */
+        .user-info {
+            background: #1a252f;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        
+        .user-badge {
+            background: #27ae60;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        
+        .user-badge.viewer {
+            background: #3498db;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: #34495e;
+            color: white;
+            padding: 5px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        /* Feature label styling */
+        .feature-label {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid #333 !important;
+            border-radius: 3px !important;
+            padding: 2px 6px !important;
+            font-weight: bold !important;
+            font-size: 12px !important;
+            color: #333 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+        }
+        
+        .feature-label:before {
+            display: none !important;
+        }
+        
+        /* Loading */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            z-index: 2000;
+        }
+        
+        /* Legend styling */
+        #legendBox {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #legendContent div {
+            font-size: 12px;
+            margin: 3px 0;
+        }
+        
+        /* View permissions indicator */
+        .view-permissions {
+            background: #e8f4fd;
+            color: #1976d2;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 11px;
+            border-left: 3px solid #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-map"></i> View-Based GIS</h3>
+            </div>
+            
+            <div class="sidebar-content">
+                <!-- User Session Section -->
+                <div class="section active">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span><i class="fas fa-user"></i> User Session</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="section-content">
+                        <div id="userInfo" class="user-info">
+                            <div class="text-center">
+                                <i class="fas fa-user-slash"></i>
+                                <div>Not logged in</div>
+                                <a href="teable-login.html" class="btn btn-primary btn-sm mt-2">
+                                    <i class="fas fa-sign-in-alt"></i> Login
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div id="viewPermissions" class="view-permissions" style="display: none;">
+                            <div><strong>View Permissions:</strong></div>
+                            <div id="permissionDetails">Loading...</div>
+                        </div>
+                        
+                        <button class="btn btn-success" onclick="refreshViewData()" id="refreshBtn" disabled>
+                            <i class="fas fa-sync"></i> Refresh View Data
+                        </button>
+                        
+                        <button class="btn btn-danger" onclick="logout()" id="logoutBtn" style="display: none;">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Base Maps Section -->
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span><i class="fas fa-layer-group"></i> Base Maps</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label>Map Style:</label>
+                            <select id="basemapSelect" class="form-control" onchange="changeBasemap()">
+                                <option value="osm">OpenStreetMap</option>
+                                <option value="satellite">Satellite</option>
+                                <option value="terrain">Terrain</option>
+                                <option value="dark">Dark</option>
+                                <option value="light">Light</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Data Layers Section -->
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span><i class="fas fa-database"></i> Data Layers</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="sitesLayer" checked onchange="toggleLayer('sites')">
+                                View Data Layer
+                            </label>
+                        </div>
+                        <div id="dataStats" class="mt-2" style="font-size: 11px; color: #bdc3c7;">
+                            No data loaded
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filters Section -->
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span><i class="fas fa-filter"></i> Filters</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label>Search:</label>
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search features..." onkeyup="applyFilters()">
+                        </div>
+                        <button class="btn btn-danger" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Styling Section -->
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <span><i class="fas fa-palette"></i> Styling</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="section-content">
+                        <div class="form-group">
+                            <label>Style Mode:</label>
+                            <select id="styleMode" class="form-control" onchange="updateStyleMode()">
+                                <option value="single">Single Color</option>
+                                <option value="categorized">Color by Field</option>
+                            </select>
+                        </div>
+                        
+                        <div id="singleColorControls">
+                            <div class="form-group">
+                                <label>Fill Color:</label>
+                                <input type="color" id="fillColor" class="form-control" value="#3498db" onchange="updateStyling()">
+                            </div>
+                            <div class="form-group">
+                                <label>Border Color:</label>
+                                <input type="color" id="borderColor" class="form-control" value="#2c3e50" onchange="updateStyling()">
+                            </div>
+                        </div>
+                        
+                        <div id="categorizedControls" style="display: none;">
+                            <div class="form-group">
+                                <label>Color by Field:</label>
+                                <select id="colorField" class="form-control" onchange="applyCategorizedStyle()">
+                                    <option value="">Select Field</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Opacity:</label>
+                            <input type="range" id="opacity" class="form-control" min="0" max="1" step="0.1" value="0.7" onchange="updateStyling()">
+                            <span id="opacityValue">0.7</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Label Field:</label>
+                            <select id="labelField" class="form-control" onchange="updateLabels()">
+                                <option value="">No Labels</option>
+                            </select>
+                        </div>
+                        
+                        <div id="legendBox" style="display: none;">
+                            <h4>Legend</h4>
+                            <div id="legendContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading" style="display: none;">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <div class="mt-2">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div id="statusLeft">Ready</div>
+            <div id="statusRight">Teable View-Based GIS</div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Draw JS -->
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <!-- Teable Auth -->
+    <script src="teable-auth.js"></script>
+    
+    <script>
+        // Global variables
+        let map;
+        let sitesLayer;
+        let currentData = [];
+        let filteredData = [];
+        let geometryField = 'geometry'; // Default geometry field name
+        
+        // Base map layers
+        const baseMaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri'
+            }),
+            terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenTopoMap contributors'
+            }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB'
+            }),
+            light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB'
+            })
+        };
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMap();
+            checkUserSession();
+        });
+
+        // Initialize map
+        function initializeMap() {
+            map = L.map('map').setView([20.5937, 78.9629], 5);
+            baseMaps.osm.addTo(map);
+            setStatus('Map initialized');
+        }
+
+        // Check user session
+        function checkUserSession() {
+            if (TeableAuth.isLoggedIn()) {
+                const session = TeableAuth.getCurrentSession();
+                updateUserInfo(session);
+                loadViewData();
+            } else {
+                setStatus('Please login to access view-based data');
+            }
+        }
+
+        // Update user info display
+        function updateUserInfo(session) {
+            const userInfoEl = document.getElementById('userInfo');
+            const viewPermissionsEl = document.getElementById('viewPermissions');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            
+            userInfoEl.innerHTML = `
+                <div>
+                    <strong>${session.email}</strong>
+                    <span class="user-badge ${session.role}">${session.role.toUpperCase()}</span>
+                </div>
+                <div style="margin-top: 5px; font-size: 10px;">
+                    <div>Base: ${session.baseId}</div>
+                    <div>Table: ${session.tableId}</div>
+                    <div>View: ${session.viewId}</div>
+                </div>
+            `;
+            
+            viewPermissionsEl.style.display = 'block';
+            document.getElementById('permissionDetails').innerHTML = `
+                <div>✓ View-filtered data access</div>
+                <div>✓ Field-level permissions</div>
+                <div>${session.role === 'editor' ? '✓ Edit permissions' : '○ Read-only access'}</div>
+            `;
+            
+            refreshBtn.disabled = false;
+            logoutBtn.style.display = 'inline-block';
+        }
+
+        // Load view data
+        async function loadViewData() {
+            try {
+                showLoading(true);
+                setStatus('Loading view-based data...');
+                
+                const data = await TeableAuth.fetchViewData({ limit: 1000 });
+                
+                currentData = data.records || [];
+                filteredData = [...currentData];
+                
+                console.log('Loaded view data:', currentData.length, 'records');
+                if (currentData.length > 0) {
+                    console.log('Sample record:', currentData[0]);
+                    
+                    // Auto-detect geometry field
+                    const sampleFields = Object.keys(currentData[0].fields || {});
+                    const geometryFieldCandidates = sampleFields.filter(field => 
+                        field.toLowerCase().includes('geom') || 
+                        field.toLowerCase().includes('wkt') || 
+                        field.toLowerCase().includes('shape') ||
+                        field.toLowerCase().includes('polygon') ||
+                        field.toLowerCase().includes('point')
+                    );
+                    
+                    if (geometryFieldCandidates.length > 0) {
+                        geometryField = geometryFieldCandidates[0];
+                        console.log('Auto-detected geometry field:', geometryField);
+                    }
+                }
+                
+                renderViewData();
+                updateDataStats();
+                setStatus(`Loaded ${currentData.length} features from view`);
+                
+            } catch (error) {
+                console.error('Error loading view data:', error);
+                setStatus(`Error loading data: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Render view data on map
+        function renderViewData() {
+            console.log('Rendering view data:', filteredData.length, 'records');
+            
+            // Clear existing layer
+            if (sitesLayer) {
+                map.removeLayer(sitesLayer);
+            }
+            
+            const features = [];
+            let polygonCount = 0;
+            
+            filteredData.forEach((record, index) => {
+                const geometry = record.fields[geometryField];
+                
+                if (geometry && typeof geometry === 'string') {
+                    try {
+                        const coordinates = parseWKTToLeaflet(geometry);
+                        
+                        if (coordinates) {
+                            coordinates.forEach(polygonCoords => {
+                                const polygon = L.polygon(polygonCoords, getFeatureStyle());
+                                
+                                // Add popup with view-filtered fields
+                                const popupContent = createPopupContent(record.fields);
+                                polygon.bindPopup(popupContent);
+                                
+                                // Store record data
+                                polygon.recordId = record.id;
+                                polygon.recordData = record.fields;
+                                
+                                // Add click handler
+                                polygon.on('click', function(e) {
+                                    highlightFeature(polygon);
+                                    setStatus(`Selected feature: ${record.id}`);
+                                });
+                                
+                                features.push(polygon);
+                                polygonCount++;
+                            });
+                        }
+                    } catch (error) {
+                        console.error(`Error parsing geometry for record ${index}:`, error);
+                    }
+                }
+            });
+            
+            console.log('Total polygons created:', polygonCount);
+            
+            // Create layer group
+            if (features.length > 0) {
+                sitesLayer = L.layerGroup(features).addTo(map);
+                
+                // Zoom to extent
+                const group = new L.featureGroup(features);
+                map.fitBounds(group.getBounds().pad(0.1));
+                
+                // Populate styling options
+                populateFieldOptions();
+                
+                setStatus(`Rendered ${polygonCount} polygons from view`);
+            } else {
+                setStatus('No valid geometry data found in view');
+            }
+        }
+
+        // Parse WKT to Leaflet coordinates (same as your original)
+        function parseWKTToLeaflet(wkt) {
+            try {
+                // Remove WKT type prefix and clean up
+                let cleanWkt = wkt.replace(/^(MULTI)?POLYGON\s*\(/i, '').replace(/\)$/, '');
+                
+                // Handle MULTIPOLYGON
+                if (wkt.toUpperCase().startsWith('MULTIPOLYGON')) {
+                    cleanWkt = cleanWkt.replace(/^\(\(/, '').replace(/\)\)$/, '');
+                    const polygonStrings = cleanWkt.split(')),((');
+                    
+                    return polygonStrings.map(polygonString => {
+                        const rings = polygonString.split('),(');
+                        return rings.map(ring => {
+                            const coords = ring.replace(/[()]/g, '').split(',');
+                            return coords.map(coord => {
+                                const [lon, lat] = coord.trim().split(' ').map(Number);
+                                return [lat, lon]; // Leaflet uses [lat, lon]
+                            });
+                        });
+                    });
+                } else {
+                    // Handle single POLYGON
+                    cleanWkt = cleanWkt.replace(/^\(/, '').replace(/\)$/, '');
+                    const rings = cleanWkt.split('),(');
+                    
+                    return [rings.map(ring => {
+                        const coords = ring.replace(/[()]/g, '').split(',');
+                        return coords.map(coord => {
+                            const [lon, lat] = coord.trim().split(' ').map(Number);
+                            return [lat, lon]; // Leaflet uses [lat, lon]
+                        });
+                    })];
+                }
+            } catch (error) {
+                console.error('Error parsing WKT:', error);
+                return null;
+            }
+        }
+
+        // Get feature styling
+        function getFeatureStyle() {
+            return {
+                fillColor: document.getElementById('fillColor').value,
+                color: document.getElementById('borderColor').value,
+                weight: 2,
+                opacity: 1,
+                fillOpacity: parseFloat(document.getElementById('opacity').value)
+            };
+        }
+
+        // Create popup content (shows only view-permitted fields)
+        function createPopupContent(fields) {
+            let content = '<div style="max-width: 300px;">';
+            content += '<h6 style="margin-bottom: 10px; color: #1976d2;">View-Filtered Data</h6>';
+            
+            Object.keys(fields).forEach(key => {
+                if (key !== geometryField && fields[key] !== null && fields[key] !== undefined) {
+                    let value = fields[key];
+                    if (typeof value === 'string' && value.length > 50) {
+                        value = value.substring(0, 50) + '...';
+                    }
+                    content += `<div style="margin-bottom: 5px;"><strong>${key}:</strong> ${value}</div>`;
+                }
+            });
+            
+            content += '</div>';
+            return content;
+        }
+
+        // Populate field options for styling
+        function populateFieldOptions() {
+            const colorField = document.getElementById('colorField');
+            const labelField = document.getElementById('labelField');
+            
+            if (filteredData.length > 0) {
+                const fields = Object.keys(filteredData[0].fields || {}).filter(field => field !== geometryField);
+                
+                // Update color field options
+                colorField.innerHTML = '<option value="">Select Field</option>';
+                fields.forEach(field => {
+                    const option = document.createElement('option');
+                    option.value = field;
+                    option.textContent = field;
+                    colorField.appendChild(option);
+                });
+                
+                // Update label field options
+                labelField.innerHTML = '<option value="">No Labels</option>';
+                fields.forEach(field => {
+                    const option = document.createElement('option');
+                    option.value = field;
+                    option.textContent = field;
+                    labelField.appendChild(option);
+                });
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            filteredData = currentData.filter(record => {
+                if (searchTerm) {
+                    const searchableText = Object.values(record.fields).join(' ').toLowerCase();
+                    return searchableText.includes(searchTerm);
+                }
+                return true;
+            });
+            
+            renderViewData();
+            updateDataStats();
+            setStatus(`Showing ${filteredData.length} of ${currentData.length} features`);
+        }
+
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            filteredData = [...currentData];
+            renderViewData();
+            updateDataStats();
+            setStatus(`Showing all ${currentData.length} features`);
+        }
+
+        // Update data statistics
+        function updateDataStats() {
+            const statsEl = document.getElementById('dataStats');
+            const session = TeableAuth.getCurrentSession();
+            
+            if (session) {
+                statsEl.innerHTML = `
+                    <div>Total Records: ${currentData.length}</div>
+                    <div>Filtered: ${filteredData.length}</div>
+                    <div>View: ${session.viewId}</div>
+                    <div>Role: ${session.role}</div>
+                `;
+            }
+        }
+
+        // Refresh view data
+        async function refreshViewData() {
+            await loadViewData();
+        }
+
+        // Logout
+        function logout() {
+            TeableAuth.logout();
+            window.location.href = 'teable-login.html';
+        }
+
+        // Highlight feature
+        function highlightFeature(layer) {
+            // Reset previous highlight
+            if (window.lastHighlightedLayer) {
+                window.lastHighlightedLayer.setStyle(getFeatureStyle());
+            }
+            
+            // Highlight current feature
+            layer.setStyle({
+                fillColor: '#ff0000',
+                color: '#ff0000',
+                weight: 3,
+                fillOpacity: 0.8
+            });
+            
+            window.lastHighlightedLayer = layer;
+        }
+
+        // Update styling
+        function updateStyling() {
+            const opacitySlider = document.getElementById('opacity');
+            const opacityValue = document.getElementById('opacityValue');
+            if (opacityValue) {
+                opacityValue.textContent = opacitySlider.value;
+            }
+            
+            if (sitesLayer) {
+                const styleMode = document.getElementById('styleMode').value;
+                
+                if (styleMode === 'single') {
+                    const style = getFeatureStyle();
+                    sitesLayer.eachLayer(layer => {
+                        if (layer.setStyle && layer !== window.lastHighlightedLayer) {
+                            layer.setStyle(style);
+                        }
+                    });
+                } else if (styleMode === 'categorized') {
+                    applyCategorizedStyle();
+                }
+            }
+        }
+
+        // Update style mode
+        function updateStyleMode() {
+            const styleMode = document.getElementById('styleMode').value;
+            const singleControls = document.getElementById('singleColorControls');
+            const categorizedControls = document.getElementById('categorizedControls');
+            const legendBox = document.getElementById('legendBox');
+            
+            if (styleMode === 'single') {
+                singleControls.style.display = 'block';
+                categorizedControls.style.display = 'none';
+                legendBox.style.display = 'none';
+                updateStyling();
+            } else if (styleMode === 'categorized') {
+                singleControls.style.display = 'none';
+                categorizedControls.style.display = 'block';
+                legendBox.style.display = 'block';
+                applyCategorizedStyle();
+            }
+        }
+
+        // Apply categorized styling
+        function applyCategorizedStyle() {
+            const field = document.getElementById('colorField').value;
+            const legendContent = document.getElementById('legendContent');
+            
+            if (!field || !sitesLayer) {
+                legendContent.innerHTML = '<p>Select a field to colorize features</p>';
+                return;
+            }
+            
+            // Get unique values for the field
+            const uniqueValues = [...new Set(filteredData.map(record => record.fields[field]))].filter(val => val != null);
+            
+            // Generate colors for each unique value
+            const colors = generateCategoryColors(uniqueValues);
+            
+            // Apply colors to features
+            sitesLayer.eachLayer(layer => {
+                if (layer.recordData && layer !== window.lastHighlightedLayer) {
+                    const fieldValue = layer.recordData[field];
+                    const color = colors[fieldValue] || '#95a5a6';
+                    
+                    layer.setStyle({
+                        fillColor: color,
+                        color: document.getElementById('borderColor').value,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: parseFloat(document.getElementById('opacity').value)
+                    });
+                }
+            });
+            
+            // Update legend
+            legendContent.innerHTML = uniqueValues.map(value => `
+                <div style="display: flex; align-items: center; margin: 5px 0;">
+                    <div style="width: 20px; height: 20px; background: ${colors[value]}; border: 1px solid #333; margin-right: 8px;"></div>
+                    <span>${value}</span>
+                </div>
+            `).join('');
+        }
+
+        // Generate category colors
+        function generateCategoryColors(values) {
+            const palette = [
+                '#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6',
+                '#e67e22', '#1abc9c', '#34495e', '#f39c12', '#d35400'
+            ];
+            
+            const colors = {};
+            values.forEach((value, index) => {
+                colors[value] = palette[index % palette.length];
+            });
+            
+            return colors;
+        }
+
+        // Update labels
+        function updateLabels() {
+            const labelField = document.getElementById('labelField').value;
+            
+            if (sitesLayer) {
+                sitesLayer.eachLayer(layer => {
+                    layer.unbindTooltip();
+                    
+                    if (labelField && layer.recordData && layer.recordData[labelField]) {
+                        layer.bindTooltip(String(layer.recordData[labelField]), {
+                            permanent: true,
+                            direction: 'center',
+                            className: 'feature-label'
+                        });
+                    }
+                });
+            }
+        }
+
+        // Change basemap
+        function changeBasemap() {
+            const selectedBasemap = document.getElementById('basemapSelect').value;
+            
+            // Remove current base layer
+            map.eachLayer(layer => {
+                if (layer._url && layer._url.includes('tile')) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            // Add new base layer
+            baseMaps[selectedBasemap].addTo(map);
+        }
+
+        // Toggle layer visibility
+        function toggleLayer(layerName) {
+            const checkbox = document.getElementById(layerName + 'Layer');
+            
+            if (layerName === 'sites' && sitesLayer) {
+                if (checkbox.checked) {
+                    sitesLayer.addTo(map);
+                } else {
+                    map.removeLayer(sitesLayer);
+                }
+            }
+        }
+
+        // Toggle sidebar sections
+        function toggleSection(header) {
+            const section = header.parentElement;
+            const chevron = header.querySelector('.fas');
+            
+            section.classList.toggle('active');
+            
+            if (section.classList.contains('active')) {
+                chevron.classList.remove('fa-chevron-right');
+                chevron.classList.add('fa-chevron-down');
+            } else {
+                chevron.classList.remove('fa-chevron-down');
+                chevron.classList.add('fa-chevron-right');
+            }
+        }
+
+        // Show/hide loading
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // Set status
+        function setStatus(message) {
+            document.getElementById('statusLeft').textContent = message;
+        }
+    </script>
+</body>
+</html> 

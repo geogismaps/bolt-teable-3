@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map View - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .app-container {
+            display: flex;
+            height: calc(100vh - 120px);
+        }
+        
+        .sidebar {
+            width: 380px;
+            background: #2c3e50;
+            color: white;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .sidebar-header {
+            padding: 15px;
+            background: #34495e;
+            border-bottom: 1px solid #445566;
+        }
+        
+        .sidebar-content {
+            padding: 10px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: #34495e;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .section-content {
+            padding: 15px;
+            display: none;
+        }
+        
+        .section.active .section-content {
+            display: block;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .layer-item {
+            background: #1a252f;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .layer-item:hover {
+            background: #243342;
+        }
+        
+        .layer-item.active {
+            border-color: #3498db;
+            background: #1e3a5f;
+        }
+        
+        .layer-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+        
+        .layer-controls button {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-zoom { background: #3498db; color: white; }
+        .btn-table { background: #2ecc71; color: white; }
+        .btn-properties { background: #f39c12; color: white; }
+        .btn-remove { background: #e74c3c; color: white; }
+        
+        .form-control {
+            background: #34495e;
+            color: white;
+            border-color: #445566;
+        }
+        
+        .form-control:focus {
+            background: #34495e;
+            color: white;
+            border-color: #3498db;
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+        
+        .btn {
+            margin: 2px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            border-color: #3498db;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            border-color: #27ae60;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            border-color: #e74c3c;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            border-color: #f39c12;
+        }
+        
+        .filter-rule {
+            background: #1a252f;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .geojson-upload {
+            border: 2px dashed #445566;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #34495e;
+            color: white;
+        }
+        
+        .geojson-upload:hover {
+            border-color: #3498db;
+            background-color: #2c3e50;
+        }
+        
+        .geojson-upload.dragover {
+            border-color: #27ae60;
+            background-color: #1e3a2e;
+        }
+        
+        .linked-field {
+            background: #e8f4fd;
+            border: 1px solid #b3d7ff;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.85rem;
+            color: #0066cc;
+        }
+        
+        .linked-field .link-icon {
+            color: #0066cc;
+            margin-right: 4px;
+        }
+        
+        /* Layer Properties Modal Styles */
+        .properties-modal {
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+        
+        .properties-tabs {
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .properties-tab {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            color: #6c757d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .properties-tab.active {
+            color: #0d6efd;
+            border-bottom-color: #0d6efd;
+        }
+        
+        .properties-tab:hover {
+            color: #495057;
+        }
+        
+        .tab-content {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .symbology-controls {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .color-ramp {
+            display: flex;
+            height: 20px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .color-stop {
+            flex: 1;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 10px;
+            border: 1px solid #333;
+        }
+        
+        /* Feature label styling */
+        .feature-label {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid #333 !important;
+            border-radius: 3px !important;
+            padding: 2px 6px !important;
+            font-weight: bold !important;
+            font-size: 12px !important;
+            color: #333 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+        }
+        
+        .feature-label:before {
+            display: none !important;
+        }
+        
+        .popup-field-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .field-checkbox {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .field-checkbox input {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-vh-100 bg-light">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="dashboard.html">
+                    <i class="fas fa-database me-2"></i>Teable GIS System
+                </a>
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <span class="nav-text text-white me-3" id="userDisplay"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4><i class="fas fa-map me-2"></i>Advanced GIS Map View</h4>
+                    <p class="text-muted mb-0">Multi-layer visualization with advanced filtering, styling, and GeoJSON support</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportMap()">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                    <button class="btn btn-primary" onclick="fullscreenMap()">
+                        <i class="fas fa-expand me-1"></i>Fullscreen
+                    </button>
+                </div>
+            </div>
+
+            <!-- App Container -->
+            <div class="app-container">
+                <!-- Sidebar -->
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <h5><i class="fas fa-layer-group me-2"></i>Map Layers & Tools</h5>
+                    </div>
+                    
+                    <div class="sidebar-content">
+                        <!-- Base Maps Section -->
+                        <div class="section active">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-map me-2"></i>Base Maps</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <select class="form-control" id="basemapSelector" onchange="changeBasemap()">
+                                    <option value="openstreetmap">OpenStreetMap</option>
+                                    <option value="satellite">Satellite</option>
+                                    <option value="terrain">Terrain</option>
+                                    <option value="dark">Dark Mode</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Data Layers Section -->
+                        <div class="section active">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-database me-2"></i>Data Layers</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <button class="btn btn-success w-100 mb-3" onclick="showAddLayerModal()">
+                                    <i class="fas fa-plus me-1"></i>Add Layer
+                                </button>
+                                <div id="layersList">
+                                    <!-- Layers will be populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters Section -->
+                        <div class="section">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-filter me-2"></i>Filters</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <div class="mb-3">
+                                    <label class="form-label">Layer:</label>
+                                    <select class="form-control" id="filterLayer" onchange="loadFilterFields()">
+                                        <option value="">Select layer...</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Field:</label>
+                                    <select class="form-control" id="filterField" onchange="loadFilterValues()">
+                                        <option value="">Select field...</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Operator:</label>
+                                    <select class="form-control" id="filterOperator">
+                                        <option value="equals">Equals</option>
+                                        <option value="contains">Contains</option>
+                                        <option value="starts_with">Starts With</option>
+                                        <option value="greater_than">Greater Than</option>
+                                        <option value="less_than">Less Than</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Value:</label>
+                                    <select class="form-control" id="filterValue">
+                                        <option value="">Select value...</option>
+                                    </select>
+                                </div>
+                                
+                                <button class="btn btn-primary btn-sm" onclick="addFilterRule()">
+                                    <i class="fas fa-plus me-1"></i>Add Filter
+                                </button>
+                                
+                                <div id="filterRules" class="mt-3"></div>
+                                
+                                <div class="mt-3">
+                                    <button class="btn btn-success btn-sm" onclick="applyFilters()">
+                                        <i class="fas fa-check me-1"></i>Apply
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="clearAllFilters()">
+                                        <i class="fas fa-times me-1"></i>Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tools Section -->
+                        <div class="section">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-tools me-2"></i>Tools</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
+                                        <i class="fas fa-ruler me-1"></i>Distance
+                                    </button>
+                                    <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
+                                        <i class="fas fa-vector-square me-1"></i>Area
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
+                                        <i class="fas fa-trash me-1"></i>Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Container -->
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Layer Modal -->
+    <div class="modal fade" id="addLayerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Add New Layer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Layer Source Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="layerSourceTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-pane" type="button" role="tab">
+                                <i class="fas fa-table me-1"></i>From Table
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="geojson-tab" data-bs-toggle="tab" data-bs-target="#geojson-pane" type="button" role="tab">
+                                <i class="fas fa-upload me-1"></i>Upload GeoJSON
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="layerSourceContent">
+                        <!-- From Table Tab -->
+                        <div class="tab-pane fade show active" id="table-pane" role="tabpanel">
+                            <div class="mb-3">
+                                <label class="form-label">Data Source (Table):</label>
+                                <select class="form-select" id="newLayerTable" onchange="loadTableFields()">
+                                    <option value="">Select table...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Layer Name:</label>
+                                <input type="text" class="form-control" id="newLayerName" placeholder="Enter layer name">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Layer Color:</label>
+                                <input type="color" class="form-control form-control-color" id="newLayerColor" value="#3498db">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Geometry Field:</label>
+                                <select class="form-select" id="newLayerGeometry">
+                                    <option value="">Auto-detect...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Linked Tables:</label>
+                                <div id="linkedTablesInfo" class="small text-muted">
+                                    Loading linked table information...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload GeoJSON Tab -->
+                        <div class="tab-pane fade" id="geojson-pane" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Admin/Creator Only:</strong> This feature creates a new table in your Teable.io base.
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">New Table Name:</label>
+                                <input type="text" class="form-control" id="geoJSONTableName" placeholder="Enter table name for the uploaded data">
+                            </div>
+                            
+                            <div class="geojson-upload" id="geoJSONUploadArea" onclick="document.getElementById('geoJSONFileInput').click()">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <h5>Drop GeoJSON file here or click to browse</h5>
+                                <p class="text-muted">Supports .geojson and .json files (max 10MB)</p>
+                                <input type="file" id="geoJSONFileInput" accept=".geojson,.json" style="display: none;" onchange="handleGeoJSONFile(event)">
+                            </div>
+                            
+                            <div id="geoJSONPreview" class="mt-3" style="display: none;">
+                                <h6>File Preview:</h6>
+                                <div class="border rounded p-3 bg-light">
+                                    <div id="geoJSONInfo"></div>
+                                </div>
+                            </div>
+                            
+                            <div id="uploadProgress" class="mt-3" style="display: none;">
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="text-center mt-2">
+                                    <small id="uploadStatus">Preparing upload...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="addLayerBtn" onclick="addNewLayer()">
+                        <i class="fas fa-plus me-1"></i>Add Layer
+                    </button>
+                    <button type="button" class="btn btn-primary" id="uploadGeoJSONBtn" onclick="uploadGeoJSON()" style="display: none;" disabled>
+                        <i class="fas fa-upload me-1"></i>Upload & Create Table
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layer Properties Modal -->
+    <div class="modal fade" id="layerPropertiesModal" tabindex="-1">
+        <div class="modal-dialog modal-xl properties-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-cog me-2"></i>Layer Properties
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- Properties Tabs -->
+                    <div class="properties-tabs d-flex">
+                        <button class="properties-tab active" onclick="switchPropertiesTab('information')">
+                            <i class="fas fa-info-circle me-2"></i>Information
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('symbology')">
+                            <i class="fas fa-palette me-2"></i>Symbology
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('labels')">
+                            <i class="fas fa-tag me-2"></i>Labels
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('itool')">
+                            <i class="fas fa-info me-2"></i>iTool
+                        </button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content">
+                        <!-- Information Tab -->
+                        <div id="information-tab" class="tab-pane active">
+                            <h6>Layer Information</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Layer Name:</label>
+                                        <input type="text" class="form-control" id="propLayerName">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Data Source:</label>
+                                        <input type="text" class="form-control" id="propDataSource" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Geometry Type:</label>
+                                        <input type="text" class="form-control" id="propGeometryType" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Feature Count:</label>
+                                        <input type="text" class="form-control" id="propFeatureCount" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Linked Tables:</label>
+                                        <div id="propLinkedTables" class="border rounded p-2" style="min-height: 60px;">
+                                            <!-- Linked tables will be shown here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Symbology Tab -->
+                        <div id="symbology-tab" class="tab-pane" style="display: none;">
+                            <h6>Symbology</h6>
+                            <div class="symbology-controls">
+                                <div class="mb-3">
+                                    <label class="form-label">Symbology Type:</label>
+                                    <select class="form-select" id="propSymbologyType" onchange="updateSymbologyType()">
+                                        <option value="single">Single Symbol</option>
+                                        <option value="graduated">Graduated</option>
+                                        <option value="categorized">Categorized</option>
+                                    </select>
+                                </div>
+
+                                <!-- Single Symbol Controls -->
+                                <div id="propSingleSymbol">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Fill Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propFillColor" value="#3498db">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Border Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propBorderColor" value="#2c3e50">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Border Width:</label>
+                                            <input type="range" class="form-range" id="propBorderWidth" min="1" max="5" value="2">
+                                            <div class="text-center small"><span id="borderWidthValue">2px</span></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Fill Opacity:</label>
+                                            <input type="range" class="form-range" id="propFillOpacity" min="0" max="1" step="0.1" value="0.7">
+                                            <div class="text-center small"><span id="fillOpacityValue">70%</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Graduated Controls -->
+                                <div id="propGraduated" style="display: none;">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Field:</label>
+                                            <select class="form-select" id="propGraduatedField">
+                                                <option value="">Select numeric field...</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Classes:</label>
+                                            <select class="form-select" id="propGraduatedClasses">
+                                                <option value="3">3</option>
+                                                <option value="5" selected>5</option>
+                                                <option value="7">7</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Method:</label>
+                                            <select class="form-select" id="propClassificationMethod">
+                                                <option value="equal">Equal Interval</option>
+                                                <option value="quantile">Quantile</option>
+                                                <option value="natural">Natural Breaks</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Color Ramp:</label>
+                                        <select class="form-select" id="propColorRamp">
+                                            <option value="blues">Blues</option>
+                                            <option value="greens">Greens</option>
+                                            <option value="reds">Reds</option>
+                                            <option value="oranges">Oranges</option>
+                                            <option value="purples">Purples</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-primary" onclick="generateGraduatedSymbology()">
+                                        <i class="fas fa-magic me-1"></i>Generate
+                                    </button>
+                                    <div id="propGraduatedLegend" class="mt-3"></div>
+                                </div>
+
+                                <!-- Categorized Controls -->
+                                <div id="propCategorized" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Field:</label>
+                                        <select class="form-select" id="propCategorizedField">
+                                            <option value="">Select field...</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-primary" onclick="generateCategorizedSymbology()">
+                                        <i class="fas fa-magic me-1"></i>Generate
+                                    </button>
+                                    <div id="propCategorizedLegend" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Labels Tab -->
+                        <div id="labels-tab" class="tab-pane" style="display: none;">
+                            <h6>Labels</h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="propEnableLabels">
+                                <label class="form-check-label" for="propEnableLabels">
+                                    Enable Labels
+                                </label>
+                            </div>
+                            
+                            <div id="propLabelControls" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Label Field:</label>
+                                            <select class="form-select" id="propLabelField">
+                                                <option value="">Select field...</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Font Size:</label>
+                                            <select class="form-select" id="propLabelSize">
+                                                <option value="10">10px</option>
+                                                <option value="12" selected>12px</option>
+                                                <option value="14">14px</option>
+                                                <option value="16">16px</option>
+                                                <option value="18">18px</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Label Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propLabelColor" value="#333333">
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propLabelBackground" checked>
+                                            <label class="form-check-label" for="propLabelBackground">
+                                                Show Background
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- iTool Tab -->
+                        <div id="itool-tab" class="tab-pane" style="display: none;">
+                            <h6>Information Tool Configuration</h6>
+                            <p class="text-muted">Configure what information is displayed when features are clicked.</p>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Popup Template:</label>
+                                <div class="border rounded p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Show Fields in Popup</span>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="selectAllPopupFields()">Select All</button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllPopupFields()">Deselect All</button>
+                                        </div>
+                                    </div>
+                                    <div class="popup-field-selector" id="propPopupFields">
+                                        <!-- Popup fields will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Max Popup Width:</label>
+                                        <input type="number" class="form-control" id="propMaxPopupWidth" value="300" min="200" max="600">
+                                        <div class="form-text">Width in pixels (200-600)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="propShowLinkedData" checked>
+                                        <label class="form-check-label" for="propShowLinkedData">
+                                            Show Linked Table Data
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cancelProperties()">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="applyProperties()">
+                        <i class="fas fa-check me-1"></i>Apply
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="applyAndCloseProperties()">
+                        <i class="fas fa-save me-1"></i>OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map.js"></script>
+</body>
+</html>
