@@ -47,6 +47,12 @@ async function initializeDashboard() {
 function displayUserInfo(session) {
     const displayName = `${session.firstName} ${session.lastName} (${session.role})`;
     document.getElementById('userDisplay').textContent = displayName;
+    
+    // Update hero section user info
+    const heroDisplay = document.getElementById('userDisplayHero');
+    if (heroDisplay) {
+        heroDisplay.textContent = `${session.firstName} ${session.lastName}`;
+    }
 }
 
 async function loadDashboardStats() {
