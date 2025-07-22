@@ -220,7 +220,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Teable.io Role</label>
-                                <select class="form-select" id="editRole" required>
+                                <select class="form-select" id="editRole" required onchange="toggleEditAdminPasswordField()">
                                     <option value="owner">Owner - Full control</option>
                                     <option value="admin">Admin - Manage users & data</option>
                                     <option value="editor">Editor - Edit data</option>

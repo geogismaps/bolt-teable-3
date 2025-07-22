@@ -82,14 +82,11 @@ class TeableAuth {
     }
 
     /**
-     * Authenticate Space Owner (direct Teable.io API)
+     * Authenticate Space Owner (requires both email and admin password validation)
      */
     async authenticateSpaceOwner(email, password) {
         try {
-            // For space owner authentication, we need to validate the API token works
-            // Since Teable.io uses API tokens rather than email/password auth for API access
-            
-            // Test if the current API token is valid by trying to access space info
+            // Step 1: Validate API token by testing endpoints
             const testEndpoints = [
                 `/api/space/${this.clientConfig.spaceId}`,
                 `/api/base/${this.clientConfig.baseId}`,
@@ -111,15 +108,58 @@ class TeableAuth {
                 throw new Error('Cannot validate space owner access. Please check your API token and permissions.');
             }
 
-            // For space owner, we assume the API token represents the space owner
-            // In a real implementation, you might want to get user info from the space
+            // Step 2: Validate space owner credentials against app_users table
+            console.log('🔐 Validating space owner credentials...');
+            
+            // Ensure system tables exist
+            await window.teableAPI.ensureSystemTables();
+
+            // Get user from app_users table
+            const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+            const user = users.records?.find(u => u.fields.email === email);
+
+            if (!user) {
+                throw new Error('Space owner email not found in system users');
+            }
+
+            if (!user.fields.is_active) {
+                throw new Error('Space owner account is inactive');
+            }
+
+            if (user.fields.role !== 'owner') {
+                throw new Error('User does not have space owner privileges');
+            }
+
+            // Step 3: Verify admin password
+            if (!user.fields.admin_password_hash) {
+                throw new Error('Admin password not set for this space owner. Please contact system administrator.');
+            }
+
+            const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            if (user.fields.admin_password_hash !== adminPasswordHash) {
+                throw new Error('Invalid admin password for space owner');
+            }
+
+            // Step 4: Update last login
+            try {
+                await window.teableAPI.updateRecord(
+                    window.teableAPI.systemTables.users,
+                    user.id,
+                    { last_login: new Date().toISOString().split('T')[0] }
+                );
+            } catch (updateError) {
+                console.log('Failed to update last login:', updateError.message);
+            }
+
+            console.log('✅ Space owner authentication successful');
+
             return {
                 userType: 'space_owner',
-                email: email,
-                firstName: 'Space',
-                lastName: 'Owner',
-                role: 'owner', // Using Teable.io role
-                userId: 'space_owner',
+                email: user.fields.email,
+                firstName: user.fields.first_name || 'Space',
+                lastName: user.fields.last_name || 'Owner',
+                role: user.fields.role,
+                userId: user.id,
                 accessToken: this.clientConfig.accessToken,
                 loginTime: new Date().toISOString(),
                 isAdmin: true

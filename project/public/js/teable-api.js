@@ -32,7 +32,7 @@ class TeableAPI {
         }
 
         const url = `${this.config.baseUrl}${endpoint}`;
-        
+
         const requestOptions = {
             headers: {
                 'Authorization': `Bearer ${this.config.accessToken}`,
@@ -46,7 +46,7 @@ class TeableAPI {
 
         try {
             const response = await fetch(url, requestOptions);
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
@@ -85,7 +85,7 @@ class TeableAPI {
                     console.log(`❌ Failed: ${endpoint} - ${error.message}`);
                 }
             }
-            
+
             throw new Error('All test endpoints failed. Please check your credentials and Base ID.');
         } catch (error) {
             return { success: false, error: error.message };
@@ -135,18 +135,18 @@ class TeableAPI {
      */
     async getRecords(tableId, options = {}) {
         let endpoint = `/api/table/${tableId}/record`;
-        
+
         // Add query parameters
         const params = new URLSearchParams();
         if (options.limit) params.append('limit', options.limit);
         if (options.offset) params.append('offset', options.offset);
         if (options.sort) params.append('sort', options.sort);
         if (options.filter) params.append('filter', JSON.stringify(options.filter));
-        
+
         if (params.toString()) {
             endpoint += `?${params.toString()}`;
         }
-        
+
         return await this.request(endpoint);
     }
 
@@ -155,7 +155,7 @@ class TeableAPI {
      */
     async createRecord(tableId, fields) {
         console.log('Creating record with fields:', fields);
-        
+
         // Use the exact Teable.io API format: POST /api/table/{tableId}/record
         // Body should contain the record fields directly
         const requestBody = {
@@ -173,19 +173,19 @@ class TeableAPI {
                 method: 'POST',
                 body: JSON.stringify(requestBody)
             });
-            
+
             console.log('✅ Create record succeeded:', result);
-            
+
             // Log the data change
             await this.logDataChange(tableId, result.records?.[0]?.id, 'create', fields, null, fields);
-            
+
             // Return the first record from the response
             if (result.records && result.records.length > 0) {
                 return result.records[0];
             }
-            
+
             return result;
-            
+
         } catch (error) {
             console.error('❌ Create record failed:', error);
             throw error;
@@ -197,7 +197,7 @@ class TeableAPI {
      */
     async updateRecord(tableId, recordId, fields) {
         console.log('Updating record:', recordId, 'with fields:', fields);
-        
+
         // Get old values first for logging
         let oldValues = {};
         try {
@@ -208,7 +208,7 @@ class TeableAPI {
         } catch (error) {
             console.log('Could not fetch old values for logging:', error.message);
         }
-        
+
         // For updates, use the record format with both records array and individual record endpoint
         const requestBody = {
             record: {
@@ -224,17 +224,17 @@ class TeableAPI {
                 method: 'PATCH',
                 body: JSON.stringify(requestBody)
             });
-            
+
             console.log('✅ Update record succeeded:', result);
-            
+
             // Log the data change
             await this.logDataChange(tableId, recordId, 'update', oldValues, fields);
-            
+
             return result;
-            
+
         } catch (error) {
             console.error('❌ Update record failed with PATCH, trying alternative format:', error);
-            
+
             // Try alternative format with records array
             try {
                 const alternativeBody = {
@@ -245,19 +245,19 @@ class TeableAPI {
                         }
                     ]
                 };
-                
+
                 const result = await this.request(`/api/table/${tableId}/record`, {
                     method: 'PATCH',
                     body: JSON.stringify(alternativeBody)
                 });
-                
+
                 console.log('✅ Update record succeeded with alternative format:', result);
-                
+
                 // Log the data change
                 await this.logDataChange(tableId, recordId, 'update', oldValues, fields);
-                
+
                 return result.records ? result.records[0] : result;
-                
+
             } catch (altError) {
                 console.error('❌ Update record failed with alternative format too:', altError);
                 throw altError;
@@ -279,14 +279,14 @@ class TeableAPI {
         } catch (error) {
             console.log('Could not fetch old values for logging:', error.message);
         }
-        
+
         const result = await this.request(`/api/table/${tableId}/record/${recordId}`, {
             method: 'DELETE'
         });
-        
+
         // Log the data change
         await this.logDataChange(tableId, recordId, 'delete', oldValues, null);
-        
+
         return result;
     }
 
@@ -299,10 +299,10 @@ class TeableAPI {
             if (!this.systemTables.dataLogs || tableId === this.systemTables.dataLogs) {
                 return;
             }
-            
+
             const session = window.teableAuth?.getCurrentSession();
             if (!session) return;
-            
+
             // Get table name
             let tableName = 'Unknown';
             try {
@@ -312,13 +312,13 @@ class TeableAPI {
             } catch (error) {
                 console.log('Could not get table name for logging:', error.message);
             }
-            
+
             const timestamp = new Date().toISOString();
             const changedAt = timestamp.split('T')[0];
-            
+
             // Create log entries for each field change
             const logEntries = [];
-            
+
             if (actionType === 'create' && newValues) {
                 // Log all new fields
                 Object.keys(newValues).forEach(fieldName => {
@@ -362,7 +362,7 @@ class TeableAPI {
                 Object.keys(newValues).forEach(fieldName => {
                     const oldValue = oldValues[fieldName];
                     const newValue = newValues[fieldName];
-                    
+
                     // Only log if value actually changed
                     if (String(oldValue) !== String(newValue)) {
                         logEntries.push({
@@ -383,7 +383,7 @@ class TeableAPI {
                     }
                 });
             }
-            
+
             // Create log entries in batch
             for (const logEntry of logEntries) {
                 try {
@@ -392,9 +392,9 @@ class TeableAPI {
                     console.error('Failed to create data log entry:', logError);
                 }
             }
-            
+
             console.log(`Logged ${logEntries.length} field changes for ${actionType} action`);
-            
+
         } catch (error) {
             console.error('Error logging data change:', error);
             // Don't throw error to avoid breaking the main operation
@@ -434,7 +434,7 @@ class TeableAPI {
     async getSpaceUsers() {
         try {
             console.log('🔍 Attempting to get space collaborators...');
-            
+
             // Try multiple endpoints to get space users
             const endpoints = [
                 `/api/space/${this.config.spaceId}/collaborators`,
@@ -448,7 +448,7 @@ class TeableAPI {
                 try {
                     console.log(`🔍 Trying endpoint: ${endpoint}`);
                     const result = await this.request(endpoint);
-                    
+
                     // Check different response formats
                     if (result.collaborators) {
                         console.log(`✅ Found collaborators via ${endpoint}:`, result.collaborators);
@@ -467,20 +467,20 @@ class TeableAPI {
                     }
                 } catch (endpointError) {
                     console.log(`❌ Endpoint ${endpoint} failed:`, endpointError.message);
-                    
+
                     // Check for permission errors specifically
                     if (endpointError.message.includes('403') || endpointError.message.includes('not allowed')) {
                         throw new Error(`Permission denied: ${endpointError.message}`);
                     }
                 }
             }
-            
+
             // If all endpoints fail, return helpful error
             throw new Error('Cannot access space collaborators with current API token permissions');
-            
+
         } catch (error) {
             console.log('❌ Cannot access space collaborators:', error.message);
-            
+
             // If we can't access space collaborators, return a helpful message
             if (error.message.includes('403') || error.message.includes('not allowed') || error.message.includes('Permission denied')) {
                 return {
@@ -489,7 +489,7 @@ class TeableAPI {
                     permissionError: true
                 };
             }
-            
+
             // For other errors, try alternative approaches
             try {
                 const spaceInfo = await this.getSpace();
@@ -551,22 +551,22 @@ class TeableAPI {
     async ensureTableFields(tableId, expectedFields) {
         try {
             console.log(`🔍 Checking fields for table ${tableId}...`);
-            
+
             // Get current table fields
             const currentFields = await this.getTableFields(tableId);
             const currentFieldNames = currentFields.map(field => field.name.toLowerCase());
-            
+
             console.log(`📋 Current fields in table:`, currentFieldNames);
             console.log(`📋 Expected fields:`, expectedFields.map(f => f.name));
-            
+
             // Check for missing fields
             const missingFields = expectedFields.filter(expectedField => 
                 !currentFieldNames.includes(expectedField.name.toLowerCase())
             );
-            
+
             if (missingFields.length > 0) {
                 console.log(`➕ Adding ${missingFields.length} missing fields:`, missingFields.map(f => f.name));
-                
+
                 // Add missing fields one by one
                 for (const fieldSchema of missingFields) {
                     try {
@@ -581,7 +581,7 @@ class TeableAPI {
             } else {
                 console.log(`✅ All required fields exist in table ${tableId}`);
             }
-            
+
         } catch (error) {
             console.error(`❌ Error ensuring table fields for ${tableId}:`, error);
             throw error;
@@ -600,6 +600,7 @@ class TeableAPI {
             const appUsersFields = [
                 { name: 'email', type: 'singleLineText' },
                 { name: 'password_hash', type: 'singleLineText' },
+                { name: 'admin_password_hash', type: 'singleLineText' },
                 { name: 'first_name', type: 'singleLineText' },
                 { name: 'last_name', type: 'singleLineText' },
                 { 

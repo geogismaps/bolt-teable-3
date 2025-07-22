@@ -11,7 +11,7 @@ const usersPerPage = 10;
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication and admin privileges
     if (!window.teableAuth.requireAdmin()) return;
-    
+
     initializeUserManagement();
 });
 
@@ -29,18 +29,18 @@ async function initializeUserManagement() {
         // Ensure system tables exist with all required fields
         console.log('🔧 Ensuring system tables exist...');
         await window.teableAPI.ensureSystemTables();
-        
+
         // Initialize user sync manager
         if (window.userSyncManager) {
             await window.userSyncManager.init();
         }
-        
+
         // Load users
         await loadUsers();
-        
+
         // Show sync status
         updateSyncStatus();
-        
+
     } catch (error) {
         console.error('User management initialization failed:', error);
         showError('Failed to initialize user management: ' + error.message);
@@ -50,16 +50,16 @@ async function initializeUserManagement() {
 async function loadUsers() {
     try {
         showLoading(true);
-        
+
         const usersData = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
         allUsers = usersData.records || [];
         filteredUsers = [...allUsers];
-        
+
         console.log(`📊 Loaded ${allUsers.length} users from app_users table`);
-        
+
         displayUsers();
         updatePagination();
-        
+
     } catch (error) {
         console.error('Error loading users:', error);
         showError('Failed to load users: ' + error.message);
@@ -70,7 +70,7 @@ async function loadUsers() {
 
 function displayUsers() {
     const container = document.getElementById('usersTableContainer');
-    
+
     if (filteredUsers.length === 0) {
         container.innerHTML = `
             <div class="text-center text-muted py-5">
@@ -116,18 +116,18 @@ function displayUsers() {
     pageUsers.forEach(user => {
         const fields = user.fields;
         const fullName = `${fields.first_name || ''} ${fields.last_name || ''}`.trim();
-        
+
         const statusBadge = fields.is_active ? 
             '<span class="badge bg-success">Active</span>' : 
             '<span class="badge bg-danger">Inactive</span>';
-            
+
         const roleBadge = getRoleBadge(fields.role);
-        
+
         // Source indicator
         const sourceBadge = fields.synced_from_teable ? 
             '<span class="badge bg-info" title="Synced from Teable.io"><i class="fas fa-sync me-1"></i>Teable</span>' :
             '<span class="badge bg-secondary" title="Created locally"><i class="fas fa-user me-1"></i>Local</span>';
-        
+
         const createdDate = fields.created_date ? 
             new Date(fields.created_date).toLocaleDateString() : 'Unknown';
         const lastLogin = fields.last_login ? 
@@ -198,20 +198,20 @@ function filterUsers() {
         const fields = user.fields;
         const fullName = `${fields.first_name || ''} ${fields.last_name || ''}`.toLowerCase();
         const email = (fields.email || '').toLowerCase();
-        
+
         // Search filter
         const matchesSearch = !searchTerm || 
             fullName.includes(searchTerm) || 
             email.includes(searchTerm);
-        
+
         // Role filter
         const matchesRole = !roleFilter || fields.role === roleFilter;
-        
+
         // Status filter
         const matchesStatus = !statusFilter || 
             (statusFilter === 'active' && fields.is_active) ||
             (statusFilter === 'inactive' && !fields.is_active);
-        
+
         return matchesSearch && matchesRole && matchesStatus;
     });
 
@@ -223,22 +223,22 @@ function filterUsers() {
 function updatePagination() {
     const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
     const pagination = document.getElementById('usersPagination');
-    
+
     if (totalPages <= 1) {
         pagination.style.display = 'none';
         return;
     }
-    
+
     pagination.style.display = 'block';
     let html = '';
-    
+
     // Previous button
     html += `
         <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>
         </li>
     `;
-    
+
     // Page numbers
     for (let i = 1; i <= totalPages; i++) {
         if (i === currentPage || i === 1 || i === totalPages || 
@@ -252,14 +252,14 @@ function updatePagination() {
             html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
     }
-    
+
     // Next button
     html += `
         <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>
         </li>
     `;
-    
+
     pagination.querySelector('.pagination').innerHTML = html;
 }
 
@@ -275,7 +275,7 @@ function changePage(page) {
 function showAddUserModal() {
     // Clear form
     document.getElementById('addUserForm').reset();
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
     modal.show();
@@ -289,6 +289,7 @@ async function createUser() {
         const password = document.getElementById('newPassword').value;
         const role = document.getElementById('newRole').value;
         const syncWithTeable = document.getElementById('syncWithTeable').checked;
+        const adminPassword = document.getElementById('newAdminPassword').value;
 
         // Validation
         if (!firstName || !lastName || !email || !password || !role) {
@@ -311,6 +312,7 @@ async function createUser() {
 
         // Hash password
         const passwordHash = await window.teableAPI.hashPassword(password);
+        const adminPasswordHash = adminPassword ? await window.teableAPI.hashPassword(adminPassword) : null;
 
         // Create user data
         const userData = {
@@ -323,14 +325,15 @@ async function createUser() {
             created_date: new Date().toISOString().split('T')[0],
             last_login: null,
             synced_from_teable: false,
-            teable_user_id: null
+            teable_user_id: null,
+            admin_password_hash: adminPasswordHash
         };
 
         console.log('Creating user with data:', userData);
 
         // Create user in Teable
         const newUser = await window.teableAPI.createRecord(window.teableAPI.systemTables.users, userData);
-        
+
         console.log('User created successfully:', newUser);
 
         // If sync with Teable is enabled, attempt to invite to space
@@ -366,12 +369,12 @@ async function createUser() {
 
         // Reload users
         await loadUsers();
-        
+
         showSuccess('User created successfully!');
 
     } catch (error) {
         console.error('Error creating user:', error);
-        
+
         // Provide more specific error messages
         let errorMessage = error.message;
         if (errorMessage.includes('Field name:') && errorMessage.includes('not found')) {
@@ -381,7 +384,7 @@ async function createUser() {
                 errorMessage = `The field "${missingField}" doesn't exist in the users table. This might be due to a table schema mismatch. Please check your table structure.`;
             }
         }
-        
+
         showError('Failed to create user: ' + errorMessage);
     }
 }
@@ -394,7 +397,7 @@ async function editUser(userId) {
         }
 
         const fields = user.fields;
-        
+
         // Populate edit form
         document.getElementById('editUserId').value = userId;
         document.getElementById('editFirstName').value = fields.first_name || '';
@@ -403,6 +406,7 @@ async function editUser(userId) {
         document.getElementById('editRole').value = fields.role || 'viewer';
         document.getElementById('editStatus').value = fields.is_active ? 'true' : 'false';
         document.getElementById('editPassword').value = '';
+        document.getElementById('editAdminPassword').value = '';
 
         // Show modal
         const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
@@ -423,6 +427,7 @@ async function updateUser() {
         const role = document.getElementById('editRole').value;
         const isActive = document.getElementById('editStatus').value === 'true';
         const newPassword = document.getElementById('editPassword').value;
+        const newAdminPassword = document.getElementById('editAdminPassword').value;
 
         // Validation
         if (!firstName || !lastName || !email || !role) {
@@ -454,6 +459,10 @@ async function updateUser() {
                 throw new Error('Password must be at least 6 characters long');
             }
             updateData.password_hash = await window.teableAPI.hashPassword(newPassword);
+        }
+
+        if (newAdminPassword) {
+            updateData.admin_password_hash = await window.teableAPI.hashPassword(newAdminPassword);
         }
 
         // Update user in Teable
@@ -490,7 +499,7 @@ async function updateUser() {
 
         // Reload users
         await loadUsers();
-        
+
         showSuccess('User updated successfully!');
 
     } catch (error) {
@@ -507,7 +516,7 @@ async function deleteUser(userId) {
         }
 
         const userEmail = user.fields.email;
-        
+
         if (!confirm(`Are you sure you want to delete user "${userEmail}"?\n\nThis action cannot be undone.`)) {
             return;
         }
@@ -529,7 +538,7 @@ async function deleteUser(userId) {
 
         // Reload users
         await loadUsers();
-        
+
         showSuccess('User deleted successfully!');
 
     } catch (error) {
@@ -547,9 +556,9 @@ async function resetPassword(userId) {
 
         const userEmail = user.fields.email;
         const newPassword = prompt(`Reset password for ${userEmail}:\n\nEnter new password (minimum 6 characters):`);
-        
+
         if (!newPassword) return;
-        
+
         if (newPassword.length < 6) {
             throw new Error('Password must be at least 6 characters long');
         }
@@ -585,38 +594,38 @@ async function resetPassword(userId) {
 async function syncWithTeable() {
     try {
         showLoading(true);
-        
+
         if (!window.userSyncManager) {
             throw new Error('User sync manager not available');
         }
-        
+
         // Show info about the sync process
         showInfo('🔄 Starting user synchronization from Teable.io...');
-        
+
         // Force sync from Teable.io
         console.log('🔄 Forcing sync from Teable.io...');
         const teableSync = await window.userSyncManager.forceSyncFromTeable();
-        
+
         if (teableSync.created > 0 || teableSync.updated > 0) {
             showSuccess(`✅ Sync from Teable.io completed! 
             • ${teableSync.created} users created
             • ${teableSync.updated} users updated
             • ${teableSync.errors} errors
-            
+
             Details: ${teableSync.details.join(', ')}`);
         } else if (teableSync.errors > 0) {
             showWarning(`⚠️ Sync completed with issues:
             • ${teableSync.errors} errors
-            
+
             Details: ${teableSync.details.join(', ')}`);
         } else {
             showInfo('ℹ️ Sync completed - all users are already up to date');
         }
-        
+
         // Reload users to show updated data
         await loadUsers();
         updateSyncStatus();
-        
+
     } catch (error) {
         console.error('Error syncing with Teable:', error);
         showError('Failed to sync with Teable: ' + error.message);
@@ -633,13 +642,13 @@ async function syncSingleUser(userId) {
         }
 
         showInfo(`🔄 Syncing user ${user.fields.email}...`);
-        
+
         // This would trigger a single user sync
         // For now, we'll just refresh the user data
         await loadUsers();
-        
+
         showSuccess(`✅ User ${user.fields.email} sync completed!`);
-        
+
     } catch (error) {
         console.error('Error syncing single user:', error);
         showError('Failed to sync user: ' + error.message);
@@ -648,10 +657,10 @@ async function syncSingleUser(userId) {
 
 function updateSyncStatus() {
     if (!window.userSyncManager) return;
-    
+
     const status = window.userSyncManager.getSyncStatus();
     const syncButton = document.querySelector('button[onclick="syncWithTeable()"]');
-    
+
     if (syncButton) {
         if (status.syncInProgress) {
             syncButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Syncing...';
@@ -660,7 +669,7 @@ function updateSyncStatus() {
             syncButton.innerHTML = '<i class="fas fa-sync me-1"></i>Sync with Teable';
             syncButton.disabled = false;
         }
-        
+
         // Update button title with last sync time
         if (status.lastSyncTime) {
             const lastSync = new Date(status.lastSyncTime).toLocaleString();
@@ -707,9 +716,9 @@ function showAlert(type, message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.insertBefore(alertDiv, document.body.firstChild);
-    
+
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -746,3 +755,40 @@ window.deleteUser = deleteUser;
 window.resetPassword = resetPassword;
 window.syncWithTeable = syncWithTeable;
 window.syncSingleUser = syncSingleUser;
+
+// Function to toggle visibility of admin password field
+window.toggleAdminPasswordField = function() {
+    const role = document.getElementById('newRole').value;
+    const adminPasswordRow = document.getElementById('adminPasswordRow');
+
+    if (role === 'owner' || role === 'admin') {
+        adminPasswordRow.style.display = 'flex';
+    } else {
+        adminPasswordRow.style.display = 'none';
+    }
+};
+
+// Function to toggle visibility of admin password field in edit user modal
+window.toggleEditAdminPasswordField = function() {
+    const role = document.getElementById('editRole').value;
+    const editAdminPasswordRow = document.getElementById('editAdminPasswordRow');
+
+    if (role === 'owner' || role === 'admin') {
+        editAdminPasswordRow.style.display = 'block';
+    } else {
+        editAdminPasswordRow.style.display = 'none';
+    }
+};
+
+// Toggle password visibility function
+window.togglePasswordVisibility = function(inputId) {
+    const passwordInput = document.getElementById(inputId);
+    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+    passwordInput.setAttribute('type', type);
+
+    // Toggle the eye icon
+    const button = passwordInput.nextElementSibling; // Assuming the button is immediately after the input
+    const icon = button.querySelector('i');
+    icon.classList.toggle('fa-eye');
+    icon.classList.toggle('fa-eye-slash');
+};
