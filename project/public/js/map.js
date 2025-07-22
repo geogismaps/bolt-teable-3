@@ -579,30 +579,9 @@ function parseWKTToLeaflet(wkt) {
         
         const upperCleanWKT = cleanWkt.toUpperCase().trim();
         
-        // Detect coordinate system by sampling coordinates
-        const coordinatePattern = /(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g;
-        const coordMatches = cleanWkt.match(coordinatePattern);
+        console.log('Parsing WKT:', upperCleanWKT.substring(0, 100) + '...');
         
-        if (coordMatches && coordMatches.length > 0) {
-            const sampleCoords = coordMatches.slice(0, 3).map(match => {
-                const parts = match.trim().split(/\s+/);
-                return [parseFloat(parts[0]), parseFloat(parts[1])];
-            });
-            
-            // Check if coordinates are in geographic range
-            const avgX = sampleCoords.reduce((sum, coord) => sum + Math.abs(coord[0]), 0) / sampleCoords.length;
-            const avgY = sampleCoords.reduce((sum, coord) => sum + Math.abs(coord[1]), 0) / sampleCoords.length;
-            
-            console.log(`Average coordinate magnitudes: x=${avgX.toFixed(2)}, y=${avgY.toFixed(2)}`);
-            
-            // If coordinates are very large, likely projected
-            if (avgX > 1000 || avgY > 1000) {
-                console.warn('Large coordinates detected - attempting coordinate transformation');
-                return parseProjectedGeometry(cleanWkt);
-            }
-        }
-        
-        // Parse based on geometry type
+        // Parse based on geometry type with better error handling
         if (upperCleanWKT.startsWith('MULTIPOLYGON')) {
             return parseMultiPolygon(cleanWkt);
         } else if (upperCleanWKT.startsWith('POLYGON')) {
@@ -617,9 +596,10 @@ function parseWKTToLeaflet(wkt) {
             return parseMultiLineString(cleanWkt);
         }
         
+        console.warn('Unknown WKT geometry type:', upperCleanWKT.split('(')[0]);
         return null;
     } catch (error) {
-        console.error('Error parsing WKT:', error, 'Input WKT:', wkt);
+        console.error('Error parsing WKT:', error, 'Input WKT:', wkt?.substring(0, 100));
         return null;
     }
 }
@@ -650,55 +630,76 @@ function parseProjectedGeometry(wkt) {
 
 // Transform projected coordinates to geographic coordinates
 function transformProjectedCoordinates(x, y) {
-    // Simple heuristic-based transformation
-    // This is a basic approximation - in production use proj4js or similar
+    console.log(`Transforming projected coordinates: x=${x}, y=${y}`);
     
     let lon, lat;
     
-    // If coordinates are very large (UTM-like)
-    if (Math.abs(x) > 100000) {
-        // Assume UTM coordinates
-        // Very rough approximation for demonstration
-        lon = (x % 1000000) / 111320; // Rough meters to degrees
-        lat = y / 110540; // Rough meters to degrees
+    // Determine the scale and likely projection system
+    const xMagnitude = Math.abs(x);
+    const yMagnitude = Math.abs(y);
+    
+    if (xMagnitude > 1000000 || yMagnitude > 1000000) {
+        // Very large coordinates - likely in a high-precision projected system
+        // Apply a significant scaling factor
+        const scaleFactor = 100000; // Adjust based on your data
+        lon = x / scaleFactor;
+        lat = y / scaleFactor;
         
-        // Normalize to reasonable geographic bounds
-        lon = ((lon % 360) + 360) % 360;
-        if (lon > 180) lon -= 360;
+        console.log(`Large scale transformation applied: factor=${scaleFactor}`);
         
-        lat = Math.max(-85, Math.min(85, lat % 180));
-        if (lat > 90) lat = 180 - lat;
+    } else if (xMagnitude > 100000 || yMagnitude > 100000) {
+        // UTM-like coordinates
+        // Rough conversion assuming coordinates are in meters
+        const metersPerDegree = 111320; // Approximate at equator
+        lon = x / metersPerDegree;
+        lat = y / 111000; // Slightly different for latitude
         
-    } else if (Math.abs(x) > 1000) {
-        // Medium scale coordinates - might be in kilometers or local grid
-        lon = x / 1000; // Convert to rough degrees
+        console.log('UTM-like transformation applied');
+        
+    } else if (xMagnitude > 1000 || yMagnitude > 1000) {
+        // Medium scale coordinates - possibly kilometers
+        lon = x / 1000; // Rough conversion
         lat = y / 1000;
         
-        // Normalize
-        lon = ((lon % 360) + 360) % 360;
-        if (lon > 180) lon -= 360;
-        lat = Math.max(-85, Math.min(85, lat));
+        console.log('Medium scale transformation applied');
         
     } else {
-        // Small coordinates - might already be degrees or need minimal transformation
+        // Assume already in degrees but potentially with wrong order
         lon = x;
         lat = y;
+        
+        console.log('No transformation applied - assuming degrees');
     }
     
-    // Final validation and correction
+    // Normalize longitude to [-180, 180]
+    while (lon > 180) lon -= 360;
+    while (lon < -180) lon += 360;
+    
+    // Clamp latitude to [-90, 90]
+    lat = Math.max(-90, Math.min(90, lat));
+    
+    // If still out of range, try different scaling or swapping
     if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
-        // Try swapping if values are out of range
-        if (Math.abs(x) <= 90 && Math.abs(y) <= 180) {
+        console.log('Coordinates still out of range after transformation, trying alternative approach');
+        
+        // Try swapping and rescaling
+        if (Math.abs(y) <= 180 && Math.abs(x) <= 90) {
             lon = y;
             lat = x;
         } else {
-            // Scale down if still too large
-            const scale = Math.max(Math.abs(x) / 180, Math.abs(y) / 90);
+            // Apply more aggressive scaling
+            const scale = Math.max(Math.abs(x) / 100, Math.abs(y) / 100);
             lon = x / scale;
             lat = y / scale;
+            
+            // Normalize again
+            while (lon > 180) lon -= 360;
+            while (lon < -180) lon += 360;
+            lat = Math.max(-90, Math.min(90, lat));
         }
     }
     
+    console.log(`Transformation result: lat=${lat}, lon=${lon}`);
     return [lat, lon]; // Return in Leaflet format [lat, lon]
 }
 
@@ -743,58 +744,65 @@ function parsePolygonRings(polygonString) {
                     
                     // Validate that coordinates are numbers
                     if (isNaN(x) || isNaN(y)) {
+                        console.warn(`Invalid coordinate values: x=${parts[0]}, y=${parts[1]}`);
                         return null;
                     }
                     
-                    // Handle coordinate transformation if needed
-                    if (Math.abs(x) > 1000 || Math.abs(y) > 1000) {
-                        return transformProjectedCoordinates(x, y);
-                    }
-                    
-                    // For geographic coordinates, determine correct order
+                    // Determine coordinate order - WKT standard is LONGITUDE LATITUDE (X Y)
                     let lat, lon;
                     
-                    // Standard WKT is LONGITUDE LATITUDE (x y)
-                    // But some systems use LATITUDE LONGITUDE
-                    // Heuristic: if first value is within latitude range and second within longitude range
-                    if (Math.abs(x) <= 90 && Math.abs(y) <= 180) {
-                        // Likely lat, lon order
-                        lat = x;
-                        lon = y;
-                    } else if (Math.abs(y) <= 90 && Math.abs(x) <= 180) {
-                        // Likely lon, lat order (standard WKT)
-                        lon = x;
-                        lat = y;
+                    // Check if coordinates need transformation (very large values indicate projected coordinates)
+                    if (Math.abs(x) > 1000 || Math.abs(y) > 1000) {
+                        console.log(`Large coordinates detected: x=${x}, y=${y} - applying transformation`);
+                        const transformed = transformProjectedCoordinates(x, y);
+                        lat = transformed[0];
+                        lon = transformed[1];
                     } else {
-                        // Both could be valid coordinates, assume standard WKT (lon, lat)
+                        // For geographic coordinates, WKT standard is lon, lat
                         lon = x;
                         lat = y;
+                        
+                        // Validate geographic ranges
+                        if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                            // If standard order doesn't work, try swapped order
+                            if (Math.abs(x) <= 90 && Math.abs(y) <= 180) {
+                                lat = x;
+                                lon = y;
+                                console.log(`Swapped coordinate order for: lat=${lat}, lon=${lon}`);
+                            } else {
+                                console.warn(`Coordinates out of valid range: x=${x}, y=${y}`);
+                                return null;
+                            }
+                        }
                     }
                     
                     // Final validation
                     if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
                         return [lat, lon]; // Leaflet format: [lat, lon]
                     } else {
-                        console.warn(`Invalid coordinates after processing: lat=${lat}, lon=${lon} from x=${x}, y=${y}`);
+                        console.warn(`Final validation failed: lat=${lat}, lon=${lon}`);
                         return null;
                     }
                 }
                 return null;
             }).filter(coord => coord !== null);
             
-            // Ensure polygon is closed
+            // Ensure polygon is closed and has minimum points
             if (validCoords.length >= 3) {
                 const first = validCoords[0];
                 const last = validCoords[validCoords.length - 1];
                 
-                if (first[0] !== last[0] || first[1] !== last[1]) {
+                // Close polygon if not already closed
+                if (Math.abs(first[0] - last[0]) > 0.0001 || Math.abs(first[1] - last[1]) > 0.0001) {
                     validCoords.push([first[0], first[1]]);
+                    console.log('Polygon closed automatically');
                 }
                 
                 return validCoords;
+            } else {
+                console.warn(`Insufficient valid coordinates for polygon ring: ${validCoords.length}`);
+                return null;
             }
-            
-            return null;
         }).filter(ring => ring && ring.length >= 4); // Minimum 4 points for a closed polygon
     } catch (error) {
         console.error('Error parsing polygon rings:', error);
@@ -812,42 +820,49 @@ function parsePoint(wkt) {
             let y = parseFloat(parts[1]);
             
             if (isNaN(x) || isNaN(y)) {
+                console.warn(`Invalid point coordinate values: x=${parts[0]}, y=${parts[1]}`);
                 return null;
             }
             
-            // Handle projected coordinates
-            if (Math.abs(x) > 1000 || Math.abs(y) > 1000) {
-                const transformed = transformProjectedCoordinates(x, y);
-                return { lat: transformed[0], lng: transformed[1] };
-            }
+            console.log(`Parsing point: x=${x}, y=${y}`);
             
-            // For geographic coordinates, determine correct order
             let lat, lon;
             
-            // Heuristic coordinate order detection
-            if (Math.abs(x) <= 90 && Math.abs(y) <= 180) {
-                // Could be lat, lon
-                lat = x;
-                lon = y;
-            } else if (Math.abs(y) <= 90 && Math.abs(x) <= 180) {
-                // Could be lon, lat (standard WKT)
-                lon = x;
-                lat = y;
+            // Handle projected coordinates
+            if (Math.abs(x) > 1000 || Math.abs(y) > 1000) {
+                console.log('Large coordinates detected for point - applying transformation');
+                const transformed = transformProjectedCoordinates(x, y);
+                lat = transformed[0];
+                lon = transformed[1];
             } else {
-                // Assume standard WKT order (lon, lat)
+                // For geographic coordinates, WKT standard is lon, lat
                 lon = x;
                 lat = y;
+                
+                // Validate and potentially swap if out of range
+                if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                    if (Math.abs(x) <= 90 && Math.abs(y) <= 180) {
+                        lat = x;
+                        lon = y;
+                        console.log(`Swapped point coordinates: lat=${lat}, lng=${lon}`);
+                    } else {
+                        console.warn(`Point coordinates out of valid range: x=${x}, y=${y}`);
+                        return null;
+                    }
+                }
             }
             
             // Validate final coordinates
             if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                console.log(`Valid point created: lat=${lat}, lng=${lon}`);
                 return { lat: lat, lng: lon };
             } else {
-                console.warn(`Invalid point coordinates: lat=${lat}, lon=${lon} from x=${x}, y=${y}`);
+                console.warn(`Final point validation failed: lat=${lat}, lng=${lon}`);
                 return null;
             }
         }
         
+        console.warn(`Insufficient coordinate parts for point: ${parts.length}`);
         return null;
     } catch (error) {
         console.error('Error parsing POINT:', error);
