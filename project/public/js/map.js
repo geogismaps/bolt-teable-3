@@ -465,7 +465,7 @@ async function createLayerFromData(records, layerConfig) {
                 },
                 popup: {
                     enabled: true,
-                    fields: Object.keys(records[0].fields || {}),
+                    fields: Object.keys(records[0].fields || {}).filter(field => field !== layerConfig.geometryField),
                     maxWidth: 300
                 }
             }
@@ -515,7 +515,13 @@ function createFeaturePopup(fields, layerConfig) {
     let content = `<div class="feature-popup">`;
     content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
     
-    Object.keys(fields).forEach(key => {
+    // Get the selected popup fields from layer properties
+    const selectedFields = layerConfig.properties && layerConfig.properties.popup && layerConfig.properties.popup.fields 
+        ? layerConfig.properties.popup.fields 
+        : Object.keys(fields).filter(key => key !== layerConfig.geometryField);
+    
+    // Only show selected fields
+    selectedFields.forEach(key => {
         if (key !== layerConfig.geometryField && fields[key] !== null && fields[key] !== undefined) {
             let value = fields[key];
             if (typeof value === 'string' && value.length > 100) {
@@ -524,6 +530,11 @@ function createFeaturePopup(fields, layerConfig) {
             content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
         }
     });
+    
+    // Show message if no fields selected
+    if (selectedFields.length === 0) {
+        content += `<div class="popup-field"><em>No popup fields configured</em></div>`;
+    }
     
     content += '</div>';
     return content;
@@ -1368,7 +1379,11 @@ function populatePopupFields(layer) {
         let html = '';
         fields.forEach(field => {
             if (field !== layer.geometryField) {
-                const isChecked = layer.properties.popup.fields.includes(field);
+                // Check if field is selected in popup configuration
+                const isChecked = layer.properties && layer.properties.popup && layer.properties.popup.fields
+                    ? layer.properties.popup.fields.includes(field)
+                    : true; // Default to true if no configuration exists
+                    
                 html += `
                     <div class="field-checkbox">
                         <input type="checkbox" id="popup_${field}" ${isChecked ? 'checked' : ''} value="${field}">
@@ -1696,7 +1711,19 @@ function applyProperties() {
     document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked').forEach(checkbox => {
         popupFields.push(checkbox.value);
     });
-    layer.properties.popup.fields = popupFields;
+    if (layer.properties && layer.properties.popup) {
+        layer.properties.popup.fields = popupFields;
+    }
+
+    // Update all feature popups with new field selection
+    layer.features.forEach(feature => {
+        if (feature.getPopup) {
+            const newPopupContent = createFeaturePopup(feature.recordData, layer);
+            feature.bindPopup(newPopupContent, {
+                maxWidth: layer.properties.popup.maxWidth || 300
+            });
+        }
+    });
 
     // Apply visual changes
     applyLayerStyling(layer);
