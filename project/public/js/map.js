@@ -372,34 +372,56 @@ async function createLayerFromData(records, layerConfig) {
                             
                         } else if (Array.isArray(leafletGeometry)) {
                             // Polygon or MultiPolygon geometry
-                            leafletGeometry.forEach(polygonCoords => {
+                            leafletGeometry.forEach((polygonCoords, polyIndex) => {
                                 if (Array.isArray(polygonCoords) && polygonCoords.length > 0) {
-                                    // Validate all coordinates in the polygon
-                                    const validPolygon = polygonCoords.every(ring => 
-                                        Array.isArray(ring) && ring.every(coord => 
-                                            Array.isArray(coord) && coord.length >= 2 &&
-                                            coord[0] >= -90 && coord[0] <= 90 && 
-                                            coord[1] >= -180 && coord[1] <= 180
-                                        )
-                                    );
+                                    // Validate polygon structure
+                                    const validRings = [];
                                     
-                                    if (validPolygon) {
-                                        const polygon = L.polygon(polygonCoords, {
-                                            fillColor: layerConfig.color,
-                                            color: layerConfig.color,
-                                            weight: 2,
-                                            fillOpacity: 0.7
-                                        });
-                                        
-                                        polygon.bindPopup(createFeaturePopup(record.fields, layerConfig));
-                                        polygon.recordId = record.id;
-                                        polygon.recordData = record.fields;
-                                        polygon.layerId = layerConfig.id;
-                                        
-                                        features.push(polygon);
-                                        validFeatureCount++;
+                                    polygonCoords.forEach((ring, ringIndex) => {
+                                        if (Array.isArray(ring) && ring.length >= 3) { // Minimum 3 points for a polygon
+                                            const validCoords = ring.filter(coord => 
+                                                Array.isArray(coord) && coord.length >= 2 &&
+                                                !isNaN(coord[0]) && !isNaN(coord[1]) &&
+                                                coord[0] >= -90 && coord[0] <= 90 && 
+                                                coord[1] >= -180 && coord[1] <= 180
+                                            );
+                                            
+                                            if (validCoords.length >= 3) {
+                                                // Ensure polygon is closed
+                                                const firstCoord = validCoords[0];
+                                                const lastCoord = validCoords[validCoords.length - 1];
+                                                
+                                                if (firstCoord[0] !== lastCoord[0] || firstCoord[1] !== lastCoord[1]) {
+                                                    validCoords.push([firstCoord[0], firstCoord[1]]);
+                                                }
+                                                
+                                                validRings.push(validCoords);
+                                            }
+                                        }
+                                    });
+                                    
+                                    if (validRings.length > 0) {
+                                        try {
+                                            const polygon = L.polygon(validRings, {
+                                                fillColor: layerConfig.color,
+                                                color: layerConfig.color,
+                                                weight: 2,
+                                                fillOpacity: 0.7,
+                                                smoothFactor: 1.0
+                                            });
+                                            
+                                            polygon.bindPopup(createFeaturePopup(record.fields, layerConfig));
+                                            polygon.recordId = record.id;
+                                            polygon.recordData = record.fields;
+                                            polygon.layerId = layerConfig.id;
+                                            
+                                            features.push(polygon);
+                                            validFeatureCount++;
+                                        } catch (polygonError) {
+                                            console.warn(`Error creating polygon for record ${index}:`, polygonError);
+                                        }
                                     } else {
-                                        console.warn(`Invalid polygon coordinates for record ${index}`);
+                                        console.warn(`No valid rings found for polygon in record ${index}`);
                                     }
                                 }
                             });
@@ -516,36 +538,45 @@ function parseWKTToLeaflet(wkt) {
         
         const upperWKT = wkt.toUpperCase().trim();
         
+        // Clean up common WKT formatting issues
+        let cleanWkt = wkt.trim();
+        
+        // Remove common prefixes that might be present
+        cleanWkt = cleanWkt.replace(/^SRID=\d+;/, ''); // Remove SRID if present
+        
         // Pre-validate coordinate format and detect coordinate system issues
-        const coordinatePattern = /(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/g;
-        const matches = wkt.match(coordinatePattern);
+        const coordinatePattern = /(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g;
+        const matches = cleanWkt.match(coordinatePattern);
         
         if (matches && matches.length > 0) {
             const firstCoord = matches[0].split(/\s+/);
             const x = parseFloat(firstCoord[0]);
             const y = parseFloat(firstCoord[1]);
             
-            // Detect if coordinates are in a projected system (UTM, State Plane, etc.)
-            if (Math.abs(x) > 180 || Math.abs(y) > 90) {
-                console.warn('Coordinates appear to be in a projected coordinate system. Attempting basic conversion...');
-                // For large coordinate values, assume they might be in meters and need conversion
-                // This is a simplified approach - in production you'd want proper coordinate transformation
-                return handleProjectedCoordinates(wkt);
+            // Log coordinate detection for debugging
+            console.log(`Detected coordinates: x=${x}, y=${y}`);
+            
+            // Detect if coordinates are in a projected system
+            if (Math.abs(x) > 360 || Math.abs(y) > 180) {
+                console.warn('Large coordinates detected - likely projected coordinate system');
+                return handleProjectedCoordinates(cleanWkt);
             }
         }
         
-        if (upperWKT.startsWith('MULTIPOLYGON')) {
-            return parseMultiPolygon(wkt);
-        } else if (upperWKT.startsWith('POLYGON')) {
-            return parsePolygon(wkt);
-        } else if (upperWKT.startsWith('POINT')) {
-            return parsePoint(wkt);
-        } else if (upperWKT.startsWith('MULTIPOINT')) {
-            return parseMultiPoint(wkt);
-        } else if (upperWKT.startsWith('LINESTRING')) {
-            return parseLineString(wkt);
-        } else if (upperWKT.startsWith('MULTILINESTRING')) {
-            return parseMultiLineString(wkt);
+        const upperCleanWKT = cleanWkt.toUpperCase().trim();
+        
+        if (upperCleanWKT.startsWith('MULTIPOLYGON')) {
+            return parseMultiPolygon(cleanWkt);
+        } else if (upperCleanWKT.startsWith('POLYGON')) {
+            return parsePolygon(cleanWkt);
+        } else if (upperCleanWKT.startsWith('POINT')) {
+            return parsePoint(cleanWkt);
+        } else if (upperCleanWKT.startsWith('MULTIPOINT')) {
+            return parseMultiPoint(cleanWkt);
+        } else if (upperCleanWKT.startsWith('LINESTRING')) {
+            return parseLineString(cleanWkt);
+        } else if (upperCleanWKT.startsWith('MULTILINESTRING')) {
+            return parseMultiLineString(cleanWkt);
         }
         
         return null;
@@ -620,25 +651,45 @@ function parsePolygonRings(polygonString) {
                     let x = parseFloat(parts[0]);
                     let y = parseFloat(parts[1]);
                     
-                    // WKT format is typically LONGITUDE LATITUDE (X Y)
-                    // But we need to ensure proper coordinate order
+                    // Validate that coordinates are numbers
+                    if (isNaN(x) || isNaN(y)) {
+                        console.warn(`Invalid coordinate values: x=${x}, y=${y}`);
+                        return null;
+                    }
+                    
+                    // WKT format is LONGITUDE LATITUDE (X Y)
+                    // Leaflet expects [latitude, longitude]
                     let lon = x;
                     let lat = y;
                     
-                    // If coordinates seem swapped (lat > 90 or lon > 180), try swapping
-                    if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
-                        // Coordinates might be swapped
-                        lon = y;
-                        lat = x;
+                    // Auto-detect coordinate system based on magnitude
+                    if (Math.abs(x) > 180 || Math.abs(y) > 90) {
+                        // Likely projected coordinates - need transformation
+                        console.warn('Projected coordinates detected, applying basic transformation');
+                        
+                        // Simple transformation for common projections
+                        // This is a simplified approach - in production you'd use proj4js
+                        if (Math.abs(x) > 1000000) {
+                            // Very large coordinates, likely UTM or similar
+                            lon = x / 111320; // Rough conversion
+                            lat = y / 110540; // Rough conversion
+                        } else if (Math.abs(x) > 1000) {
+                            // Medium coordinates, might be in feet or local grid
+                            lon = x / 111320 * 0.3048; // Convert from feet if needed
+                            lat = y / 110540 * 0.3048;
+                        }
+                        
+                        // Ensure coordinates are within valid range
+                        lon = Math.max(-180, Math.min(180, lon));
+                        lat = Math.max(-90, Math.min(90, lat));
                     }
                     
-                    // Validate coordinate ranges for geographic coordinates
-                    if (!isNaN(lat) && !isNaN(lon) && 
-                        lat >= -90 && lat <= 90 && 
-                        lon >= -180 && lon <= 180) {
-                        return [lat, lon]; // Leaflet uses [lat, lon]
+                    // Final validation for geographic coordinates
+                    if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        return [lat, lon]; // Leaflet format: [lat, lon]
                     } else {
-                        console.warn(`Invalid coordinates: lat=${lat}, lon=${lon} from original x=${x}, y=${y}`);
+                        console.warn(`Coordinates out of valid range: lat=${lat}, lon=${lon}`);
+                        return null;
                     }
                 }
                 return null;
