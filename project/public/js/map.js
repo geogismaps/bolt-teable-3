@@ -1087,6 +1087,7 @@ function createAttributeTable(layer) {
         height: calc(100% - 60px);
         overflow: auto;
         padding: 0;
+        position: relative;
     `;
 
     // Build table
@@ -1095,17 +1096,17 @@ function createAttributeTable(layer) {
         
         let tableHTML = `
             <table class="table table-sm table-hover mb-0">
-                <thead class="table-light sticky-top">
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
                     <tr>
-                        <th style="width: 40px;">
+                        <th style="width: 40px; position: sticky; top: 0; background: #f8f9fa; z-index: 11;">
                             <input type="checkbox" onchange="selectAllRows(this.checked, '${layer.id}')">
                         </th>
-                        <th style="width: 60px;">#</th>
+                        <th style="width: 60px; position: sticky; top: 0; background: #f8f9fa; z-index: 11;">#</th>
         `;
         
         fields.forEach(field => {
             if (field !== layer.geometryField) {
-                tableHTML += `<th>${field}</th>`;
+                tableHTML += `<th style="position: sticky; top: 0; background: #f8f9fa; z-index: 11;">${field}</th>`;
             }
         });
         
