@@ -351,37 +351,56 @@ async function createLayerFromData(records, layerConfig) {
                     if (leafletGeometry) {
                         // Handle different geometry types
                         if (leafletGeometry.lat && leafletGeometry.lng) {
-                            // Point geometry
-                            const marker = L.marker([leafletGeometry.lat, leafletGeometry.lng], {
-                                color: layerConfig.color
-                            });
-                            
-                            marker.bindPopup(createFeaturePopup(record.fields, layerConfig));
-                            marker.recordId = record.id;
-                            marker.recordData = record.fields;
-                            marker.layerId = layerConfig.id;
-                            
-                            features.push(marker);
-                            validFeatureCount++;
+                            // Point geometry - validate coordinates
+                            if (leafletGeometry.lat >= -90 && leafletGeometry.lat <= 90 && 
+                                leafletGeometry.lng >= -180 && leafletGeometry.lng <= 180) {
+                                
+                                const marker = L.marker([leafletGeometry.lat, leafletGeometry.lng], {
+                                    color: layerConfig.color
+                                });
+                                
+                                marker.bindPopup(createFeaturePopup(record.fields, layerConfig));
+                                marker.recordId = record.id;
+                                marker.recordData = record.fields;
+                                marker.layerId = layerConfig.id;
+                                
+                                features.push(marker);
+                                validFeatureCount++;
+                            } else {
+                                console.warn(`Invalid coordinates for record ${index}: lat=${leafletGeometry.lat}, lng=${leafletGeometry.lng}`);
+                            }
                             
                         } else if (Array.isArray(leafletGeometry)) {
                             // Polygon or MultiPolygon geometry
                             leafletGeometry.forEach(polygonCoords => {
                                 if (Array.isArray(polygonCoords) && polygonCoords.length > 0) {
-                                    const polygon = L.polygon(polygonCoords, {
-                                        fillColor: layerConfig.color,
-                                        color: layerConfig.color,
-                                        weight: 2,
-                                        fillOpacity: 0.7
-                                    });
+                                    // Validate all coordinates in the polygon
+                                    const validPolygon = polygonCoords.every(ring => 
+                                        Array.isArray(ring) && ring.every(coord => 
+                                            Array.isArray(coord) && coord.length >= 2 &&
+                                            coord[0] >= -90 && coord[0] <= 90 && 
+                                            coord[1] >= -180 && coord[1] <= 180
+                                        )
+                                    );
                                     
-                                    polygon.bindPopup(createFeaturePopup(record.fields, layerConfig));
-                                    polygon.recordId = record.id;
-                                    polygon.recordData = record.fields;
-                                    polygon.layerId = layerConfig.id;
-                                    
-                                    features.push(polygon);
-                                    validFeatureCount++;
+                                    if (validPolygon) {
+                                        const polygon = L.polygon(polygonCoords, {
+                                            fillColor: layerConfig.color,
+                                            color: layerConfig.color,
+                                            weight: 2,
+                                            fillOpacity: 0.7
+                                        });
+                                        
+                                        polygon.bindPopup(createFeaturePopup(record.fields, layerConfig));
+                                        polygon.recordId = record.id;
+                                        polygon.recordData = record.fields;
+                                        polygon.layerId = layerConfig.id;
+                                        
+                                        features.push(polygon);
+                                        validFeatureCount++;
+                                    } else {
+                                        console.warn(`Invalid polygon coordinates for record ${index}`);
+                                    }
                                 }
                             });
                         }
@@ -497,6 +516,22 @@ function parseWKTToLeaflet(wkt) {
         
         const upperWKT = wkt.toUpperCase().trim();
         
+        // Check if coordinates might be in a projected coordinate system
+        const coordinatePattern = /(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/g;
+        const matches = wkt.match(coordinatePattern);
+        
+        if (matches && matches.length > 0) {
+            const firstCoord = matches[0].split(/\s+/);
+            const x = parseFloat(firstCoord[0]);
+            const y = parseFloat(firstCoord[1]);
+            
+            // If coordinates are very large, they might be in a projected system
+            if (Math.abs(x) > 180 || Math.abs(y) > 90) {
+                console.warn('Coordinates appear to be in a projected coordinate system. Consider converting to WGS84 (EPSG:4326)');
+                // For now, we'll try to handle as-is but this might need transformation
+            }
+        }
+        
         if (upperWKT.startsWith('MULTIPOLYGON')) {
             return parseMultiPolygon(wkt);
         } else if (upperWKT.startsWith('POLYGON')) {
@@ -557,7 +592,10 @@ function parsePolygonRings(polygonString) {
                     const lon = parseFloat(parts[0]);
                     const lat = parseFloat(parts[1]);
                     
-                    if (!isNaN(lat) && !isNaN(lon)) {
+                    // Validate coordinate ranges
+                    if (!isNaN(lat) && !isNaN(lon) && 
+                        lat >= -90 && lat <= 90 && 
+                        lon >= -180 && lon <= 180) {
                         return [lat, lon]; // Leaflet uses [lat, lon]
                     }
                 }
@@ -579,7 +617,10 @@ function parsePoint(wkt) {
             const lon = parseFloat(parts[0]);
             const lat = parseFloat(parts[1]);
             
-            if (!isNaN(lat) && !isNaN(lon)) {
+            // Validate coordinate ranges and ensure proper lat/lon order
+            if (!isNaN(lat) && !isNaN(lon) && 
+                lat >= -90 && lat <= 90 && 
+                lon >= -180 && lon <= 180) {
                 return { lat: lat, lng: lon };
             }
         }
@@ -627,7 +668,10 @@ function parseLineString(wkt) {
                 const lon = parseFloat(parts[0]);
                 const lat = parseFloat(parts[1]);
                 
-                if (!isNaN(lat) && !isNaN(lon)) {
+                // Validate coordinate ranges
+                if (!isNaN(lat) && !isNaN(lon) && 
+                    lat >= -90 && lat <= 90 && 
+                    lon >= -180 && lon <= 180) {
                     return [lat, lon];
                 }
             }
