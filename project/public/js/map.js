@@ -132,10 +132,45 @@ async function loadTableFields() {
 
     try {
         // Get sample records to detect fields
-        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 1 });
+        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
         
         if (recordsData.records && recordsData.records.length > 0) {
             const fields = Object.keys(recordsData.records[0].fields || {});
+            
+            // Auto-detect geometry field
+            let detectedGeometryField = null;
+            const geometryFieldCandidates = fields.filter(field => {
+                const fieldLower = field.toLowerCase();
+                return fieldLower.includes('geom') || 
+                       fieldLower.includes('wkt') || 
+                       fieldLower.includes('shape') ||
+                       fieldLower.includes('polygon') ||
+                       fieldLower.includes('point') ||
+                       fieldLower.includes('coordinates') ||
+                       fieldLower.includes('geometry');
+            });
+            
+            // If no obvious candidates, check field content for geometry patterns
+            if (geometryFieldCandidates.length === 0) {
+                for (const field of fields) {
+                    const sampleValue = recordsData.records[0].fields[field];
+                    if (typeof sampleValue === 'string' && sampleValue.length > 10) {
+                        const upperValue = sampleValue.toUpperCase();
+                        if (upperValue.includes('POINT') || 
+                            upperValue.includes('POLYGON') || 
+                            upperValue.includes('LINESTRING') ||
+                            upperValue.includes('MULTIPOLYGON') ||
+                            upperValue.includes('MULTIPOINT')) {
+                            geometryFieldCandidates.push(field);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (geometryFieldCandidates.length > 0) {
+                detectedGeometryField = geometryFieldCandidates[0];
+            }
             
             // Populate geometry field selector
             if (geometrySelector) {
@@ -144,15 +179,24 @@ async function loadTableFields() {
                     const option = document.createElement('option');
                     option.value = field;
                     option.textContent = field;
+                    if (field === detectedGeometryField) {
+                        option.selected = true;
+                    }
                     geometrySelector.appendChild(option);
                 });
+                
+                // If we detected a geometry field, show it in the info
+                if (detectedGeometryField) {
+                    showSuccess(`Auto-detected geometry field: ${detectedGeometryField}`);
+                }
             }
 
-            // Show linked tables info (placeholder for now)
+            // Show linked tables info
             if (linkedTablesInfo) {
                 linkedTablesInfo.innerHTML = `
                     <div class="small">
                         <strong>Available Fields:</strong> ${fields.length}<br>
+                        <strong>Geometry Field:</strong> ${detectedGeometryField || 'Not detected'}<br>
                         <strong>Sample Fields:</strong> ${fields.slice(0, 3).join(', ')}${fields.length > 3 ? '...' : ''}
                     </div>
                 `;
@@ -208,18 +252,40 @@ async function addLayerFromTable() {
         let detectedGeometryField = geometryField;
         if (!detectedGeometryField) {
             const sampleFields = Object.keys(records[0].fields || {});
-            const geometryFieldCandidates = sampleFields.filter(field => 
-                field.toLowerCase().includes('geom') || 
-                field.toLowerCase().includes('wkt') || 
-                field.toLowerCase().includes('shape') ||
-                field.toLowerCase().includes('polygon') ||
-                field.toLowerCase().includes('point')
-            );
+            const geometryFieldCandidates = sampleFields.filter(field => {
+                const fieldLower = field.toLowerCase();
+                return fieldLower.includes('geom') || 
+                       fieldLower.includes('wkt') || 
+                       fieldLower.includes('shape') ||
+                       fieldLower.includes('polygon') ||
+                       fieldLower.includes('point') ||
+                       fieldLower.includes('coordinates') ||
+                       fieldLower.includes('geometry');
+            });
+            
+            // If no obvious candidates, check field content for geometry patterns
+            if (geometryFieldCandidates.length === 0) {
+                for (const field of sampleFields) {
+                    const sampleValue = records[0].fields[field];
+                    if (typeof sampleValue === 'string' && sampleValue.length > 10) {
+                        const upperValue = sampleValue.toUpperCase();
+                        if (upperValue.includes('POINT') || 
+                            upperValue.includes('POLYGON') || 
+                            upperValue.includes('LINESTRING') ||
+                            upperValue.includes('MULTIPOLYGON') ||
+                            upperValue.includes('MULTIPOINT')) {
+                            geometryFieldCandidates.push(field);
+                            break;
+                        }
+                    }
+                }
+            }
             
             if (geometryFieldCandidates.length > 0) {
                 detectedGeometryField = geometryFieldCandidates[0];
+                console.log(`Auto-detected geometry field: ${detectedGeometryField}`);
             } else {
-                throw new Error('No geometry field found. Please specify the geometry field manually.');
+                throw new Error('No geometry field found. Please specify the geometry field manually or ensure your data contains valid WKT/GeoJSON geometry.');
             }
         }
 
@@ -250,7 +316,16 @@ async function addLayerFromTable() {
             if (newLayerColor) newLayerColor.value = '#3498db';
             if (newLayerGeometry) newLayerGeometry.value = '';
 
-            showSuccess('Layer added successfully!');
+            // Auto-zoom to the new layer
+            if (layer.bounds) {
+                setTimeout(() => {
+                    map.fitBounds(layer.bounds.pad(0.1));
+                    showSuccess(`Layer "${layerName}" added and zoomed to extent!`);
+                }, 500);
+            } else {
+                showSuccess('Layer added successfully!');
+            }
+            
             updateLayersList();
             updateMapStatistics();
         }
@@ -357,8 +432,25 @@ async function createLayerFromData(records, layerConfig) {
 
         // Calculate bounds
         if (features.length > 0) {
-            const group = new L.featureGroup(features);
-            layer.bounds = group.getBounds();
+            try {
+                const group = new L.featureGroup(features);
+                layer.bounds = group.getBounds();
+                
+                // Validate bounds
+                if (layer.bounds && 
+                    !isNaN(layer.bounds.getNorth()) && 
+                    !isNaN(layer.bounds.getSouth()) && 
+                    !isNaN(layer.bounds.getEast()) && 
+                    !isNaN(layer.bounds.getWest())) {
+                    console.log(`Layer bounds calculated: ${layer.bounds.toBBoxString()}`);
+                } else {
+                    console.warn('Invalid bounds calculated for layer');
+                    layer.bounds = null;
+                }
+            } catch (error) {
+                console.error('Error calculating layer bounds:', error);
+                layer.bounds = null;
+            }
         }
 
         // Add to map if visible
