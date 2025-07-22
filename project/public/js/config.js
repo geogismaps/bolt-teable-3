@@ -4,7 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     loadExistingConfigs();
-    
+
     // Setup form handler
     const configForm = document.getElementById('configForm');
     if (configForm) {
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function handleConfigSubmit(event) {
     event.preventDefault();
-    
+
     try {
         const config = {
             clientName: document.getElementById('clientName').value.trim(),
@@ -40,7 +40,7 @@ async function handleConfigSubmit(event) {
 
         // Test connection first
         showAlert('info', 'Testing connection...');
-        
+
         // Initialize API for testing
         if (window.teableAPI) {
             window.teableAPI.init({
@@ -63,7 +63,7 @@ async function handleConfigSubmit(event) {
 
         // Save configuration
         const savedConfigs = window.teableAuth.addClientConfig(config);
-        
+
         // Set as current config
         window.teableAuth.saveClientConfig({
             baseUrl: config.baseUrl,
@@ -74,10 +74,10 @@ async function handleConfigSubmit(event) {
 
         // Show success
         showAlert('success', 'Client configuration created successfully!');
-        
+
         // Clear form
         document.getElementById('configForm').reset();
-        
+
         // Refresh list
         loadExistingConfigs();
 
@@ -122,7 +122,7 @@ async function testConnection() {
             });
 
             const result = await window.teableAPI.testConnection();
-            
+
             if (result.success) {
                 document.getElementById('connectionStatus').innerHTML = `
                     <div class="alert alert-success">
@@ -150,9 +150,9 @@ async function testConnection() {
 function loadExistingConfigs() {
     const configs = window.teableAuth ? window.teableAuth.getClientConfigs() : [];
     const container = document.getElementById('existingConfigs');
-    
+
     if (!container) return;
-    
+
     if (configs.length === 0) {
         container.innerHTML = `
             <div class="text-center text-muted py-3">
@@ -193,16 +193,16 @@ function loadExistingConfigs() {
         `;
     });
     html += '</div>';
-    
+
     container.innerHTML = html;
 }
 
 function useConfig(configId) {
     if (!window.teableAuth) return;
-    
+
     const configs = window.teableAuth.getClientConfigs();
     const config = configs.find(c => c.id === configId);
-    
+
     if (config) {
         // Save as current client config
         window.teableAuth.saveClientConfig({
@@ -211,9 +211,9 @@ function useConfig(configId) {
             baseId: config.baseId,
             accessToken: config.accessToken
         });
-        
+
         showAlert('success', 'Configuration loaded successfully!');
-        
+
         // Redirect to login
         setTimeout(() => {
             window.location.href = 'login.html';
@@ -223,7 +223,7 @@ function useConfig(configId) {
 
 function deleteConfig(configId) {
     if (!window.teableAuth) return;
-    
+
     if (confirm('Are you sure you want to delete this client configuration?')) {
         const configs = window.teableAuth.getClientConfigs();
         const updatedConfigs = configs.filter(c => c.id !== configId);
@@ -241,7 +241,7 @@ function showAlert(type, message) {
             alert.remove();
         }
     });
-    
+
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.innerHTML = `
@@ -249,19 +249,36 @@ function showAlert(type, message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     // Insert at top of form
     const form = document.getElementById('configForm');
     if (form && form.parentNode) {
         form.parentNode.insertBefore(alertDiv, form);
     }
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
         }
     }, 5000);
+}
+
+// Toggle password visibility
+function togglePasswordVisibility(inputId) {
+    const passwordInput = document.getElementById(inputId);
+    const button = passwordInput.nextElementSibling;
+    const icon = button.querySelector('i');
+
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
 }
 
 // Make functions globally available

@@ -37,6 +37,20 @@
                                     <input type="email" class="form-control" id="adminEmail" 
                                            placeholder="admin@client.com" required>
                                 </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-semibold">
+                                        <i class="fas fa-lock me-2"></i>Admin Password
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="adminPassword" 
+                                               placeholder="Enter Teable space owner password" required>
+                                        <button class="btn btn-outline-secondary" type="button" 
+                                                onclick="togglePasswordVisibility('adminPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Space owner password for authentication verification</div>
+                                </div>
                             </div>
 
                             <div class="mb-4">
