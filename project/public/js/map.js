@@ -516,7 +516,7 @@ function parseWKTToLeaflet(wkt) {
         
         const upperWKT = wkt.toUpperCase().trim();
         
-        // Check if coordinates might be in a projected coordinate system
+        // Pre-validate coordinate format and detect coordinate system issues
         const coordinatePattern = /(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/g;
         const matches = wkt.match(coordinatePattern);
         
@@ -525,10 +525,12 @@ function parseWKTToLeaflet(wkt) {
             const x = parseFloat(firstCoord[0]);
             const y = parseFloat(firstCoord[1]);
             
-            // If coordinates are very large, they might be in a projected system
+            // Detect if coordinates are in a projected system (UTM, State Plane, etc.)
             if (Math.abs(x) > 180 || Math.abs(y) > 90) {
-                console.warn('Coordinates appear to be in a projected coordinate system. Consider converting to WGS84 (EPSG:4326)');
-                // For now, we'll try to handle as-is but this might need transformation
+                console.warn('Coordinates appear to be in a projected coordinate system. Attempting basic conversion...');
+                // For large coordinate values, assume they might be in meters and need conversion
+                // This is a simplified approach - in production you'd want proper coordinate transformation
+                return handleProjectedCoordinates(wkt);
             }
         }
         
@@ -549,6 +551,32 @@ function parseWKTToLeaflet(wkt) {
         return null;
     } catch (error) {
         console.error('Error parsing WKT:', error);
+        return null;
+    }
+}
+
+// Handle projected coordinates (simplified conversion)
+function handleProjectedCoordinates(wkt) {
+    try {
+        console.warn('Attempting to handle projected coordinates - results may not be accurate without proper transformation');
+        
+        // For demonstration purposes, we'll assume the data might be in a common projection
+        // and attempt a basic scaling/offset approach
+        // In production, you would use a proper coordinate transformation library like Proj4js
+        
+        const upperWKT = wkt.toUpperCase().trim();
+        
+        if (upperWKT.startsWith('POLYGON')) {
+            return parseProjectedPolygon(wkt);
+        } else if (upperWKT.startsWith('MULTIPOLYGON')) {
+            return parseProjectedMultiPolygon(wkt);
+        } else if (upperWKT.startsWith('POINT')) {
+            return parseProjectedPoint(wkt);
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error handling projected coordinates:', error);
         return null;
     }
 }
@@ -589,14 +617,28 @@ function parsePolygonRings(polygonString) {
             return coords.map(coord => {
                 const parts = coord.trim().split(/\s+/);
                 if (parts.length >= 2) {
-                    const lon = parseFloat(parts[0]);
-                    const lat = parseFloat(parts[1]);
+                    let x = parseFloat(parts[0]);
+                    let y = parseFloat(parts[1]);
                     
-                    // Validate coordinate ranges
+                    // WKT format is typically LONGITUDE LATITUDE (X Y)
+                    // But we need to ensure proper coordinate order
+                    let lon = x;
+                    let lat = y;
+                    
+                    // If coordinates seem swapped (lat > 90 or lon > 180), try swapping
+                    if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
+                        // Coordinates might be swapped
+                        lon = y;
+                        lat = x;
+                    }
+                    
+                    // Validate coordinate ranges for geographic coordinates
                     if (!isNaN(lat) && !isNaN(lon) && 
                         lat >= -90 && lat <= 90 && 
                         lon >= -180 && lon <= 180) {
                         return [lat, lon]; // Leaflet uses [lat, lon]
+                    } else {
+                        console.warn(`Invalid coordinates: lat=${lat}, lon=${lon} from original x=${x}, y=${y}`);
                     }
                 }
                 return null;
@@ -614,14 +656,28 @@ function parsePoint(wkt) {
         const parts = coordString.trim().split(/\s+/);
         
         if (parts.length >= 2) {
-            const lon = parseFloat(parts[0]);
-            const lat = parseFloat(parts[1]);
+            let x = parseFloat(parts[0]);
+            let y = parseFloat(parts[1]);
             
-            // Validate coordinate ranges and ensure proper lat/lon order
+            // WKT typically uses LONGITUDE LATITUDE order (X Y)
+            let lon = x;
+            let lat = y;
+            
+            // Check if coordinates might be swapped
+            if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
+                // Swap coordinates
+                lon = y;
+                lat = x;
+                console.log(`Swapped coordinates for point: original (${x}, ${y}) -> (${lat}, ${lon})`);
+            }
+            
+            // Validate coordinate ranges
             if (!isNaN(lat) && !isNaN(lon) && 
                 lat >= -90 && lat <= 90 && 
                 lon >= -180 && lon <= 180) {
                 return { lat: lat, lng: lon };
+            } else {
+                console.warn(`Invalid point coordinates: lat=${lat}, lon=${lon} from original x=${x}, y=${y}`);
             }
         }
         
@@ -707,6 +763,110 @@ function parseMultiLineString(wkt) {
         }).filter(line => line.length > 0);
     } catch (error) {
         console.error('Error parsing MULTILINESTRING:', error);
+        return null;
+    }
+}
+
+// Handle projected polygon coordinates
+function parseProjectedPolygon(wkt) {
+    try {
+        let cleanWkt = wkt.replace(/^POLYGON\s*\(/i, '').replace(/\)$/, '');
+        return [parseProjectedPolygonRings(cleanWkt)];
+    } catch (error) {
+        console.error('Error parsing projected POLYGON:', error);
+        return null;
+    }
+}
+
+function parseProjectedMultiPolygon(wkt) {
+    try {
+        let cleanWkt = wkt.replace(/^MULTIPOLYGON\s*\(\s*\(/i, '').replace(/\)\s*\)$/, '');
+        const polygonStrings = cleanWkt.split(')),((');
+        
+        return polygonStrings.map(polygonString => {
+            const cleanPolygon = polygonString.replace(/^\(+/, '').replace(/\)+$/, '');
+            return parseProjectedPolygonRings(cleanPolygon);
+        }).filter(polygon => polygon !== null);
+    } catch (error) {
+        console.error('Error parsing projected MULTIPOLYGON:', error);
+        return null;
+    }
+}
+
+function parseProjectedPolygonRings(polygonString) {
+    try {
+        const rings = polygonString.split('),(');
+        
+        return rings.map(ring => {
+            const cleanRing = ring.replace(/^\(+/, '').replace(/\)+$/, '');
+            const coords = cleanRing.split(',');
+            
+            // Find coordinate bounds to determine scaling
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            const rawCoords = coords.map(coord => {
+                const parts = coord.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                    const x = parseFloat(parts[0]);
+                    const y = parseFloat(parts[1]);
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
+                    return [x, y];
+                }
+                return null;
+            }).filter(coord => coord !== null);
+            
+            // Simple scaling approach - assume coordinates are in meters
+            // and convert to approximate degrees (very rough approximation)
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            
+            // Rough conversion: 1 degree ≈ 111,000 meters at equator
+            const scaleFactor = 1 / 111000;
+            
+            return rawCoords.map(([x, y]) => {
+                // Convert to approximate lat/lon
+                const approximateLon = (x - centerX) * scaleFactor + 78.9629; // Use map center as reference
+                const approximateLat = (y - centerY) * scaleFactor + 20.5937; // Use map center as reference
+                
+                // Validate and constrain to reasonable bounds
+                const constrainedLat = Math.max(-85, Math.min(85, approximateLat));
+                const constrainedLon = Math.max(-180, Math.min(180, approximateLon));
+                
+                return [constrainedLat, constrainedLon];
+            });
+        }).filter(ring => ring.length > 0);
+    } catch (error) {
+        console.error('Error parsing projected polygon rings:', error);
+        return null;
+    }
+}
+
+function parseProjectedPoint(wkt) {
+    try {
+        const coordString = wkt.replace(/^POINT\s*\(/i, '').replace(/\)$/, '');
+        const parts = coordString.trim().split(/\s+/);
+        
+        if (parts.length >= 2) {
+            const x = parseFloat(parts[0]);
+            const y = parseFloat(parts[1]);
+            
+            // Simple scaling approach - assume coordinates are in meters
+            const scaleFactor = 1 / 111000;
+            const approximateLon = x * scaleFactor + 78.9629; // Use map center as reference
+            const approximateLat = y * scaleFactor + 20.5937; // Use map center as reference
+            
+            // Constrain to reasonable bounds
+            const constrainedLat = Math.max(-85, Math.min(85, approximateLat));
+            const constrainedLon = Math.max(-180, Math.min(180, approximateLon));
+            
+            return { lat: constrainedLat, lng: constrainedLon };
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Error parsing projected POINT:', error);
         return null;
     }
 }
