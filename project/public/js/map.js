@@ -1081,44 +1081,95 @@ function createAttributeTable(layer) {
         </div>
     `;
 
-    // Create table content
+    // Create table content with enhanced styling for frozen headers
     const tableContent = document.createElement('div');
     tableContent.style.cssText = `
         height: calc(100% - 60px);
         overflow: auto;
         padding: 0;
         position: relative;
+        border: 1px solid #dee2e6;
     `;
 
-    // Build table
+    // Build table with permanently frozen headers
     if (layer.records.length > 0) {
         const fields = Object.keys(layer.records[0].fields || {});
         
         let tableHTML = `
-            <table class="table table-sm table-hover mb-0">
-                <thead class="table-light" style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
-                    <tr>
-                        <th style="width: 40px; position: sticky; top: 0; background: #f8f9fa; z-index: 11;">
+            <table class="table table-sm table-hover mb-0" style="border-collapse: separate; border-spacing: 0;">
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 100; background: #f8f9fa; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr style="background: #f8f9fa;">
+                        <th style="
+                            width: 40px; 
+                            position: sticky; 
+                            top: 0; 
+                            background: #f8f9fa; 
+                            z-index: 101;
+                            border-bottom: 2px solid #dee2e6;
+                            border-right: 1px solid #dee2e6;
+                            padding: 8px;
+                            font-weight: 600;
+                            text-align: center;
+                        ">
                             <input type="checkbox" onchange="selectAllRows(this.checked, '${layer.id}')">
                         </th>
-                        <th style="width: 60px; position: sticky; top: 0; background: #f8f9fa; z-index: 11;">#</th>
+                        <th style="
+                            width: 60px; 
+                            position: sticky; 
+                            top: 0; 
+                            background: #f8f9fa; 
+                            z-index: 101;
+                            border-bottom: 2px solid #dee2e6;
+                            border-right: 1px solid #dee2e6;
+                            padding: 8px;
+                            font-weight: 600;
+                            text-align: center;
+                        ">#</th>
         `;
         
         fields.forEach(field => {
             if (field !== layer.geometryField) {
-                tableHTML += `<th style="position: sticky; top: 0; background: #f8f9fa; z-index: 11;">${field}</th>`;
+                tableHTML += `
+                    <th style="
+                        position: sticky; 
+                        top: 0; 
+                        background: #f8f9fa; 
+                        z-index: 101;
+                        border-bottom: 2px solid #dee2e6;
+                        border-right: 1px solid #dee2e6;
+                        padding: 8px;
+                        font-weight: 600;
+                        min-width: 120px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    " title="${field}">${field}</th>
+                `;
             }
         });
         
-        tableHTML += `</tr></thead><tbody>`;
+        tableHTML += `</tr></thead><tbody style="background: white;">`;
         
         layer.records.forEach((record, index) => {
             tableHTML += `
-                <tr data-record-id="${record.id}" onclick="selectTableRow(this, '${layer.id}', '${record.id}')">
-                    <td>
+                <tr data-record-id="${record.id}" 
+                    onclick="selectTableRow(this, '${layer.id}', '${record.id}')"
+                    style="border-bottom: 1px solid #dee2e6;">
+                    <td style="
+                        padding: 8px;
+                        border-right: 1px solid #dee2e6;
+                        text-align: center;
+                        background: white;
+                    ">
                         <input type="checkbox" onclick="event.stopPropagation();" onchange="toggleRowSelection('${layer.id}', '${record.id}', this.checked)">
                     </td>
-                    <td>${index + 1}</td>
+                    <td style="
+                        padding: 8px;
+                        border-right: 1px solid #dee2e6;
+                        text-align: center;
+                        background: white;
+                        font-weight: 500;
+                    ">${index + 1}</td>
             `;
             
             fields.forEach(field => {
@@ -1128,7 +1179,18 @@ function createAttributeTable(layer) {
                     if (typeof value === 'string' && value.length > 50) {
                         value = value.substring(0, 50) + '...';
                     }
-                    tableHTML += `<td>${value}</td>`;
+                    tableHTML += `
+                        <td style="
+                            padding: 8px;
+                            border-right: 1px solid #dee2e6;
+                            background: white;
+                            min-width: 120px;
+                            max-width: 200px;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                        " title="${value}">${value}</td>
+                    `;
                 }
             });
             
@@ -1136,6 +1198,33 @@ function createAttributeTable(layer) {
         });
         
         tableHTML += '</tbody></table>';
+        
+        // Add custom CSS for the table
+        const style = document.createElement('style');
+        style.textContent = `
+            #attributeTableContainer .table-active {
+                background-color: #e3f2fd !important;
+            }
+            #attributeTableContainer .table-active td {
+                background-color: #e3f2fd !important;
+            }
+            #attributeTableContainer tr:hover td {
+                background-color: #f5f5f5 !important;
+            }
+            #attributeTableContainer thead th {
+                user-select: none;
+                cursor: default;
+            }
+            #attributeTableContainer tbody tr {
+                cursor: pointer;
+            }
+            #attributeTableContainer table {
+                table-layout: auto;
+                width: 100%;
+            }
+        `;
+        document.head.appendChild(style);
+        
         tableContent.innerHTML = tableHTML;
     } else {
         tableContent.innerHTML = '<div class="text-center text-muted py-4">No records found</div>';
