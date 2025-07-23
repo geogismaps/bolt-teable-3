@@ -738,8 +738,8 @@ function showAttributeTable(layerId) {
         return;
     }
 
-    // Create and show attribute table modal
-    createAttributeTableModal(layer);
+    // Create and show docked attribute table
+    createDockedAttributeTable(layer);
 }
 
 function showLayerProperties(layerId) {
@@ -760,80 +760,75 @@ function showLayerProperties(layerId) {
     modal.show();
 }
 
-function createAttributeTableModal(layer) {
-    // Remove existing modal if present
-    const existingModal = document.getElementById('attributeTableModal');
-    if (existingModal) {
-        existingModal.remove();
+function createDockedAttributeTable(layer) {
+    // Remove existing docked table if present
+    const existingTable = document.getElementById('dockedAttributeTable');
+    if (existingTable) {
+        existingTable.remove();
     }
 
-    // Create modal HTML
-    const modalHTML = `
-        <div class="modal fade" id="attributeTableModal" tabindex="-1" aria-labelledby="attributeTableModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="attributeTableModalLabel">
-                            <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                        <div class="table-toolbar p-3 bg-light border-bottom">
-                            <div class="row align-items-center">
-                                <div class="col-md-6">
-                                    <div class="d-flex gap-2">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
-                                            <i class="fas fa-check-square me-1"></i>Select All
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
-                                            <i class="fas fa-square me-1"></i>Clear Selection
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
-                                            <i class="fas fa-search-plus me-1"></i>Zoom to Selection
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 text-end">
-                                    <span class="text-muted">
-                                        <span id="selectedCount">0</span> of ${layer.records.length} features selected
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="table-container" style="max-height: 500px; overflow: auto;">
-                            <table class="table table-sm table-striped mb-0" id="attributeTable">
-                                <thead class="table-dark sticky-top">
-                                    ${createTableHeader(layer)}
-                                </thead>
-                                <tbody>
-                                    ${createTableBody(layer)}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary" onclick="exportTableData('${layer.id}')">
-                            <i class="fas fa-download me-1"></i>Export CSV
+    // Create docked attribute table HTML
+    const dockedTableHTML = `
+        <div id="dockedAttributeTable" class="docked-attribute-table">
+            <div class="docked-table-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
+                    </h6>
+                    <div class="docked-table-controls">
+                        <button class="btn btn-sm btn-outline-light" onclick="toggleDockedTableSize()" title="Toggle Size">
+                            <i class="fas fa-expand-alt" id="tableToggleIcon"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" onclick="closeDockedTable()" title="Close">
+                            <i class="fas fa-times"></i>
                         </button>
                     </div>
                 </div>
             </div>
+            <div class="docked-table-toolbar">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
+                                <i class="fas fa-check-square me-1"></i>Select All
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
+                                <i class="fas fa-square me-1"></i>Clear Selection
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
+                                <i class="fas fa-search-plus me-1"></i>Zoom to Selection
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="exportTableData('${layer.id}')">
+                                <i class="fas fa-download me-1"></i>Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <span class="text-muted">
+                            <span id="selectedCount">0</span> of ${layer.records.length} features selected
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="docked-table-content">
+                <table class="table table-sm table-striped mb-0" id="attributeTable">
+                    <thead class="table-dark sticky-top">
+                        ${createTableHeader(layer)}
+                    </thead>
+                    <tbody>
+                        ${createTableBody(layer)}
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
 
-    // Add modal to document
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    // Add docked table to map container
+    const mapContainer = document.querySelector('.map-container');
+    mapContainer.insertAdjacentHTML('beforeend', dockedTableHTML);
 
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('attributeTableModal'));
-    modal.show();
-
-    // Clean up when modal is closed
-    document.getElementById('attributeTableModal').addEventListener('hidden.bs.modal', function () {
-        this.remove();
-    });
+    // Adjust map height to accommodate the docked table
+    adjustMapForDockedTable();
 }
 
 function createTableHeader(layer) {
@@ -1653,6 +1648,24 @@ function updatePopupFieldSelection(fieldName, isSelected) {
     } else if (!isSelected) {
         layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
     }
+    
+    // Update the actual layer reference in mapLayers array
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        mapLayers[layerIndex] = layer;
+        
+        // Refresh popup content for all features in this layer
+        layer.features.forEach(feature => {
+            if (feature.recordData) {
+                const newPopupContent = createFeaturePopup(feature.recordData, layer);
+                if (feature.getPopup()) {
+                    feature.getPopup().setContent(newPopupContent);
+                } else {
+                    feature.bindPopup(newPopupContent);
+                }
+            }
+        });
+    }
 }
 
 function selectAllPopupFields() {
@@ -1975,6 +1988,8 @@ window.showAttributeTable = showAttributeTable;
 window.showLayerProperties = showLayerProperties;
 window.removeLayer = removeLayer;
 window.changeBasemap = changeBasemap;
+window.toggleDockedTableSize = toggleDockedTableSize;
+window.closeDockedTable = closeDockedTable;
 window.startMeasurement = startMeasurement;
 window.clearMeasurements = clearMeasurements;
 window.loadFilterFields = loadFilterFields;
@@ -2003,6 +2018,57 @@ window.exportTableData = exportTableData;
 window.clearSelection = clearSelection;
 window.toggleAllRows = toggleAllRows;
 window.updatePopupFieldSelection = updatePopupFieldSelection;
+
+// Docked table utility functions
+function toggleDockedTableSize() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
+    
+    if (!dockedTable) return;
+    
+    if (dockedTable.classList.contains('expanded')) {
+        dockedTable.classList.remove('expanded');
+        toggleIcon.className = 'fas fa-expand-alt';
+    } else {
+        dockedTable.classList.add('expanded');
+        toggleIcon.className = 'fas fa-compress-alt';
+    }
+    
+    adjustMapForDockedTable();
+}
+
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        adjustMapForDockedTable();
+    }
+}
+
+function adjustMapForDockedTable() {
+    const mapElement = document.getElementById('map');
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    
+    if (!mapElement) return;
+    
+    if (dockedTable) {
+        const isExpanded = dockedTable.classList.contains('expanded');
+        const tableHeight = isExpanded ? '60%' : '30%';
+        const mapHeight = isExpanded ? '40%' : '70%';
+        
+        mapElement.style.height = mapHeight;
+        dockedTable.style.height = tableHeight;
+    } else {
+        mapElement.style.height = '100%';
+    }
+    
+    // Invalidate map size to ensure proper rendering
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
+}
 
 // Global functions for popup zoom controls
 window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
