@@ -433,16 +433,20 @@ function createFeaturePopup(fields, layerConfig) {
     content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
 
     // Get the selected popup fields from layer properties
-    // If no specific fields are selected, show all fields except geometry
     const selectedFields = layerConfig.properties?.popup?.fields;
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
-    const fieldsToShow = selectedFields && selectedFields.length > 0 ? selectedFields : allFields;
+    
+    // Use selected fields if they exist and have at least one field selected
+    // Otherwise, show all fields except geometry
+    let fieldsToShow;
+    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
+        fieldsToShow = selectedFields;
+    } else {
+        fieldsToShow = allFields;
+    }
 
-    // Always show all available fields if none are specifically configured
-    const finalFieldsToShow = fieldsToShow.length > 0 ? fieldsToShow : allFields;
-
-    // Show selected fields or all fields if none selected
-    finalFieldsToShow.forEach(key => {
+    // Show the determined fields
+    fieldsToShow.forEach(key => {
         if (key !== layerConfig.geometryField && fields[key] !== null && fields[key] !== undefined) {
             let value = fields[key];
             if (typeof value === 'string' && value.length > 100) {
@@ -1066,7 +1070,7 @@ function populatePopupFieldsSelector(layer) {
     if (!container || !layer.records || layer.records.length === 0) return;
 
     const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-    const selectedFields = layer.properties?.popup?.fields || fields;
+    const selectedFields = layer.properties?.popup?.fields || [];
 
     let html = '';
     fields.forEach(field => {
@@ -1734,7 +1738,8 @@ function updatePopupFieldSelection(fieldName, isSelected) {
 
     const layer = window.currentPropertiesLayer;
     if (!layer.properties) layer.properties = {};
-    if (!layer.properties.popup) layer.properties.popup = { fields: [] };
+    if (!layer.properties.popup) layer.properties.popup = {};
+    if (!layer.properties.popup.fields) layer.properties.popup.fields = [];
 
     if (isSelected && !layer.properties.popup.fields.includes(fieldName)) {
         layer.properties.popup.fields.push(fieldName);
@@ -1745,7 +1750,7 @@ function updatePopupFieldSelection(fieldName, isSelected) {
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
-        mapLayers[layerIndex] = layer;
+        mapLayers[layerIndex].properties = layer.properties;
 
         // Refresh popup content for all features in this layer
         layer.features.forEach(feature => {
