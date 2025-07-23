@@ -276,6 +276,35 @@
             display: none !important;
         }
         
+        /* Enhanced label styling for better visibility */
+        .enhanced-feature-label {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 2px solid #2c3e50 !important;
+            border-radius: 6px !important;
+            padding: 4px 8px !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+            color: #2c3e50 !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8) !important;
+            white-space: nowrap !important;
+            pointer-events: none !important;
+            z-index: 1000 !important;
+            line-height: 1.2 !important;
+            min-width: 40px !important;
+            text-align: center !important;
+        }
+        
+        .enhanced-feature-label:before {
+            display: none !important;
+        }
+        
+        /* Reduce feature opacity when labels are enabled */
+        .labeled-feature {
+            fill-opacity: 0.5 !important;
+            stroke-opacity: 0.8 !important;
+        }
+        
         .popup-field-selector {
             max-height: 200px;
             overflow-y: auto;
