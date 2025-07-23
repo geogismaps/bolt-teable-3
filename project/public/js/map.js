@@ -727,11 +727,528 @@ function zoomToLayer(layerId) {
 }
 
 function showAttributeTable(layerId) {
-    showInfo('Attribute table functionality would be implemented here');
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+
+    if (!layer.records || layer.records.length === 0) {
+        showError('No data available for this layer');
+        return;
+    }
+
+    // Create and show attribute table modal
+    createAttributeTableModal(layer);
 }
 
 function showLayerProperties(layerId) {
-    showInfo('Layer properties functionality would be implemented here');
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+
+    // Store current layer for properties modal
+    window.currentPropertiesLayer = layer;
+    
+    // Populate properties modal with layer data
+    populatePropertiesModal(layer);
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
+    modal.show();
+}
+
+function createAttributeTableModal(layer) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('attributeTableModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create modal HTML
+    const modalHTML = `
+        <div class="modal fade" id="attributeTableModal" tabindex="-1" aria-labelledby="attributeTableModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="attributeTableModalLabel">
+                            <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="table-toolbar p-3 bg-light border-bottom">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
+                                            <i class="fas fa-check-square me-1"></i>Select All
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
+                                            <i class="fas fa-square me-1"></i>Clear Selection
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
+                                            <i class="fas fa-search-plus me-1"></i>Zoom to Selection
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <span class="text-muted">
+                                        <span id="selectedCount">0</span> of ${layer.records.length} features selected
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-container" style="max-height: 500px; overflow: auto;">
+                            <table class="table table-sm table-striped mb-0" id="attributeTable">
+                                <thead class="table-dark sticky-top">
+                                    ${createTableHeader(layer)}
+                                </thead>
+                                <tbody>
+                                    ${createTableBody(layer)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="exportTableData('${layer.id}')">
+                            <i class="fas fa-download me-1"></i>Export CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add modal to document
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('attributeTableModal'));
+    modal.show();
+
+    // Clean up when modal is closed
+    document.getElementById('attributeTableModal').addEventListener('hidden.bs.modal', function () {
+        this.remove();
+    });
+}
+
+function createTableHeader(layer) {
+    if (!layer.records || layer.records.length === 0) return '';
+    
+    const fields = Object.keys(layer.records[0].fields || {});
+    let headerHTML = '<tr>';
+    
+    // Add selection checkbox column
+    headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
+    
+    // Add field columns
+    fields.forEach(field => {
+        if (field !== layer.geometryField) {
+            headerHTML += `<th>${field}</th>`;
+        }
+    });
+    
+    // Add actions column
+    headerHTML += '<th style="width: 100px;">Actions</th>';
+    headerHTML += '</tr>';
+    
+    return headerHTML;
+}
+
+function createTableBody(layer) {
+    if (!layer.records || layer.records.length === 0) return '';
+    
+    const fields = Object.keys(layer.records[0].fields || {});
+    let bodyHTML = '';
+    
+    layer.records.forEach((record, index) => {
+        bodyHTML += `<tr data-record-id="${record.id}" data-feature-index="${index}">`;
+        
+        // Add selection checkbox
+        bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
+        
+        // Add field data
+        fields.forEach(field => {
+            if (field !== layer.geometryField) {
+                let value = record.fields[field];
+                if (value === null || value === undefined) {
+                    value = '';
+                } else if (typeof value === 'string' && value.length > 50) {
+                    value = value.substring(0, 50) + '...';
+                }
+                bodyHTML += `<td title="${record.fields[field] || ''}">${value}</td>`;
+            }
+        });
+        
+        // Add actions
+        bodyHTML += `
+            <td>
+                <button class="btn btn-xs btn-outline-primary" onclick="zoomToFeature('${layer.id}', ${index})" title="Zoom to Feature">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="btn btn-xs btn-outline-info" onclick="showFeatureInfo('${layer.id}', ${index})" title="Show Info">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </td>
+        `;
+        
+        bodyHTML += '</tr>';
+    });
+    
+    return bodyHTML;
+}
+
+function populatePropertiesModal(layer) {
+    // Information tab
+    document.getElementById('propLayerName').value = layer.name || '';
+    document.getElementById('propDataSource').value = layer.tableId || '';
+    document.getElementById('propGeometryType').value = determineGeometryType(layer);
+    document.getElementById('propFeatureCount').value = layer.featureCount || 0;
+
+    // Populate field selectors
+    populateFieldSelectors(layer);
+
+    // Symbology tab
+    const symbology = layer.properties?.symbology || {};
+    document.getElementById('propSymbologyType').value = symbology.type || 'single';
+    document.getElementById('propFillColor').value = symbology.fillColor || '#3498db';
+    document.getElementById('propBorderColor').value = symbology.borderColor || '#2c3e50';
+    document.getElementById('propBorderWidth').value = symbology.borderWidth || 2;
+    document.getElementById('propFillOpacity').value = symbology.fillOpacity || 0.7;
+    
+    // Update opacity display
+    document.getElementById('fillOpacityValue').textContent = Math.round((symbology.fillOpacity || 0.7) * 100) + '%';
+    document.getElementById('borderWidthValue').textContent = (symbology.borderWidth || 2) + 'px';
+
+    // Labels tab
+    const labels = layer.properties?.labels || {};
+    document.getElementById('propEnableLabels').checked = labels.enabled || false;
+    document.getElementById('propLabelField').value = labels.field || '';
+    document.getElementById('propLabelSize').value = labels.fontSize || 12;
+    document.getElementById('propLabelColor').value = labels.color || '#333333';
+    document.getElementById('propLabelBackground').checked = labels.background !== false;
+
+    // Update label controls visibility
+    document.getElementById('propLabelControls').style.display = labels.enabled ? 'block' : 'none';
+
+    // iTool tab
+    populatePopupFieldsSelector(layer);
+    document.getElementById('propMaxPopupWidth').value = layer.properties?.popup?.maxWidth || 300;
+
+    // Update symbology type display
+    updateSymbologyType();
+}
+
+function populateFieldSelectors(layer) {
+    if (!layer.records || layer.records.length === 0) return;
+    
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    
+    // Populate label field selector
+    const labelFieldSelect = document.getElementById('propLabelField');
+    if (labelFieldSelect) {
+        const currentValue = labelFieldSelect.value;
+        labelFieldSelect.innerHTML = '<option value="">Select field...</option>';
+        fields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            labelFieldSelect.appendChild(option);
+        });
+        if (currentValue) labelFieldSelect.value = currentValue;
+    }
+
+    // Populate graduated field selector
+    const graduatedFieldSelect = document.getElementById('propGraduatedField');
+    if (graduatedFieldSelect) {
+        const currentValue = graduatedFieldSelect.value;
+        graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
+        fields.forEach(field => {
+            // Try to determine if field is numeric by checking sample values
+            const isNumeric = layer.records.some(record => {
+                const value = record.fields[field];
+                return !isNaN(parseFloat(value)) && isFinite(value);
+            });
+            
+            if (isNumeric) {
+                const option = document.createElement('option');
+                option.value = field;
+                option.textContent = field;
+                graduatedFieldSelect.appendChild(option);
+            }
+        });
+        if (currentValue) graduatedFieldSelect.value = currentValue;
+    }
+
+    // Populate categorized field selector
+    const categorizedFieldSelect = document.getElementById('propCategorizedField');
+    if (categorizedFieldSelect) {
+        const currentValue = categorizedFieldSelect.value;
+        categorizedFieldSelect.innerHTML = '<option value="">Select field...</option>';
+        fields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            categorizedFieldSelect.appendChild(option);
+        });
+        if (currentValue) categorizedFieldSelect.value = currentValue;
+    }
+}
+
+function populatePopupFieldsSelector(layer) {
+    const container = document.getElementById('propPopupFields');
+    if (!container || !layer.records || layer.records.length === 0) return;
+
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const selectedFields = layer.properties?.popup?.fields || fields;
+
+    let html = '';
+    fields.forEach(field => {
+        const isSelected = selectedFields.includes(field);
+        html += `
+            <div class="field-checkbox">
+                <input class="form-check-input" type="checkbox" id="popup_field_${field}" 
+                       ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
+                <label class="form-check-label" for="popup_field_${field}">
+                    ${field}
+                </label>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function determineGeometryType(layer) {
+    if (!layer.features || layer.features.length === 0) return 'Unknown';
+    
+    const feature = layer.features[0];
+    if (feature.getLatLng) return 'Point';
+    if (feature.getLatLngs) return 'Polygon';
+    return 'Unknown';
+}
+
+function selectAllRows(layerId) {
+    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, true);
+    });
+}
+
+function clearSelection(layerId) {
+    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, false);
+    });
+}
+
+function toggleAllRows(masterCheckbox, layerId) {
+    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = masterCheckbox.checked;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, masterCheckbox.checked);
+    });
+}
+
+function toggleRowSelection(layerId, featureIndex, isSelected) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.features[featureIndex]) return;
+
+    const feature = layer.features[featureIndex];
+    
+    if (isSelected) {
+        // Add to selection
+        if (!selectedFeatures.includes(feature)) {
+            selectedFeatures.push(feature);
+            
+            // Highlight feature on map
+            if (feature.setStyle) {
+                feature.setStyle({
+                    color: '#ff0000',
+                    weight: 4,
+                    fillOpacity: 0.9
+                });
+            }
+        }
+    } else {
+        // Remove from selection
+        const index = selectedFeatures.indexOf(feature);
+        if (index !== -1) {
+            selectedFeatures.splice(index, 1);
+            
+            // Reset feature style
+            if (feature.setStyle) {
+                const originalStyle = layer.properties?.symbology || {};
+                feature.setStyle({
+                    color: originalStyle.borderColor || '#3498db',
+                    weight: originalStyle.borderWidth || 2,
+                    fillOpacity: originalStyle.fillOpacity || 0.7,
+                    fillColor: originalStyle.fillColor || '#3498db'
+                });
+            }
+        }
+    }
+
+    // Update selection count
+    updateSelectionCount();
+}
+
+function updateSelectionCount() {
+    const countElement = document.getElementById('selectedCount');
+    const zoomButton = document.getElementById('zoomToSelectionBtn');
+    
+    if (countElement) {
+        countElement.textContent = selectedFeatures.length;
+    }
+    
+    if (zoomButton) {
+        zoomButton.disabled = selectedFeatures.length === 0;
+    }
+}
+
+function zoomToSelection(layerId) {
+    if (selectedFeatures.length === 0) {
+        showWarning('No features selected');
+        return;
+    }
+
+    // Create bounds from selected features
+    let bounds = null;
+    selectedFeatures.forEach(feature => {
+        if (feature.getBounds) {
+            const featureBounds = feature.getBounds();
+            if (!bounds) {
+                bounds = featureBounds;
+            } else {
+                bounds.extend(featureBounds);
+            }
+        } else if (feature.getLatLng) {
+            const latlng = feature.getLatLng();
+            if (!bounds) {
+                bounds = L.latLngBounds([latlng, latlng]);
+            } else {
+                bounds.extend(latlng);
+            }
+        }
+    });
+
+    if (bounds) {
+        map.fitBounds(bounds.pad(0.1));
+        showSuccess(`Zoomed to ${selectedFeatures.length} selected feature(s)`);
+    }
+}
+
+function zoomToFeature(layerId, featureIndex, options = null) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.features[featureIndex]) return;
+
+    const feature = layer.features[featureIndex];
+    
+    // Store reference for popup zoom controls
+    window.currentPopupFeature = feature;
+    
+    const defaultOptions = {
+        padding: 0.3,
+        maxZoom: 18,
+        minZoom: 10
+    };
+    
+    const zoomOptions = { ...defaultOptions, ...options };
+
+    if (feature.getBounds) {
+        // Polygon or complex geometry
+        const bounds = feature.getBounds();
+        map.fitBounds(bounds.pad(zoomOptions.padding), {
+            maxZoom: zoomOptions.maxZoom
+        });
+    } else if (feature.getLatLng) {
+        // Point geometry
+        const latlng = feature.getLatLng();
+        map.setView(latlng, Math.max(zoomOptions.minZoom, map.getZoom()));
+    }
+
+    // Open popup if feature has one
+    if (feature.getPopup && feature.getPopup()) {
+        feature.openPopup();
+    }
+
+    showSuccess('Zoomed to feature');
+}
+
+function showFeatureInfo(layerId, featureIndex) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.records[featureIndex]) return;
+
+    const record = layer.records[featureIndex];
+    const feature = layer.features[featureIndex];
+    
+    // Create popup content
+    const popupContent = createFeaturePopup(record.fields, layer);
+    
+    // Show popup on map
+    if (feature.getBounds) {
+        const center = feature.getBounds().getCenter();
+        L.popup()
+            .setLatLng(center)
+            .setContent(popupContent)
+            .openOn(map);
+    } else if (feature.getLatLng) {
+        feature.bindPopup(popupContent).openPopup();
+    }
+}
+
+function exportTableData(layerId) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.records) {
+        showError('No data to export');
+        return;
+    }
+
+    try {
+        // Prepare CSV data
+        const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        
+        // Create CSV header
+        let csvContent = fields.join(',') + '\n';
+        
+        // Add data rows
+        layer.records.forEach(record => {
+            const row = fields.map(field => {
+                let value = record.fields[field] || '';
+                // Escape commas and quotes
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                    value = '"' + value.replace(/"/g, '""') + '"';
+                }
+                return value;
+            });
+            csvContent += row.join(',') + '\n';
+        });
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${layer.name}_data.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showSuccess('Data exported successfully');
+    } catch (error) {
+        console.error('Export error:', error);
+        showError('Failed to export data: ' + error.message);
+    }
 }
 
 function removeLayer(layerId) {
@@ -1084,6 +1601,369 @@ function showAlert(type, message) {
     }, 5000);
 }
 
+// Properties modal functions
+function switchPropertiesTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.properties-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update tab content
+    document.querySelectorAll('.tab-pane').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById(tabName + '-tab').style.display = 'block';
+}
+
+function updateSymbologyType() {
+    const symbologyType = document.getElementById('propSymbologyType').value;
+    const singleControls = document.getElementById('propSingleSymbol');
+    const graduatedControls = document.getElementById('propGraduated');
+    const categorizedControls = document.getElementById('propCategorized');
+    
+    // Hide all controls first
+    if (singleControls) singleControls.style.display = 'none';
+    if (graduatedControls) graduatedControls.style.display = 'none';
+    if (categorizedControls) categorizedControls.style.display = 'none';
+    
+    // Show relevant controls
+    switch (symbologyType) {
+        case 'single':
+            if (singleControls) singleControls.style.display = 'block';
+            break;
+        case 'graduated':
+            if (graduatedControls) graduatedControls.style.display = 'block';
+            break;
+        case 'categorized':
+            if (categorizedControls) categorizedControls.style.display = 'block';
+            break;
+    }
+}
+
+function updatePopupFieldSelection(fieldName, isSelected) {
+    if (!window.currentPropertiesLayer) return;
+    
+    const layer = window.currentPropertiesLayer;
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = { fields: [] };
+    
+    if (isSelected && !layer.properties.popup.fields.includes(fieldName)) {
+        layer.properties.popup.fields.push(fieldName);
+    } else if (!isSelected) {
+        layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
+    }
+}
+
+function selectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, true);
+    });
+}
+
+function deselectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, false);
+    });
+}
+
+function generateGraduatedSymbology() {
+    const field = document.getElementById('propGraduatedField').value;
+    const classes = parseInt(document.getElementById('propGraduatedClasses').value);
+    const colorRamp = document.getElementById('propColorRamp').value;
+    
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for graduated symbology');
+        return;
+    }
+    
+    const layer = window.currentPropertiesLayer;
+    const values = layer.records.map(record => parseFloat(record.fields[field])).filter(v => !isNaN(v));
+    
+    if (values.length === 0) {
+        showError('No numeric values found in the selected field');
+        return;
+    }
+    
+    // Calculate class breaks
+    values.sort((a, b) => a - b);
+    const min = values[0];
+    const max = values[values.length - 1];
+    const interval = (max - min) / classes;
+    
+    // Generate color ramp
+    const colors = generateColorRamp(colorRamp, classes);
+    
+    // Create legend
+    let legendHTML = '<div class="graduated-legend">';
+    for (let i = 0; i < classes; i++) {
+        const minVal = (min + i * interval).toFixed(2);
+        const maxVal = (min + (i + 1) * interval).toFixed(2);
+        legendHTML += `
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: ${colors[i]}"></div>
+                <span>${minVal} - ${maxVal}</span>
+            </div>
+        `;
+    }
+    legendHTML += '</div>';
+    
+    const legendContainer = document.getElementById('propGraduatedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+    
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    layer.properties.symbology = {
+        type: 'graduated',
+        field: field,
+        classes: classes,
+        colorRamp: colorRamp,
+        breaks: Array.from({length: classes}, (_, i) => min + (i + 1) * interval),
+        colors: colors
+    };
+    
+    showSuccess('Graduated symbology generated successfully');
+}
+
+function generateCategorizedSymbology() {
+    const field = document.getElementById('propCategorizedField').value;
+    
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for categorized symbology');
+        return;
+    }
+    
+    const layer = window.currentPropertiesLayer;
+    const uniqueValues = [...new Set(layer.records.map(record => record.fields[field]).filter(v => v != null))];
+    
+    if (uniqueValues.length === 0) {
+        showError('No values found in the selected field');
+        return;
+    }
+    
+    // Generate colors
+    const colors = generateColorPalette(uniqueValues.length);
+    
+    // Create legend
+    let legendHTML = '<div class="categorized-legend">';
+    uniqueValues.forEach((value, index) => {
+        legendHTML += `
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: ${colors[index]}"></div>
+                <span>${value}</span>
+            </div>
+        `;
+    });
+    legendHTML += '</div>';
+    
+    const legendContainer = document.getElementById('propCategorizedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+    
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    layer.properties.symbology = {
+        type: 'categorized',
+        field: field,
+        categories: uniqueValues.map((value, index) => ({
+            value: value,
+            color: colors[index],
+            label: String(value)
+        }))
+    };
+    
+    showSuccess('Categorized symbology generated successfully');
+}
+
+function generateColorRamp(rampName, count) {
+    const ramps = {
+        blues: ['#08519c', '#3182bd', '#6baed6', '#9ecae1', '#c6dbef'],
+        greens: ['#006d2c', '#31a354', '#74c476', '#a1d99b', '#c7e9c0'],
+        reds: ['#a50f15', '#de2d26', '#fb6a4a', '#fc9272', '#fcbba1'],
+        oranges: ['#b30000', '#e34a33', '#fc8d59', '#fdbb84', '#fdd49e'],
+        purples: ['#54278f', '#756bb1', '#9e9ac8', '#bcbddc', '#dadaeb']
+    };
+    
+    const baseColors = ramps[rampName] || ramps.blues;
+    
+    if (count <= baseColors.length) {
+        return baseColors.slice(0, count);
+    }
+    
+    // Interpolate colors if we need more than available
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        const ratio = i / (count - 1);
+        const index = ratio * (baseColors.length - 1);
+        const lower = Math.floor(index);
+        const upper = Math.ceil(index);
+        
+        if (lower === upper) {
+            colors.push(baseColors[lower]);
+        } else {
+            // Simple interpolation
+            colors.push(baseColors[lower]); // For simplicity, just use the lower color
+        }
+    }
+    
+    return colors;
+}
+
+function generateColorPalette(count) {
+    const colors = [];
+    const hueStep = 360 / count;
+    
+    for (let i = 0; i < count; i++) {
+        const hue = (i * hueStep) % 360;
+        const saturation = 70 + (i % 3) * 10;
+        const lightness = 50 + (i % 2) * 10;
+        
+        colors.push(hslToHex(hue, saturation, lightness));
+    }
+    
+    return colors;
+}
+
+function hslToHex(h, s, l) {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function applyProperties() {
+    if (!window.currentPropertiesLayer) {
+        showError('No layer selected for properties update');
+        return;
+    }
+    
+    const layer = window.currentPropertiesLayer;
+    
+    // Update layer name
+    layer.name = document.getElementById('propLayerName').value;
+    
+    // Update symbology properties
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+    
+    layer.properties.symbology.fillColor = document.getElementById('propFillColor').value;
+    layer.properties.symbology.borderColor = document.getElementById('propBorderColor').value;
+    layer.properties.symbology.borderWidth = parseInt(document.getElementById('propBorderWidth').value);
+    layer.properties.symbology.fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
+    
+    // Update labels properties
+    if (!layer.properties.labels) layer.properties.labels = {};
+    layer.properties.labels.enabled = document.getElementById('propEnableLabels').checked;
+    layer.properties.labels.field = document.getElementById('propLabelField').value;
+    layer.properties.labels.fontSize = parseInt(document.getElementById('propLabelSize').value);
+    layer.properties.labels.color = document.getElementById('propLabelColor').value;
+    layer.properties.labels.background = document.getElementById('propLabelBackground').checked;
+    
+    // Update popup properties
+    if (!layer.properties.popup) layer.properties.popup = {};
+    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
+    
+    // Apply changes to map features
+    applyLayerStyling(layer);
+    
+    // Update layers list
+    updateLayersList();
+    
+    showSuccess('Layer properties applied successfully');
+}
+
+function applyAndCloseProperties() {
+    applyProperties();
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function cancelProperties() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function applyLayerStyling(layer) {
+    if (!layer.features || !layer.properties) return;
+    
+    const symbology = layer.properties.symbology;
+    
+    layer.features.forEach(feature => {
+        if (feature.setStyle) {
+            feature.setStyle({
+                fillColor: symbology.fillColor || '#3498db',
+                color: symbology.borderColor || '#2c3e50',
+                weight: symbology.borderWidth || 2,
+                fillOpacity: symbology.fillOpacity || 0.7
+            });
+        }
+    });
+    
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    }
+}
+
+function applyLabelsToLayer(layer) {
+    // Remove existing labels
+    if (layer.labelGroup) {
+        map.removeLayer(layer.labelGroup);
+    }
+    
+    const labels = layer.properties.labels;
+    if (!labels.enabled || !labels.field) return;
+    
+    const labelMarkers = [];
+    
+    layer.features.forEach((feature, index) => {
+        const record = layer.records[index];
+        if (!record || !record.fields[labels.field]) return;
+        
+        let labelPosition;
+        if (feature.getLatLng) {
+            labelPosition = feature.getLatLng();
+        } else if (feature.getBounds) {
+            labelPosition = feature.getBounds().getCenter();
+        } else {
+            return;
+        }
+        
+        const labelText = record.fields[labels.field];
+        const labelMarker = L.marker(labelPosition, {
+            icon: L.divIcon({
+                className: 'enhanced-feature-label',
+                html: labelText,
+                iconSize: [null, null],
+                iconAnchor: [0, 0]
+            })
+        });
+        
+        labelMarkers.push(labelMarker);
+    });
+    
+    if (labelMarkers.length > 0) {
+        layer.labelGroup = L.layerGroup(labelMarkers).addTo(map);
+    }
+}
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -1111,15 +1991,18 @@ window.applyProperties = applyProperties;
 window.applyAndCloseProperties = applyAndCloseProperties;
 window.cancelProperties = cancelProperties;
 window.selectAllRows = selectAllRows;
-window.selectTableRow = selectTableRow;
 window.toggleRowSelection = toggleRowSelection;
 window.zoomToSelection = zoomToSelection;
-window.closeAttributeTable = closeAttributeTable;
 window.generateGraduatedSymbology = generateGraduatedSymbology;
 window.generateCategorizedSymbology = generateCategorizedSymbology;
 window.selectAllPopupFields = selectAllPopupFields;
 window.deselectAllPopupFields = deselectAllPopupFields;
 window.zoomToFeature = zoomToFeature;
+window.showFeatureInfo = showFeatureInfo;
+window.exportTableData = exportTableData;
+window.clearSelection = clearSelection;
+window.toggleAllRows = toggleAllRows;
+window.updatePopupFieldSelection = updatePopupFieldSelection;
 
 // Global functions for popup zoom controls
 window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
