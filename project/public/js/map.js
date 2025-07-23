@@ -309,6 +309,12 @@ async function createLayerFromData(records, layerConfig) {
                             marker.recordId = record.id;
                             marker.recordData = record.fields;
                             marker.layerId = layerConfig.id;
+                            marker.featureIndex = index;
+
+                            // Add click handler for selection
+                            marker.on('click', function(e) {
+                                handleFeatureClick(this, index, layerConfig);
+                            });
 
                             features.push(marker);
                             validFeatureCount++;
@@ -417,12 +423,13 @@ function createFeaturePopup(fields, layerConfig) {
     content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
 
     // Get the selected popup fields from layer properties
-    const selectedFields = layerConfig.properties && layerConfig.properties.popup && layerConfig.properties.popup.fields 
-        ? layerConfig.properties.popup.fields 
-        : Object.keys(fields).filter(key => key !== layerConfig.geometryField);
+    // If no specific fields are selected, show all fields except geometry
+    const selectedFields = layerConfig.properties?.popup?.fields;
+    const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
+    const fieldsToShow = selectedFields && selectedFields.length > 0 ? selectedFields : allFields;
 
-    // Only show selected fields
-    selectedFields.forEach(key => {
+    // Show selected fields or all fields if none selected
+    fieldsToShow.forEach(key => {
         if (key !== layerConfig.geometryField && fields[key] !== null && fields[key] !== undefined) {
             let value = fields[key];
             if (typeof value === 'string' && value.length > 100) {
@@ -751,10 +758,10 @@ function showLayerProperties(layerId) {
 
     // Store current layer for properties modal
     window.currentPropertiesLayer = layer;
-    
+
     // Populate properties modal with layer data
     populatePropertiesModal(layer);
-    
+
     // Show the modal
     const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
     modal.show();
@@ -833,39 +840,39 @@ function createDockedAttributeTable(layer) {
 
 function createTableHeader(layer) {
     if (!layer.records || layer.records.length === 0) return '';
-    
+
     const fields = Object.keys(layer.records[0].fields || {});
     let headerHTML = '<tr>';
-    
+
     // Add selection checkbox column
     headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
-    
+
     // Add field columns
     fields.forEach(field => {
         if (field !== layer.geometryField) {
             headerHTML += `<th>${field}</th>`;
         }
     });
-    
+
     // Add actions column
     headerHTML += '<th style="width: 100px;">Actions</th>';
     headerHTML += '</tr>';
-    
+
     return headerHTML;
 }
 
 function createTableBody(layer) {
     if (!layer.records || layer.records.length === 0) return '';
-    
+
     const fields = Object.keys(layer.records[0].fields || {});
     let bodyHTML = '';
-    
+
     layer.records.forEach((record, index) => {
         bodyHTML += `<tr data-record-id="${record.id}" data-feature-index="${index}">`;
-        
+
         // Add selection checkbox
         bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
-        
+
         // Add field data
         fields.forEach(field => {
             if (field !== layer.geometryField) {
@@ -878,7 +885,7 @@ function createTableBody(layer) {
                 bodyHTML += `<td title="${record.fields[field] || ''}">${value}</td>`;
             }
         });
-        
+
         // Add actions
         bodyHTML += `
             <td>
@@ -890,10 +897,10 @@ function createTableBody(layer) {
                 </button>
             </td>
         `;
-        
+
         bodyHTML += '</tr>';
     });
-    
+
     return bodyHTML;
 }
 
@@ -914,7 +921,7 @@ function populatePropertiesModal(layer) {
     document.getElementById('propBorderColor').value = symbology.borderColor || '#2c3e50';
     document.getElementById('propBorderWidth').value = symbology.borderWidth || 2;
     document.getElementById('propFillOpacity').value = symbology.fillOpacity || 0.7;
-    
+
     // Update opacity display
     document.getElementById('fillOpacityValue').textContent = Math.round((symbology.fillOpacity || 0.7) * 100) + '%';
     document.getElementById('borderWidthValue').textContent = (symbology.borderWidth || 2) + 'px';
@@ -923,7 +930,7 @@ function populatePropertiesModal(layer) {
     const labels = layer.properties?.labels || {};
     document.getElementById('propEnableLabels').checked = labels.enabled || false;
     document.getElementById('propLabelField').value = labels.field || '';
-    document.getElementById('propLabelSize').value = labels.fontSize || 12;
+    documentgetElementById('propLabelSize').value = labels.fontSize || 12;
     document.getElementById('propLabelColor').value = labels.color || '#333333';
     document.getElementById('propLabelBackground').checked = labels.background !== false;
 
@@ -940,9 +947,9 @@ function populatePropertiesModal(layer) {
 
 function populateFieldSelectors(layer) {
     if (!layer.records || layer.records.length === 0) return;
-    
+
     const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-    
+
     // Populate label field selector
     const labelFieldSelect = document.getElementById('propLabelField');
     if (labelFieldSelect) {
@@ -968,7 +975,7 @@ function populateFieldSelectors(layer) {
                 const value = record.fields[field];
                 return !isNaN(parseFloat(value)) && isFinite(value);
             });
-            
+
             if (isNumeric) {
                 const option = document.createElement('option');
                 option.value = field;
@@ -1020,7 +1027,7 @@ function populatePopupFieldsSelector(layer) {
 
 function determineGeometryType(layer) {
     if (!layer.features || layer.features.length === 0) return 'Unknown';
-    
+
     const feature = layer.features[0];
     if (feature.getLatLng) return 'Point';
     if (feature.getLatLngs) return 'Polygon';
@@ -1059,12 +1066,12 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
     if (!layer || !layer.features[featureIndex]) return;
 
     const feature = layer.features[featureIndex];
-    
+
     if (isSelected) {
         // Add to selection
         if (!selectedFeatures.includes(feature)) {
             selectedFeatures.push(feature);
-            
+
             // Highlight feature on map
             if (feature.setStyle) {
                 feature.setStyle({
@@ -1079,7 +1086,7 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
         const index = selectedFeatures.indexOf(feature);
         if (index !== -1) {
             selectedFeatures.splice(index, 1);
-            
+
             // Reset feature style
             if (feature.setStyle) {
                 const originalStyle = layer.properties?.symbology || {};
@@ -1100,11 +1107,11 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
 function updateSelectionCount() {
     const countElement = document.getElementById('selectedCount');
     const zoomButton = document.getElementById('zoomToSelectionBtn');
-    
+
     if (countElement) {
         countElement.textContent = selectedFeatures.length;
     }
-    
+
     if (zoomButton) {
         zoomButton.disabled = selectedFeatures.length === 0;
     }
@@ -1147,16 +1154,16 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     if (!layer || !layer.features[featureIndex]) return;
 
     const feature = layer.features[featureIndex];
-    
+
     // Store reference for popup zoom controls
     window.currentPopupFeature = feature;
-    
+
     const defaultOptions = {
         padding: 0.3,
         maxZoom: 18,
         minZoom: 10
     };
-    
+
     const zoomOptions = { ...defaultOptions, ...options };
 
     if (feature.getBounds) {
@@ -1185,10 +1192,10 @@ function showFeatureInfo(layerId, featureIndex) {
 
     const record = layer.records[featureIndex];
     const feature = layer.features[featureIndex];
-    
+
     // Create popup content
     const popupContent = createFeaturePopup(record.fields, layer);
-    
+
     // Show popup on map
     if (feature.getBounds) {
         const center = feature.getBounds().getCenter();
@@ -1211,10 +1218,10 @@ function exportTableData(layerId) {
     try {
         // Prepare CSV data
         const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-        
+
         // Create CSV header
         let csvContent = fields.join(',') + '\n';
-        
+
         // Add data rows
         layer.records.forEach(record => {
             const row = fields.map(field => {
@@ -1603,7 +1610,7 @@ function switchPropertiesTab(tabName) {
         tab.classList.remove('active');
     });
     event.target.classList.add('active');
-    
+
     // Update tab content
     document.querySelectorAll('.tab-pane').forEach(content => {
         content.style.display = 'none';
@@ -1616,12 +1623,12 @@ function updateSymbologyType() {
     const singleControls = document.getElementById('propSingleSymbol');
     const graduatedControls = document.getElementById('propGraduated');
     const categorizedControls = document.getElementById('propCategorized');
-    
+
     // Hide all controls first
     if (singleControls) singleControls.style.display = 'none';
     if (graduatedControls) graduatedControls.style.display = 'none';
     if (categorizedControls) categorizedControls.style.display = 'none';
-    
+
     // Show relevant controls
     switch (symbologyType) {
         case 'single':
@@ -1638,22 +1645,22 @@ function updateSymbologyType() {
 
 function updatePopupFieldSelection(fieldName, isSelected) {
     if (!window.currentPropertiesLayer) return;
-    
+
     const layer = window.currentPropertiesLayer;
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.popup) layer.properties.popup = { fields: [] };
-    
+
     if (isSelected && !layer.properties.popup.fields.includes(fieldName)) {
         layer.properties.popup.fields.push(fieldName);
     } else if (!isSelected) {
         layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
     }
-    
+
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
         mapLayers[layerIndex] = layer;
-        
+
         // Refresh popup content for all features in this layer
         layer.features.forEach(feature => {
             if (feature.recordData) {
@@ -1690,29 +1697,29 @@ function generateGraduatedSymbology() {
     const field = document.getElementById('propGraduatedField').value;
     const classes = parseInt(document.getElementById('propGraduatedClasses').value);
     const colorRamp = document.getElementById('propColorRamp').value;
-    
+
     if (!field || !window.currentPropertiesLayer) {
         showError('Please select a field for graduated symbology');
         return;
     }
-    
+
     const layer = window.currentPropertiesLayer;
     const values = layer.records.map(record => parseFloat(record.fields[field])).filter(v => !isNaN(v));
-    
+
     if (values.length === 0) {
         showError('No numeric values found in the selected field');
         return;
     }
-    
+
     // Calculate class breaks
     values.sort((a, b) => a - b);
     const min = values[0];
     const max = values[values.length - 1];
     const interval = (max - min) / classes;
-    
+
     // Generate color ramp
     const colors = generateColorRamp(colorRamp, classes);
-    
+
     // Create legend
     let legendHTML = '<div class="graduated-legend">';
     for (let i = 0; i < classes; i++) {
@@ -1726,12 +1733,12 @@ function generateGraduatedSymbology() {
         `;
     }
     legendHTML += '</div>';
-    
+
     const legendContainer = document.getElementById('propGraduatedLegend');
     if (legendContainer) {
         legendContainer.innerHTML = legendHTML;
     }
-    
+
     // Update layer properties
     if (!layer.properties) layer.properties = {};
     layer.properties.symbology = {
@@ -1742,29 +1749,29 @@ function generateGraduatedSymbology() {
         breaks: Array.from({length: classes}, (_, i) => min + (i + 1) * interval),
         colors: colors
     };
-    
+
     showSuccess('Graduated symbology generated successfully');
 }
 
 function generateCategorizedSymbology() {
     const field = document.getElementById('propCategorizedField').value;
-    
+
     if (!field || !window.currentPropertiesLayer) {
         showError('Please select a field for categorized symbology');
         return;
     }
-    
+
     const layer = window.currentPropertiesLayer;
     const uniqueValues = [...new Set(layer.records.map(record => record.fields[field]).filter(v => v != null))];
-    
+
     if (uniqueValues.length === 0) {
         showError('No values found in the selected field');
         return;
     }
-    
+
     // Generate colors
     const colors = generateColorPalette(uniqueValues.length);
-    
+
     // Create legend
     let legendHTML = '<div class="categorized-legend">';
     uniqueValues.forEach((value, index) => {
@@ -1776,12 +1783,12 @@ function generateCategorizedSymbology() {
         `;
     });
     legendHTML += '</div>';
-    
+
     const legendContainer = document.getElementById('propCategorizedLegend');
     if (legendContainer) {
         legendContainer.innerHTML = legendHTML;
     }
-    
+
     // Update layer properties
     if (!layer.properties) layer.properties = {};
     layer.properties.symbology = {
@@ -1793,7 +1800,7 @@ function generateCategorizedSymbology() {
             label: String(value)
         }))
     };
-    
+
     showSuccess('Categorized symbology generated successfully');
 }
 
@@ -1805,13 +1812,13 @@ function generateColorRamp(rampName, count) {
         oranges: ['#b30000', '#e34a33', '#fc8d59', '#fdbb84', '#fdd49e'],
         purples: ['#54278f', '#756bb1', '#9e9ac8', '#bcbddc', '#dadaeb']
     };
-    
+
     const baseColors = ramps[rampName] || ramps.blues;
-    
+
     if (count <= baseColors.length) {
         return baseColors.slice(0, count);
     }
-    
+
     // Interpolate colors if we need more than available
     const colors = [];
     for (let i = 0; i < count; i++) {
@@ -1819,7 +1826,7 @@ function generateColorRamp(rampName, count) {
         const index = ratio * (baseColors.length - 1);
         const lower = Math.floor(index);
         const upper = Math.ceil(index);
-        
+
         if (lower === upper) {
             colors.push(baseColors[lower]);
         } else {
@@ -1827,22 +1834,22 @@ function generateColorRamp(rampName, count) {
             colors.push(baseColors[lower]); // For simplicity, just use the lower color
         }
     }
-    
+
     return colors;
 }
 
 function generateColorPalette(count) {
     const colors = [];
     const hueStep = 360 / count;
-    
+
     for (let i = 0; i < count; i++) {
         const hue = (i * hueStep) % 360;
         const saturation = 70 + (i % 3) * 10;
         const lightness = 50 + (i % 2) * 10;
-        
+
         colors.push(hslToHex(hue, saturation, lightness));
     }
-    
+
     return colors;
 }
 
@@ -1862,21 +1869,21 @@ function applyProperties() {
         showError('No layer selected for properties update');
         return;
     }
-    
+
     const layer = window.currentPropertiesLayer;
-    
+
     // Update layer name
     layer.name = document.getElementById('propLayerName').value;
-    
+
     // Update symbology properties
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.symbology) layer.properties.symbology = {};
-    
+
     layer.properties.symbology.fillColor = document.getElementById('propFillColor').value;
     layer.properties.symbology.borderColor = document.getElementById('propBorderColor').value;
     layer.properties.symbology.borderWidth = parseInt(document.getElementById('propBorderWidth').value);
     layer.properties.symbology.fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
-    
+
     // Update labels properties
     if (!layer.properties.labels) layer.properties.labels = {};
     layer.properties.labels.enabled = document.getElementById('propEnableLabels').checked;
@@ -1884,17 +1891,17 @@ function applyProperties() {
     layer.properties.labels.fontSize = parseInt(document.getElementById('propLabelSize').value);
     layer.properties.labels.color = document.getElementById('propLabelColor').value;
     layer.properties.labels.background = document.getElementById('propLabelBackground').checked;
-    
+
     // Update popup properties
     if (!layer.properties.popup) layer.properties.popup = {};
     layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
-    
+
     // Apply changes to map features
     applyLayerStyling(layer);
-    
+
     // Update layers list
     updateLayersList();
-    
+
     showSuccess('Layer properties applied successfully');
 }
 
@@ -1915,9 +1922,9 @@ function cancelProperties() {
 
 function applyLayerStyling(layer) {
     if (!layer.features || !layer.properties) return;
-    
+
     const symbology = layer.properties.symbology;
-    
+
     layer.features.forEach(feature => {
         if (feature.setStyle) {
             feature.setStyle({
@@ -1928,7 +1935,7 @@ function applyLayerStyling(layer) {
             });
         }
     });
-    
+
     // Apply labels if enabled
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
@@ -1940,16 +1947,16 @@ function applyLabelsToLayer(layer) {
     if (layer.labelGroup) {
         map.removeLayer(layer.labelGroup);
     }
-    
+
     const labels = layer.properties.labels;
     if (!labels.enabled || !labels.field) return;
-    
+
     const labelMarkers = [];
-    
+
     layer.features.forEach((feature, index) => {
         const record = layer.records[index];
         if (!record || !record.fields[labels.field]) return;
-        
+
         let labelPosition;
         if (feature.getLatLng) {
             labelPosition = feature.getLatLng();
@@ -1958,7 +1965,7 @@ function applyLabelsToLayer(layer) {
         } else {
             return;
         }
-        
+
         const labelText = record.fields[labels.field];
         const labelMarker = L.marker(labelPosition, {
             icon: L.divIcon({
@@ -1968,10 +1975,10 @@ function applyLabelsToLayer(layer) {
                 iconAnchor: [0, 0]
             })
         });
-        
+
         labelMarkers.push(labelMarker);
     });
-    
+
     if (labelMarkers.length > 0) {
         layer.labelGroup = L.layerGroup(labelMarkers).addTo(map);
     }
@@ -2023,9 +2030,9 @@ window.updatePopupFieldSelection = updatePopupFieldSelection;
 function toggleDockedTableSize() {
     const dockedTable = document.getElementById('dockedAttributeTable');
     const toggleIcon = document.getElementById('tableToggleIcon');
-    
+
     if (!dockedTable) return;
-    
+
     if (dockedTable.classList.contains('expanded')) {
         dockedTable.classList.remove('expanded');
         toggleIcon.className = 'fas fa-expand-alt';
@@ -2033,7 +2040,7 @@ function toggleDockedTableSize() {
         dockedTable.classList.add('expanded');
         toggleIcon.className = 'fas fa-compress-alt';
     }
-    
+
     adjustMapForDockedTable();
 }
 
@@ -2048,20 +2055,20 @@ function closeDockedTable() {
 function adjustMapForDockedTable() {
     const mapElement = document.getElementById('map');
     const dockedTable = document.getElementById('dockedAttributeTable');
-    
+
     if (!mapElement) return;
-    
+
     if (dockedTable) {
         const isExpanded = dockedTable.classList.contains('expanded');
         const tableHeight = isExpanded ? '60%' : '30%';
         const mapHeight = isExpanded ? '40%' : '70%';
-        
+
         mapElement.style.height = mapHeight;
         dockedTable.style.height = tableHeight;
     } else {
         mapElement.style.height = '100%';
     }
-    
+
     // Invalidate map size to ensure proper rendering
     setTimeout(() => {
         if (map) {
@@ -2578,4 +2585,32 @@ function exportMap() {
 
 function fullscreenMap() {
     showInfo('Map fullscreen functionality would be implemented here');
+}
+
+function handleFeatureClick(feature, featureIndex, layerConfig) {
+    // Check if the feature is already selected
+    const isSelected = selectedFeatures.includes(feature);
+
+    // Toggle selection state
+    toggleRowSelection(layerConfig.id, featureIndex, !isSelected);
+
+    // Highlight if selected, reset style if deselected
+    if (!isSelected) {
+        feature.setStyle({
+            fillColor: 'yellow',   // Highlight color
+            color: 'black',        // Highlight border
+            weight: 3              // Thicker border
+        });
+        // Open popup
+        feature.openPopup();
+    } else {
+        // Reset to original style
+        const originalStyle = layerConfig.properties?.symbology || {};
+        feature.setStyle({
+            fillColor: originalStyle.fillColor || '#3498db',
+            color: originalStyle.borderColor || '#2c3e50',
+            weight: originalStyle.borderWidth || 2,
+            fillOpacity: originalStyle.fillOpacity || 0.7
+        });
+    }
 }
