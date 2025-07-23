@@ -359,10 +359,16 @@ async function createLayerFromData(records, layerConfig) {
                                     color: layerConfig.color
                                 });
                                 
-                                marker.bindPopup(createFeaturePopup(record.fields, layerConfig));
+                                const popupContent = createFeaturePopup(record.fields, layerConfig);
+                                marker.bindPopup(popupContent);
                                 marker.recordId = record.id;
                                 marker.recordData = record.fields;
                                 marker.layerId = layerConfig.id;
+                                
+                                // Store reference for popup zoom controls
+                                marker.on('popupopen', function() {
+                                    window.currentPopupFeature = marker;
+                                });
                                 
                                 features.push(marker);
                                 validFeatureCount++;
@@ -410,10 +416,16 @@ async function createLayerFromData(records, layerConfig) {
                                                 smoothFactor: 1.0
                                             });
                                             
-                                            polygon.bindPopup(createFeaturePopup(record.fields, layerConfig));
+                                            const popupContent = createFeaturePopup(record.fields, layerConfig);
+                                            polygon.bindPopup(popupContent);
                                             polygon.recordId = record.id;
                                             polygon.recordData = record.fields;
                                             polygon.layerId = layerConfig.id;
+                                            
+                                            // Store reference for popup zoom controls
+                                            polygon.on('popupopen', function() {
+                                                window.currentPopupFeature = polygon;
+                                            });
                                             
                                             features.push(polygon);
                                             validFeatureCount++;
@@ -558,6 +570,24 @@ function createFeaturePopup(fields, layerConfig) {
     if (selectedFields.length === 0) {
         content += `<div class="popup-field"><em>No popup fields configured</em></div>`;
     }
+    
+    // Add zoom controls
+    content += `
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #eee; text-align: center;">
+            <button onclick="zoomToCurrentPopupFeature('close')" 
+                    class="btn btn-sm btn-primary me-1" style="font-size: 10px; padding: 3px 6px;">
+                <i class="fas fa-search-plus"></i> Zoom
+            </button>
+            <button onclick="zoomToCurrentPopupFeature('medium')" 
+                    class="btn btn-sm btn-secondary me-1" style="font-size: 10px; padding: 3px 6px;">
+                <i class="fas fa-expand-arrows-alt"></i> Fit
+            </button>
+            <button onclick="centerCurrentPopupFeature()" 
+                    class="btn btn-sm btn-info" style="font-size: 10px; padding: 3px 6px;">
+                <i class="fas fa-crosshairs"></i> Center
+            </button>
+        </div>
+    `;
     
     content += '</div>';
     return content;
@@ -1151,9 +1181,86 @@ function toggleLayerVisibility(layerId) {
 
 function zoomToLayer(layerId) {
     const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer || !layer.bounds) return;
+    if (!layer) return;
 
-    map.fitBounds(layer.bounds.pad(0.1));
+    // Enhanced zoom with adaptive padding and zoom levels
+    if (layer.bounds) {
+        const bounds = layer.bounds;
+        
+        // Calculate adaptive padding based on bounds size
+        const latSpan = bounds.getNorth() - bounds.getSouth();
+        const lngSpan = bounds.getEast() - bounds.getWest();
+        const maxSpan = Math.max(latSpan, lngSpan);
+        
+        // Adaptive padding: smaller for large areas, larger for small areas
+        let padding = 0.1;
+        if (maxSpan < 0.001) {
+            // Very small features (like points) - use larger padding
+            padding = 0.5;
+        } else if (maxSpan < 0.01) {
+            // Small features - moderate padding
+            padding = 0.3;
+        } else if (maxSpan < 0.1) {
+            // Medium features - normal padding
+            padding = 0.2;
+        } else {
+            // Large features - minimal padding
+            padding = 0.05;
+        }
+        
+        // Fit bounds with adaptive padding
+        map.fitBounds(bounds.pad(padding));
+        
+        // For very small features, set a minimum zoom level
+        setTimeout(() => {
+            if (maxSpan < 0.001 && map.getZoom() > 18) {
+                map.setZoom(18);
+            } else if (maxSpan < 0.01 && map.getZoom() > 16) {
+                map.setZoom(16);
+            } else if (maxSpan > 10 && map.getZoom() < 6) {
+                map.setZoom(6);
+            }
+        }, 100);
+        
+    } else if (layer.features && layer.features.length > 0) {
+        // Fallback: calculate bounds from individual features
+        const validFeatures = layer.features.filter(feature => {
+            if (feature.getLatLng) {
+                // Point feature
+                const latlng = feature.getLatLng();
+                return latlng && !isNaN(latlng.lat) && !isNaN(latlng.lng);
+            } else if (feature.getLatLngs) {
+                // Polygon/line feature
+                const latlngs = feature.getLatLngs();
+                return latlngs && latlngs.length > 0;
+            }
+            return false;
+        });
+        
+        if (validFeatures.length > 0) {
+            const group = new L.featureGroup(validFeatures);
+            const bounds = group.getBounds();
+            
+            // Apply same adaptive logic
+            const latSpan = bounds.getNorth() - bounds.getSouth();
+            const lngSpan = bounds.getEast() - bounds.getWest();
+            const maxSpan = Math.max(latSpan, lngSpan);
+            
+            let padding = maxSpan < 0.001 ? 0.5 : maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
+            
+            map.fitBounds(bounds.pad(padding));
+            
+            // Set appropriate zoom level
+            setTimeout(() => {
+                if (maxSpan < 0.001 && map.getZoom() > 18) {
+                    map.setZoom(18);
+                } else if (maxSpan < 0.01 && map.getZoom() > 16) {
+                    map.setZoom(16);
+                }
+            }, 100);
+        }
+    }
+
     showSuccess(`Zoomed to layer: ${layer.name}`);
 }
 
@@ -1469,8 +1576,56 @@ function zoomToSelection() {
         return;
     }
 
-    const group = new L.featureGroup(selectedFeatures);
-    map.fitBounds(group.getBounds().pad(0.1));
+    // Enhanced zoom for selected features
+    if (selectedFeatures.length === 1) {
+        // Single feature - use smart zoom
+        const feature = selectedFeatures[0];
+        
+        if (feature.getLatLng) {
+            // Point feature - zoom to point with appropriate level
+            const latlng = feature.getLatLng();
+            map.setView(latlng, Math.max(map.getZoom(), 16));
+        } else if (feature.getBounds) {
+            // Polygon feature - fit to bounds with adaptive padding
+            const bounds = feature.getBounds();
+            const latSpan = bounds.getNorth() - bounds.getSouth();
+            const lngSpan = bounds.getEast() - bounds.getWest();
+            const maxSpan = Math.max(latSpan, lngSpan);
+            
+            let padding = maxSpan < 0.001 ? 0.5 : maxSpan < 0.01 ? 0.3 : 0.2;
+            map.fitBounds(bounds.pad(padding));
+            
+            // Set minimum zoom for very small features
+            setTimeout(() => {
+                if (maxSpan < 0.001 && map.getZoom() > 18) {
+                    map.setZoom(18);
+                } else if (maxSpan < 0.01 && map.getZoom() > 16) {
+                    map.setZoom(16);
+                }
+            }, 100);
+        }
+    } else {
+        // Multiple features - create group and fit bounds
+        const group = new L.featureGroup(selectedFeatures);
+        const bounds = group.getBounds();
+        
+        // Calculate adaptive padding for multiple features
+        const latSpan = bounds.getNorth() - bounds.getSouth();
+        const lngSpan = bounds.getEast() - bounds.getWest();
+        const maxSpan = Math.max(latSpan, lngSpan);
+        
+        let padding = maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
+        map.fitBounds(bounds.pad(padding));
+        
+        // Ensure reasonable zoom level
+        setTimeout(() => {
+            if (map.getZoom() > 18) {
+                map.setZoom(18);
+            } else if (map.getZoom() < 8 && maxSpan < 1) {
+                map.setZoom(Math.min(14, map.getZoom() + 2));
+            }
+        }, 100);
+    }
     
     showSuccess(`Zoomed to ${selectedFeatures.length} selected feature(s)`);
 }
@@ -2762,6 +2917,95 @@ function showAlert(type, message) {
     }, 5000);
 }
 
+// Enhanced zoom function for individual features
+function zoomToFeature(feature, options = {}) {
+    if (!feature) return;
+    
+    const {
+        padding = 'auto',
+        maxZoom = 18,
+        minZoom = 8,
+        animationDuration = 500
+    } = options;
+    
+    if (feature.getLatLng) {
+        // Point feature
+        const latlng = feature.getLatLng();
+        const targetZoom = Math.max(Math.min(maxZoom, 16), map.getZoom());
+        
+        map.setView(latlng, targetZoom, {
+            animate: true,
+            duration: animationDuration / 1000
+        });
+    } else if (feature.getBounds) {
+        // Polygon/line feature
+        const bounds = feature.getBounds();
+        const latSpan = bounds.getNorth() - bounds.getSouth();
+        const lngSpan = bounds.getEast() - bounds.getWest();
+        const maxSpan = Math.max(latSpan, lngSpan);
+        
+        // Auto-calculate padding if not specified
+        let finalPadding = padding;
+        if (padding === 'auto') {
+            if (maxSpan < 0.0001) {
+                finalPadding = 1.0;  // Very small features
+            } else if (maxSpan < 0.001) {
+                finalPadding = 0.7;  // Small features
+            } else if (maxSpan < 0.01) {
+                finalPadding = 0.4;  // Medium-small features
+            } else if (maxSpan < 0.1) {
+                finalPadding = 0.2;  // Medium features
+            } else {
+                finalPadding = 0.1;  // Large features
+            }
+        }
+        
+        // Fit bounds with animation
+        map.fitBounds(bounds.pad(finalPadding), {
+            animate: true,
+            duration: animationDuration / 1000
+        });
+        
+        // Apply zoom constraints after animation
+        setTimeout(() => {
+            const currentZoom = map.getZoom();
+            if (currentZoom > maxZoom) {
+                map.setZoom(maxZoom);
+            } else if (currentZoom < minZoom) {
+                map.setZoom(minZoom);
+            }
+        }, animationDuration);
+    }
+}
+
+// Add zoom controls to feature popups
+function enhanceFeaturePopup(feature, popupContent, layerConfig) {
+    const enhancedContent = `
+        ${popupContent}
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+            <button onclick="zoomToFeature(window.currentPopupFeature, {maxZoom: 20, padding: 0.5})" 
+                    class="btn btn-sm btn-primary me-2" style="font-size: 11px; padding: 4px 8px;">
+                <i class="fas fa-search-plus"></i> Zoom In
+            </button>
+            <button onclick="zoomToFeature(window.currentPopupFeature, {maxZoom: 14, padding: 0.3})" 
+                    class="btn btn-sm btn-secondary me-2" style="font-size: 11px; padding: 4px 8px;">
+                <i class="fas fa-search-minus"></i> Zoom Out
+            </button>
+            <button onclick="map.setView(window.currentPopupFeature.getLatLng ? window.currentPopupFeature.getLatLng() : window.currentPopupFeature.getBounds().getCenter(), 12)" 
+                    class="btn btn-sm btn-info" style="font-size: 11px; padding: 4px 8px;">
+                <i class="fas fa-crosshairs"></i> Center
+            </button>
+        </div>
+    `;
+    
+    // Store reference to current feature for popup buttons
+    feature.on('popupopen', function() {
+        window.currentPopupFeature = feature;
+    });
+    
+    return enhancedContent;
+}
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -2799,6 +3043,80 @@ window.generateGraduatedSymbology = generateGraduatedSymbology;
 window.generateCategorizedSymbology = generateCategorizedSymbology;
 window.selectAllPopupFields = selectAllPopupFields;
 window.deselectAllPopupFields = deselectAllPopupFields;
+window.zoomToFeature = zoomToFeature;
+
+// Global functions for popup zoom controls
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
+    if (!window.currentPopupFeature) return;
+    
+    const options = {
+        close: { padding: 0.8, maxZoom: 20, minZoom: 16 },
+        medium: { padding: 0.4, maxZoom: 16, minZoom: 12 },
+        far: { padding: 0.2, maxZoom: 12, minZoom: 8 }
+    };
+    
+    zoomToFeature(window.currentPopupFeature, options[zoomType] || options.close);
+};
+
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
+    
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
+    }
+    
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
+    }
+};
+
+// Additional zoom control functions
+window.resetMapView = function() {
+    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
+    showInfo('Map view reset to default');
+};
+
+window.zoomToAllLayers = function() {
+    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
+    
+    if (visibleLayers.length === 0) {
+        showWarning('No visible layers to zoom to');
+        return;
+    }
+    
+    // Collect all features from visible layers
+    const allFeatures = [];
+    visibleLayers.forEach(layer => {
+        layer.features.forEach(feature => {
+            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
+                allFeatures.push(feature);
+            }
+        });
+    });
+    
+    if (allFeatures.length === 0) {
+        showWarning('No valid features found to zoom to');
+        return;
+    }
+    
+    // Create feature group and fit bounds
+    const group = new L.featureGroup(allFeatures);
+    const bounds = group.getBounds();
+    
+    // Calculate adaptive padding
+    const latSpan = bounds.getNorth() - bounds.getSouth();
+    const lngSpan = bounds.getEast() - bounds.getWest();
+    const maxSpan = Math.max(latSpan, lngSpan);
+    
+    let padding = maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
+    
+    map.fitBounds(bounds.pad(padding), { animate: true, duration: 1 });
+    
+    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features`);
+};
 
 // Event listeners for property controls
 document.addEventListener('DOMContentLoaded', function() {

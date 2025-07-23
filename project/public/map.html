@@ -432,16 +432,45 @@
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <div class="section-content">
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
-                                        <i class="fas fa-ruler me-1"></i>Distance
-                                    </button>
-                                    <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
-                                        <i class="fas fa-vector-square me-1"></i>Area
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
-                                        <i class="fas fa-trash me-1"></i>Clear
-                                    </button>
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">MEASUREMENT TOOLS</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
+                                            <i class="fas fa-ruler me-1"></i>Distance
+                                        </button>
+                                        <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
+                                            <i class="fas fa-vector-square me-1"></i>Area
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
+                                            <i class="fas fa-trash me-1"></i>Clear
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">ZOOM CONTROLS</h6>
+                                    <div class="row g-1">
+                                        <div class="col-6">
+                                            <button class="btn btn-outline-info btn-sm w-100" onclick="map.zoomIn()">
+                                                <i class="fas fa-plus"></i> In
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button class="btn btn-outline-info btn-sm w-100" onclick="map.zoomOut()">
+                                                <i class="fas fa-minus"></i> Out
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetMapView()">
+                                            <i class="fas fa-globe me-1"></i>Reset View
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-warning btn-sm w-100" onclick="zoomToAllLayers()">
+                                            <i class="fas fa-expand me-1"></i>Fit All Layers
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
