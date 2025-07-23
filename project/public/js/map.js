@@ -441,33 +441,31 @@ function createFeaturePopup(fields, layerConfig) {
     // Determine which fields to show
     let fieldsToShow = [];
     
-    // If popup fields are specifically configured and not empty, use only those
+    // If popup fields are specifically configured and not empty, use ONLY those
     if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
         // Show only the selected fields that exist in the data
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
-            allFields.includes(field) &&
-            fields[field] !== null && 
-            fields[field] !== undefined && 
-            fields[field] !== ''
+            allFields.includes(field)
         );
-    }
-    
-    // If no fields are selected or none are valid, show all available fields
-    if (fieldsToShow.length === 0) {
-        fieldsToShow = allFields.filter(field => 
-            fields[field] !== null && 
-            fields[field] !== undefined && 
-            fields[field] !== ''
-        );
+    } else {
+        // If no popup fields are configured, show all available fields as fallback
+        fieldsToShow = allFields;
     }
 
     // Show the determined fields
     fieldsToShow.forEach(key => {
         let value = fields[key];
-        if (typeof value === 'string' && value.length > 100) {
+        
+        // Handle null, undefined, or empty values
+        if (value === null || value === undefined) {
+            value = '<em>No data</em>';
+        } else if (value === '') {
+            value = '<em>Empty</em>';
+        } else if (typeof value === 'string' && value.length > 100) {
             value = value.substring(0, 100) + '...';
         }
+        
         content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
     });
 
