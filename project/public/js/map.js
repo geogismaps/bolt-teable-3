@@ -784,15 +784,20 @@ function showLayerProperties(layerId) {
         return;
     }
 
-    // Store current layer for properties modal
-    window.currentPropertiesLayer = layer;
+    try {
+        // Store current layer for properties modal
+        window.currentPropertiesLayer = layer;
 
-    // Populate properties modal with layer data
-    populatePropertiesModal(layer);
+        // Populate properties modal with layer data
+        populatePropertiesModal(layer);
 
-    // Show the modal
-    const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
-    modal.show();
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Error opening layer properties:', error);
+        showError('Failed to open layer properties: ' + error.message);
+    }
 }
 
 function createDockedAttributeTable(layer) {
@@ -933,44 +938,71 @@ function createTableBody(layer) {
 }
 
 function populatePropertiesModal(layer) {
-    // Information tab
-    document.getElementById('propLayerName').value = layer.name || '';
-    document.getElementById('propDataSource').value = layer.tableId || '';
-    document.getElementById('propGeometryType').value = determineGeometryType(layer);
-    document.getElementById('propFeatureCount').value = layer.featureCount || 0;
+    try {
+        // Information tab
+        const propLayerName = document.getElementById('propLayerName');
+        const propDataSource = document.getElementById('propDataSource');
+        const propGeometryType = document.getElementById('propGeometryType');
+        const propFeatureCount = document.getElementById('propFeatureCount');
+        
+        if (propLayerName) propLayerName.value = layer.name || '';
+        if (propDataSource) propDataSource.value = layer.tableId || '';
+        if (propGeometryType) propGeometryType.value = determineGeometryType(layer);
+        if (propFeatureCount) propFeatureCount.value = layer.featureCount || 0;
 
     // Populate field selectors
     populateFieldSelectors(layer);
 
     // Symbology tab
-    const symbology = layer.properties?.symbology || {};
-    document.getElementById('propSymbologyType').value = symbology.type || 'single';
-    document.getElementById('propFillColor').value = symbology.fillColor || '#3498db';
-    document.getElementById('propBorderColor').value = symbology.borderColor || '#2c3e50';
-    document.getElementById('propBorderWidth').value = symbology.borderWidth || 2;
-    document.getElementById('propFillOpacity').value = symbology.fillOpacity || 0.7;
+        const symbology = layer.properties?.symbology || {};
+        const propSymbologyType = document.getElementById('propSymbologyType');
+        const propFillColor = document.getElementById('propFillColor');
+        const propBorderColor = document.getElementById('propBorderColor');
+        const propBorderWidth = document.getElementById('propBorderWidth');
+        const propFillOpacity = document.getElementById('propFillOpacity');
+        const fillOpacityValue = document.getElementById('fillOpacityValue');
+        const borderWidthValue = document.getElementById('borderWidthValue');
+        
+        if (propSymbologyType) propSymbologyType.value = symbology.type || 'single';
+        if (propFillColor) propFillColor.value = symbology.fillColor || '#3498db';
+        if (propBorderColor) propBorderColor.value = symbology.borderColor || '#2c3e50';
+        if (propBorderWidth) propBorderWidth.value = symbology.borderWidth || 2;
+        if (propFillOpacity) propFillOpacity.value = symbology.fillOpacity || 0.7;
 
-    // Update opacity display
-    document.getElementById('fillOpacityValue').textContent = Math.round((symbology.fillOpacity || 0.7) * 100) + '%';
-    document.getElementById('borderWidthValue').textContent = (symbology.borderWidth || 2) + 'px';
+        // Update opacity display
+        if (fillOpacityValue) fillOpacityValue.textContent = Math.round((symbology.fillOpacity || 0.7) * 100) + '%';
+        if (borderWidthValue) borderWidthValue.textContent = (symbology.borderWidth || 2) + 'px';
 
     // Labels tab
-    const labels = layer.properties?.labels || {};
-    document.getElementById('propEnableLabels').checked = labels.enabled || false;
-    document.getElementById('propLabelField').value = labels.field || '';
-    documentgetElementById('propLabelSize').value = labels.fontSize || 12;
-    document.getElementById('propLabelColor').value = labels.color || '#333333';
-    document.getElementById('propLabelBackground').checked = labels.background !== false;
+        const labels = layer.properties?.labels || {};
+        const propEnableLabels = document.getElementById('propEnableLabels');
+        const propLabelField = document.getElementById('propLabelField');
+        const propLabelSize = document.getElementById('propLabelSize');
+        const propLabelColor = document.getElementById('propLabelColor');
+        const propLabelBackground = document.getElementById('propLabelBackground');
+        const propLabelControls = document.getElementById('propLabelControls');
+        
+        if (propEnableLabels) propEnableLabels.checked = labels.enabled || false;
+        if (propLabelField) propLabelField.value = labels.field || '';
+        if (propLabelSize) propLabelSize.value = labels.fontSize || 12;
+        if (propLabelColor) propLabelColor.value = labels.color || '#333333';
+        if (propLabelBackground) propLabelBackground.checked = labels.background !== false;
 
-    // Update label controls visibility
-    document.getElementById('propLabelControls').style.display = labels.enabled ? 'block' : 'none';
+        // Update label controls visibility
+        if (propLabelControls) propLabelControls.style.display = labels.enabled ? 'block' : 'none';
 
     // iTool tab
-    populatePopupFieldsSelector(layer);
-    document.getElementById('propMaxPopupWidth').value = layer.properties?.popup?.maxWidth || 300;
+        populatePopupFieldsSelector(layer);
+        const propMaxPopupWidth = document.getElementById('propMaxPopupWidth');
+        if (propMaxPopupWidth) propMaxPopupWidth.value = layer.properties?.popup?.maxWidth || 300;
 
-    // Update symbology type display
-    updateSymbologyType();
+        // Update symbology type display
+        updateSymbologyType();
+        
+    } catch (error) {
+        console.error('Error populating properties modal:', error);
+        showError('Failed to load layer properties: ' + error.message);
+    }
 }
 
 function populateFieldSelectors(layer) {
