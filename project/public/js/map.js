@@ -1035,7 +1035,7 @@ function determineGeometryType(layer) {
 }
 
 function selectAllRows(layerId) {
-    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
     checkboxes.forEach(checkbox => {
         checkbox.checked = true;
         const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
@@ -1044,7 +1044,7 @@ function selectAllRows(layerId) {
 }
 
 function clearSelection(layerId) {
-    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
     checkboxes.forEach(checkbox => {
         checkbox.checked = false;
         const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
@@ -1053,7 +1053,7 @@ function clearSelection(layerId) {
 }
 
 function toggleAllRows(masterCheckbox, layerId) {
-    const checkboxes = document.querySelectorAll('#attributeTableModal .row-selector');
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
     checkboxes.forEach(checkbox => {
         checkbox.checked = masterCheckbox.checked;
         const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
