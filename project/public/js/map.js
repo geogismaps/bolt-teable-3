@@ -313,6 +313,8 @@ async function createLayerFromData(records, layerConfig) {
 
                             // Add click handler for selection
                             marker.on('click', function(e) {
+                                // Store reference for popup controls
+                                window.currentPopupFeature = this;
                                 handleFeatureClick(this, index, layerConfig);
                             });
 
@@ -336,6 +338,14 @@ async function createLayerFromData(records, layerConfig) {
                                         polygon.recordId = record.id;
                                         polygon.recordData = record.fields;
                                         polygon.layerId = layerConfig.id;
+                                        polygon.featureIndex = index;
+
+                                        // Add click handler for selection
+                                        polygon.on('click', function(e) {
+                                            // Store reference for popup controls
+                                            window.currentPopupFeature = this;
+                                            handleFeatureClick(this, index, layerConfig);
+                                        });
 
                                         features.push(polygon);
                                         validFeatureCount++;
@@ -428,8 +438,11 @@ function createFeaturePopup(fields, layerConfig) {
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
     const fieldsToShow = selectedFields && selectedFields.length > 0 ? selectedFields : allFields;
 
+    // Always show all available fields if none are specifically configured
+    const finalFieldsToShow = fieldsToShow.length > 0 ? fieldsToShow : allFields;
+
     // Show selected fields or all fields if none selected
-    fieldsToShow.forEach(key => {
+    finalFieldsToShow.forEach(key => {
         if (key !== layerConfig.geometryField && fields[key] !== null && fields[key] !== undefined) {
             let value = fields[key];
             if (typeof value === 'string' && value.length > 100) {
@@ -438,6 +451,21 @@ function createFeaturePopup(fields, layerConfig) {
             content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
         }
     });
+
+    // Add zoom controls to popup
+    content += `
+        <div class="popup-controls mt-2">
+            <button class="btn btn-xs btn-outline-primary me-1" onclick="window.zoomToCurrentPopupFeature('close')" title="Zoom Close">
+                <i class="fas fa-search-plus"></i>
+            </button>
+            <button class="btn btn-xs btn-outline-secondary me-1" onclick="window.zoomToCurrentPopupFeature('medium')" title="Zoom Medium">
+                <i class="fas fa-search"></i>
+            </button>
+            <button class="btn btn-xs btn-outline-info" onclick="window.centerCurrentPopupFeature()" title="Center">
+                <i class="fas fa-crosshairs"></i>
+            </button>
+        </div>
+    `;
 
     content += '</div>';
     return content;
@@ -1072,12 +1100,13 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
         if (!selectedFeatures.includes(feature)) {
             selectedFeatures.push(feature);
 
-            // Highlight feature on map
+            // Highlight feature on map in yellow
             if (feature.setStyle) {
                 feature.setStyle({
-                    color: '#ff0000',
-                    weight: 4,
-                    fillOpacity: 0.9
+                    fillColor: '#ffff00',   // Yellow highlight
+                    color: '#000000',       // Black border
+                    weight: 3,              // Thicker border
+                    fillOpacity: 0.8        // More opaque when selected
                 });
             }
         }
@@ -1087,14 +1116,14 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
         if (index !== -1) {
             selectedFeatures.splice(index, 1);
 
-            // Reset feature style
+            // Reset feature style to original
             if (feature.setStyle) {
                 const originalStyle = layer.properties?.symbology || {};
                 feature.setStyle({
-                    color: originalStyle.borderColor || '#3498db',
+                    fillColor: originalStyle.fillColor || '#3498db',
+                    color: originalStyle.borderColor || '#2c3e50',
                     weight: originalStyle.borderWidth || 2,
-                    fillOpacity: originalStyle.fillOpacity || 0.7,
-                    fillColor: originalStyle.fillColor || '#3498db'
+                    fillOpacity: originalStyle.fillOpacity || 0.7
                 });
             }
         }
@@ -1192,6 +1221,31 @@ function showFeatureInfo(layerId, featureIndex) {
 
     const record = layer.records[featureIndex];
     const feature = layer.features[featureIndex];
+
+    // Store reference for popup controls
+    window.currentPopupFeature = feature;
+
+    // Highlight the feature in yellow
+    if (feature.setStyle) {
+        feature.setStyle({
+            fillColor: '#ffff00',   // Yellow highlight
+            color: '#000000',       // Black border
+            weight: 3,              // Thicker border
+            fillOpacity: 0.8        // More opaque when selected
+        });
+    }
+
+    // Add to selected features if not already selected
+    if (!selectedFeatures.includes(feature)) {
+        selectedFeatures.push(feature);
+        updateSelectionCount();
+        
+        // Update the corresponding checkbox in attribute table if visible
+        const checkbox = document.querySelector(`tr[data-feature-index="${featureIndex}"] .row-selector`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    }
 
     // Create popup content
     const popupContent = createFeaturePopup(record.fields, layer);
@@ -2596,21 +2650,33 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
 
     // Highlight if selected, reset style if deselected
     if (!isSelected) {
-        feature.setStyle({
-            fillColor: 'yellow',   // Highlight color
-            color: 'black',        // Highlight border
-            weight: 3              // Thicker border
-        });
-        // Open popup
-        feature.openPopup();
+        // Highlight in yellow
+        if (feature.setStyle) {
+            feature.setStyle({
+                fillColor: '#ffff00',   // Yellow highlight color
+                color: '#000000',       // Black border
+                weight: 3,              // Thicker border
+                fillOpacity: 0.8        // More opaque when selected
+            });
+        }
+        
+        // Create popup content with all fields if no specific selection, or selected fields if configured
+        const popupContent = createFeaturePopup(feature.recordData, layerConfig);
+        
+        // Open popup with updated content
+        if (feature.bindPopup) {
+            feature.bindPopup(popupContent).openPopup();
+        }
     } else {
         // Reset to original style
-        const originalStyle = layerConfig.properties?.symbology || {};
-        feature.setStyle({
-            fillColor: originalStyle.fillColor || '#3498db',
-            color: originalStyle.borderColor || '#2c3e50',
-            weight: originalStyle.borderWidth || 2,
-            fillOpacity: originalStyle.fillOpacity || 0.7
-        });
+        if (feature.setStyle) {
+            const originalStyle = layerConfig.properties?.symbology || {};
+            feature.setStyle({
+                fillColor: originalStyle.fillColor || '#3498db',
+                color: originalStyle.borderColor || '#2c3e50',
+                weight: originalStyle.borderWidth || 2,
+                fillOpacity: originalStyle.fillOpacity || 0.7
+            });
+        }
     }
 }
