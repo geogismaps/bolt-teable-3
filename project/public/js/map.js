@@ -439,28 +439,36 @@ function createFeaturePopup(fields, layerConfig) {
     const selectedFields = layerConfig.properties?.popup?.fields;
     
     // Determine which fields to show
-    let fieldsToShow = allFields; // Default to all fields
+    let fieldsToShow = [];
     
     // If popup fields are specifically configured and not empty, use only those
     if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
-        // Filter to only show fields that are both selected AND exist in the data
-        fieldsToShow = selectedFields.filter(field => allFields.includes(field));
-        
-        // If no valid selected fields found, fallback to all fields
-        if (fieldsToShow.length === 0) {
-            fieldsToShow = allFields;
-        }
+        // Show only the selected fields that exist in the data
+        fieldsToShow = selectedFields.filter(field => 
+            field !== layerConfig.geometryField && 
+            allFields.includes(field) &&
+            fields[field] !== null && 
+            fields[field] !== undefined && 
+            fields[field] !== ''
+        );
+    }
+    
+    // If no fields are selected or none are valid, show all available fields
+    if (fieldsToShow.length === 0) {
+        fieldsToShow = allFields.filter(field => 
+            fields[field] !== null && 
+            fields[field] !== undefined && 
+            fields[field] !== ''
+        );
     }
 
     // Show the determined fields
     fieldsToShow.forEach(key => {
-        if (fields[key] !== null && fields[key] !== undefined && fields[key] !== '') {
-            let value = fields[key];
-            if (typeof value === 'string' && value.length > 100) {
-                value = value.substring(0, 100) + '...';
-            }
-            content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
+        let value = fields[key];
+        if (typeof value === 'string' && value.length > 100) {
+            value = value.substring(0, 100) + '...';
         }
+        content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
     });
 
     // Add zoom controls to popup
@@ -1996,6 +2004,25 @@ function applyProperties() {
     // Update popup properties
     if (!layer.properties.popup) layer.properties.popup = {};
     layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
+
+    // Update the actual layer reference in mapLayers array
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        // Update the layer properties in the main array
+        mapLayers[layerIndex].properties = { ...layer.properties };
+
+        // Refresh popup content for all features in this layer to apply new field selections
+        mapLayers[layerIndex].features.forEach((feature, index) => {
+            if (feature.recordData) {
+                const newPopupContent = createFeaturePopup(feature.recordData, mapLayers[layerIndex]);
+                feature.bindPopup(newPopupContent);
+            } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
+                // Use record data if feature.recordData is not available
+                const newPopupContent = createFeaturePopup(mapLayers[layerIndex].records[index].fields, mapLayers[layerIndex]);
+                feature.bindPopup(newPopupContent);
+            }
+        });
+    }
 
     // Apply changes to map features
     applyLayerStyling(layer);
