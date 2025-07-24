@@ -608,11 +608,11 @@ class TeableAPI {
                     type: 'singleSelect',
                     options: {
                         choices: [
-                            { name: 'owner', color: 'red' },
-                            { name: 'admin', color: 'blue' },
-                            { name: 'editor', color: 'green' },
-                            { name: 'commenter', color: 'orange' },
-                            { name: 'viewer', color: 'yellow' }
+                            { name: 'Owner', color: 'red' },
+                            { name: 'Admin', color: 'blue' },
+                            { name: 'Editor', color: 'green' },
+                            { name: 'Commenter', color: 'orange' },
+                            { name: 'Viewer', color: 'yellow' }
                         ]
                     }
                 },
@@ -723,7 +723,7 @@ class TeableAPI {
             password_hash: await this.hashPassword('admin123'),
             first_name: 'System',
             last_name: 'Administrator',
-            role: 'admin', // Using Teable.io role
+            role: 'Admin', // Using Teable.io role
             is_active: true,
             created_date: new Date().toISOString().split('T')[0],
             last_login: null,

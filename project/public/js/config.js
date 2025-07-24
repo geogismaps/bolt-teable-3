@@ -172,7 +172,7 @@ async function setupSpaceOwner(config) {
         console.log('🔍 Checking local app_users table...');
         const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
         const existingUser = users.records?.find(u => 
-            u.fields.email === config.adminEmail.toLowerCase()
+            u.fields.email?.toLowerCase() === config.adminEmail.toLowerCase()
         );
 
         // Step 4: Hash the admin password
@@ -186,7 +186,7 @@ async function setupSpaceOwner(config) {
                 window.teableAPI.systemTables.users,
                 existingUser.id,
                 {
-                    role: 'owner', // Ensure they have owner role
+                    role: 'Owner', // Ensure they have Owner role (capitalized)
                     admin_password_hash: adminPasswordHash,
                     is_active: true,
                     is_space_owner: true,
@@ -219,7 +219,7 @@ async function setupSpaceOwner(config) {
                 admin_password_hash: adminPasswordHash, // The actual admin password for space owner auth
                 first_name: firstName,
                 last_name: lastName,
-                role: 'owner',
+                role: 'Owner', // Using capitalized Owner role
                 is_active: true,
                 is_space_owner: true,
                 created_date: new Date().toISOString().split('T')[0],

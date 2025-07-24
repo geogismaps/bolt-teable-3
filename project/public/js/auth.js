@@ -96,7 +96,7 @@ class TeableAuth {
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
             const localUser = users.records?.find(u => 
                 u.fields.email === email.toLowerCase() && 
-                u.fields.role === 'owner' &&
+                u.fields.role === 'Owner' &&
                 u.fields.admin_password_hash // Must have admin password set
             );
 
@@ -242,10 +242,10 @@ class TeableAuth {
                 email: user.fields.email,
                 firstName: user.fields.first_name,
                 lastName: user.fields.last_name,
-                role: user.fields.role || 'viewer', // Using Teable.io role
+                role: user.fields.role || 'Viewer', // Using Teable.io role
                 userId: user.id,
                 loginTime: new Date().toISOString(),
-                isAdmin: ['owner', 'admin'].includes(user.fields.role)
+                isAdmin: ['Owner', 'Admin'].includes(user.fields.role)
             };
 
         } catch (error) {
@@ -285,7 +285,7 @@ class TeableAuth {
      * Check if user is admin (owner or admin role)
      */
     isAdmin() {
-        return this.currentSession?.isAdmin || ['owner', 'admin'].includes(this.currentSession?.role);
+        return this.currentSession?.isAdmin || ['Owner', 'Admin'].includes(this.currentSession?.role);
     }
 
     /**
@@ -304,11 +304,11 @@ class TeableAuth {
         if (!this.currentSession) return false;
         
         const roleHierarchy = {
-            'viewer': 1,
-            'commenter': 2,
-            'editor': 3,
-            'admin': 4,
-            'owner': 5
+            'Viewer': 1,
+            'Commenter': 2,
+            'Editor': 3,
+            'Admin': 4,
+            'Owner': 5
         };
         
         const userLevel = roleHierarchy[this.currentSession.role] || 0;
