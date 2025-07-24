@@ -19,6 +19,7 @@ async function handleConfigSubmit(event) {
         const config = {
             clientName: document.getElementById('clientName').value.trim(),
             adminEmail: document.getElementById('adminEmail').value.trim(),
+            adminPassword: document.getElementById('adminPassword').value.trim(),
             baseUrl: document.getElementById('teableUrl').value.trim(),
             spaceId: document.getElementById('spaceId').value.trim(),
             baseId: document.getElementById('baseId').value.trim(),
@@ -26,13 +27,17 @@ async function handleConfigSubmit(event) {
         };
 
         // Validation
-        if (!config.clientName || !config.adminEmail || !config.baseUrl || 
-            !config.baseId || !config.accessToken) {
-            throw new Error('Please fill in all required fields');
+        if (!config.clientName || !config.adminEmail || !config.adminPassword || 
+            !config.baseUrl || !config.baseId || !config.accessToken) {
+            throw new Error('Please fill in all required fields including admin password');
         }
 
         if (!config.adminEmail.includes('@')) {
             throw new Error('Please enter a valid email address');
+        }
+
+        if (config.adminPassword.length < 6) {
+            throw new Error('Admin password must be at least 6 characters long');
         }
 
         // Clean up URL
@@ -58,11 +63,20 @@ async function handleConfigSubmit(event) {
             // Initialize system tables
             showAlert('info', 'Initializing system tables...');
             await window.teableAPI.ensureSystemTables();
+            
+            // Create default admin
             await window.teableAPI.createDefaultAdmin();
+
+            // Now set up the space owner with admin credentials
+            showAlert('info', 'Setting up space owner authentication...');
+            await setupSpaceOwner(config);
         }
 
-        // Save configuration
-        const savedConfigs = window.teableAuth.addClientConfig(config);
+        // Save configuration (without the password for security)
+        const configToSave = { ...config };
+        delete configToSave.adminPassword; // Don't save password in client config
+        
+        const savedConfigs = window.teableAuth.addClientConfig(configToSave);
 
         // Set as current config
         window.teableAuth.saveClientConfig({
@@ -73,7 +87,7 @@ async function handleConfigSubmit(event) {
         });
 
         // Show success
-        showAlert('success', 'Client configuration created successfully!');
+        showAlert('success', 'Space owner configuration completed successfully!');
 
         // Clear form
         document.getElementById('configForm').reset();
@@ -91,6 +105,136 @@ async function handleConfigSubmit(event) {
     } catch (error) {
         console.error('Configuration failed:', error);
         showAlert('danger', error.message);
+    }
+}
+
+/**
+ * Set up space owner in local database with admin password
+ */
+async function setupSpaceOwner(config) {
+    try {
+        console.log('🔧 Setting up space owner authentication...');
+
+        // Step 1: Try to fetch space owner details from Teable.io
+        let spaceOwnerFromTeable = null;
+        let spaceOwnerEmail = config.adminEmail.toLowerCase(); // Default to admin email
+
+        try {
+            console.log('🔍 Attempting to fetch space owner from Teable.io...');
+            
+            const testEndpoints = [
+                `/api/space/${config.spaceId}/collaborators`,
+                `/api/space/${config.spaceId}/collaborator`,
+                `/api/space/${config.spaceId}`,
+                `/api/space`
+            ];
+
+            for (const endpoint of testEndpoints) {
+                try {
+                    const result = await window.teableAPI.request(endpoint);
+                    
+                    // Look for space owner in different response formats
+                    if (result.collaborators) {
+                        spaceOwnerFromTeable = result.collaborators.find(user => 
+                            user.role === 'owner' || user.email === config.adminEmail
+                        );
+                    } else if (result.members) {
+                        spaceOwnerFromTeable = result.members.find(user => 
+                            user.role === 'owner' || user.email === config.adminEmail
+                        );
+                    } else if (result.owner) {
+                        spaceOwnerFromTeable = result.owner;
+                    } else if (result.email === config.adminEmail) {
+                        spaceOwnerFromTeable = result;
+                    }
+
+                    if (spaceOwnerFromTeable) {
+                        console.log('✅ Found space owner from Teable.io:', spaceOwnerFromTeable);
+                        spaceOwnerEmail = spaceOwnerFromTeable.email || config.adminEmail;
+                        break;
+                    }
+
+                } catch (endpointError) {
+                    console.log(`❌ Endpoint ${endpoint} failed:`, endpointError.message);
+                }
+            }
+        } catch (teableError) {
+            console.log('⚠️ Could not fetch space owner from Teable.io:', teableError.message);
+        }
+
+        // Step 2: Check if space owner already exists in app_users
+        console.log('🔍 Checking if space owner exists in local database...');
+        const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+        const existingSpaceOwner = users.records?.find(u => 
+            u.fields.email === spaceOwnerEmail && u.fields.role === 'owner'
+        );
+
+        // Step 3: Hash the admin password
+        const adminPasswordHash = await window.teableAPI.hashPassword(config.adminPassword);
+
+        if (existingSpaceOwner) {
+            console.log('🔄 Updating existing space owner with admin password...');
+            // Update existing space owner with admin password
+            await window.teableAPI.updateRecord(
+                window.teableAPI.systemTables.users,
+                existingSpaceOwner.id,
+                {
+                    admin_password_hash: adminPasswordHash,
+                    is_active: true,
+                    synced_from_teable: spaceOwnerFromTeable ? true : false,
+                    teable_user_id: spaceOwnerFromTeable?.id || 'manual_setup'
+                }
+            );
+            console.log('✅ Updated existing space owner');
+        } else {
+            console.log('➕ Creating new space owner record...');
+            
+            // Parse name from Teable.io data or email
+            let firstName = 'Space';
+            let lastName = 'Owner';
+            
+            if (spaceOwnerFromTeable?.name) {
+                const nameParts = spaceOwnerFromTeable.name.split(' ');
+                firstName = nameParts[0] || 'Space';
+                lastName = nameParts.slice(1).join(' ') || 'Owner';
+            } else {
+                // Use email prefix as first name
+                firstName = spaceOwnerEmail.split('@')[0];
+                lastName = 'Owner';
+            }
+
+            // Create new space owner record
+            const spaceOwnerData = {
+                email: spaceOwnerEmail,
+                password_hash: await window.teableAPI.hashPassword('temp123'), // Temp password for app user auth
+                admin_password_hash: adminPasswordHash, // The actual admin password for space owner auth
+                first_name: firstName,
+                last_name: lastName,
+                role: 'owner',
+                is_active: true,
+                created_date: new Date().toISOString().split('T')[0],
+                last_login: null,
+                synced_from_teable: spaceOwnerFromTeable ? true : false,
+                teable_user_id: spaceOwnerFromTeable?.id || 'manual_setup'
+            };
+
+            await window.teableAPI.createRecord(window.teableAPI.systemTables.users, spaceOwnerData);
+            console.log('✅ Created space owner record');
+        }
+
+        console.log('✅ Space owner setup completed successfully!');
+        
+        // Log the setup activity
+        await window.teableAPI.logActivity(
+            spaceOwnerEmail,
+            'space_owner_setup',
+            `Space owner configured for client: ${config.clientName}`,
+            'app_users'
+        );
+
+    } catch (error) {
+        console.error('❌ Space owner setup failed:', error);
+        throw new Error('Failed to set up space owner: ' + error.message);
     }
 }
 
