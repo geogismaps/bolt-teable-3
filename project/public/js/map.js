@@ -441,17 +441,21 @@ function createFeaturePopup(fields, layerConfig) {
     // Determine which fields to show - ONLY show selected fields if configured
     let fieldsToShow = [];
     
-    // If popup fields are configured and selected, show ONLY those fields
-    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
-        fieldsToShow = selectedFields.filter(field => 
-            field !== layerConfig.geometryField && 
-            allFields.includes(field)
-        );
-    } else if (layerConfig.properties?.popup?.configured) {
-        // If popup is configured but no fields selected, show nothing
-        fieldsToShow = [];
+    // Check if popup fields are specifically configured
+    const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
+    
+    if (isPopupConfigured) {
+        // If popup is configured, use ONLY the selected fields (even if empty array)
+        if (selectedFields && Array.isArray(selectedFields)) {
+            fieldsToShow = selectedFields.filter(field => 
+                field !== layerConfig.geometryField && 
+                allFields.includes(field)
+            );
+        } else {
+            fieldsToShow = []; // No fields selected, show nothing
+        }
     } else {
-        // If popup is not configured at all, show all fields as fallback
+        // If popup is not configured, show all fields as default behavior
         fieldsToShow = allFields;
     }
 
@@ -2012,7 +2016,7 @@ function applyProperties() {
     // Update popup fields in layer properties - ensure it's always an array
     layer.properties.popup.fields = selectedPopupFields;
     
-    // Mark that popup configuration has been set
+    // ALWAYS mark that popup configuration has been explicitly set
     layer.properties.popup.configured = true;
 
     // Update the actual layer reference in mapLayers array
