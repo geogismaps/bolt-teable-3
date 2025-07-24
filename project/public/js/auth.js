@@ -82,37 +82,45 @@ class TeableAuth {
     }
 
     /**
-     * Authenticate Space Owner (fetches from Teable.io and validates admin password)
+     * Authenticate Space Owner using clean logic
      */
     async authenticateSpaceOwner(email, password) {
         try {
             console.log('🔐 Starting space owner authentication...');
 
-            // Step 1: Validate API token by testing endpoints
-            const testEndpoints = [
-                `/api/space/${this.clientConfig.spaceId}`,
-                `/api/base/${this.clientConfig.baseId}`,
-                `/api/base/${this.clientConfig.baseId}/table`
-            ];
+            // Step 1: Ensure system tables exist
+            await window.teableAPI.ensureSystemTables();
 
-            let workingEndpoint = null;
-            for (const endpoint of testEndpoints) {
-                try {
-                    await window.teableAPI.request(endpoint);
-                    workingEndpoint = endpoint;
-                    break;
-                } catch (error) {
-                    console.log(`Endpoint ${endpoint} failed:`, error.message);
-                }
+            // Step 2: Get user from local app_users table
+            console.log('🔍 Checking local app_users table...');
+            const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+            const localUser = users.records?.find(u => 
+                u.fields.email === email.toLowerCase() && 
+                u.fields.role === 'owner' &&
+                u.fields.admin_password_hash // Must have admin password set
+            );
+
+            if (!localUser) {
+                throw new Error('Space owner not found. Please ensure the admin email was configured correctly during client setup.');
             }
 
-            if (!workingEndpoint) {
-                throw new Error('Cannot validate space owner access. Please check your API token and permissions.');
+            if (!localUser.fields.is_active) {
+                throw new Error('Space owner account is inactive');
             }
 
-            // Step 2: Fetch space owner details from Teable.io
-            console.log('🔍 Fetching space owner details from Teable.io...');
-            let spaceOwnerFromTeable = null;
+            // Step 3: Verify admin password
+            if (!localUser.fields.admin_password_hash) {
+                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
+            }
+
+            const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            if (localUser.fields.admin_password_hash !== adminPasswordHash) {
+                throw new Error('Invalid admin password for space owner');
+            }
+
+            // Step 4: Fetch current space owner from Teable.io for verification
+            console.log('🔍 Verifying against live Teable.io space data...');
+            let teableSpaceOwner = null;
 
             try {
                 const endpoints = [
@@ -126,78 +134,42 @@ class TeableAuth {
                     try {
                         const result = await window.teableAPI.request(endpoint);
 
-                        // Look for space owner in different response formats
+                        // Look for owner role
                         if (result.collaborators) {
-                            spaceOwnerFromTeable = result.collaborators.find(user => 
-                                user.email === email || user.role === 'owner'
+                            teableSpaceOwner = result.collaborators.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
                             );
                         } else if (result.members) {
-                            spaceOwnerFromTeable = result.members.find(user => 
-                                user.email === email || user.role === 'owner'
+                            teableSpaceOwner = result.members.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
                             );
-                        } else if (result.owner && result.owner.email === email) {
-                            spaceOwnerFromTeable = result.owner;
-                        } else if (result.email === email) {
-                            spaceOwnerFromTeable = result;
+                        } else if (result.owner) {
+                            teableSpaceOwner = result.owner;
                         }
 
-                        if (spaceOwnerFromTeable) break;
+                        if (teableSpaceOwner) break;
 
                     } catch (endpointError) {
                         console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
                     }
                 }
+
+                // Verify email matches current space owner
+                if (teableSpaceOwner && teableSpaceOwner.email) {
+                    if (teableSpaceOwner.email.toLowerCase() !== email.toLowerCase()) {
+                        throw new Error(`Authentication failed: You are not the current space owner. Current owner: ${teableSpaceOwner.email}`);
+                    }
+                    console.log('✅ Email verified against live Teable.io space data');
+                } else {
+                    console.log('⚠️ Could not verify against Teable.io - proceeding with local authentication');
+                }
+
             } catch (teableError) {
-                console.log('⚠️ Could not fetch from Teable.io:', teableError.message);
+                console.log('⚠️ Could not verify against Teable.io:', teableError.message);
+                // Continue with local authentication
             }
 
-            // If we couldn't find the user in Teable.io, check if they're the configured space owner
-            if (!spaceOwnerFromTeable) {
-                console.log('⚠️ Space owner not found in Teable.io API, checking local configuration...');
-            }
-
-            // Step 3: Validate against local app_users table
-            console.log('🔐 Validating against local user database...');
-            
-            // Ensure system tables exist
-            await window.teableAPI.ensureSystemTables();
-
-            // Get user from app_users table - look for space owner with matching email
-            const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records?.find(u => 
-                u.fields.email === email && 
-                (u.fields.role === 'owner' || u.fields.role === 'admin') &&
-                u.fields.admin_password_hash // Must have admin password set
-            );
-
-            if (!localUser) {
-                throw new Error('Space owner email not found in system users. Please ensure the admin email was configured correctly during client setup.');
-            }
-
-            if (!localUser.fields.is_active) {
-                throw new Error('Space owner account is inactive');
-            }
-
-            if (localUser.fields.role !== 'owner') {
-                throw new Error('User does not have space owner privileges');
-            }
-
-            // Step 4: Verify admin password
-            if (!localUser.fields.admin_password_hash) {
-                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
-            }
-
-            const adminPasswordHash = await window.teableAPI.hashPassword(password);
-            if (localUser.fields.admin_password_hash !== adminPasswordHash) {
-                throw new Error('Invalid admin password for space owner');
-            }
-
-            // Step 5: Verify email matches space owner (if we found one from Teable.io)
-            if (spaceOwnerFromTeable && spaceOwnerFromTeable.email !== email) {
-                throw new Error(`Email mismatch: Expected ${spaceOwnerFromTeable.email}, got ${email}`);
-            }
-
-            // Step 6: Update last login
+            // Step 5: Update last login
             try {
                 await window.teableAPI.updateRecord(
                     window.teableAPI.systemTables.users,
@@ -220,7 +192,7 @@ class TeableAuth {
                 accessToken: this.clientConfig.accessToken,
                 loginTime: new Date().toISOString(),
                 isAdmin: true,
-                teableSpaceOwner: spaceOwnerFromTeable || { email: email, verified: false }
+                teableSpaceOwner: teableSpaceOwner || { email: email, verified: false }
             };
 
         } catch (error) {
