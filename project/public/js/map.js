@@ -940,9 +940,17 @@ function toggleLayerVisibility(layerId) {
 
     if (layer.visible) {
         map.removeLayer(layer.leafletLayer);
+        // Also hide labels when layer is hidden
+        if (layer.labelGroup) {
+            map.removeLayer(layer.labelGroup);
+        }
         layer.visible = false;
     } else {
         layer.leafletLayer.addTo(map);
+        // Show labels when layer is shown (if labels are enabled)
+        if (layer.labelGroup && layer.properties?.labels?.enabled) {
+            layer.labelGroup.addTo(map);
+        }
         layer.visible = true;
     }
 
@@ -2329,6 +2337,17 @@ function applyProperties() {
     // Apply visual styling changes to map features
     applyLayerStyling(layer);
 
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    } else {
+        // Remove labels if disabled
+        if (layer.labelGroup) {
+            map.removeLayer(layer.labelGroup);
+            layer.labelGroup = null;
+        }
+    }
+
     // Update layers list to reflect changes
     updateLayersList();
 
@@ -2381,6 +2400,7 @@ function applyLabelsToLayer(layer) {
     // Remove existing labels
     if (layer.labelGroup) {
         map.removeLayer(layer.labelGroup);
+        layer.labelGroup = null;
     }
 
     const labels = layer.properties.labels;
@@ -2401,21 +2421,43 @@ function applyLabelsToLayer(layer) {
             return;
         }
 
-        const labelText = record.fields[labels.field];
+        const labelText = String(record.fields[labels.field]);
+        const fontSize = labels.fontSize || 12;
+        const color = labels.color || '#333333';
+        const background = labels.background !== false;
+        
         const labelMarker = L.marker(labelPosition, {
             icon: L.divIcon({
-                className: 'enhanced-feature-label',
-                html: labelText,
+                className: 'feature-label',
+                html: `<div style="
+                    font-size: ${fontSize}px;
+                    color: ${color};
+                    font-weight: bold;
+                    text-align: center;
+                    white-space: nowrap;
+                    pointer-events: none;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+                    ${background ? `
+                        background: rgba(255,255,255,0.8);
+                        padding: 2px 6px;
+                        border-radius: 3px;
+                        border: 1px solid rgba(0,0,0,0.3);
+                    ` : ''}
+                ">${labelText}</div>`,
                 iconSize: [null, null],
                 iconAnchor: [0, 0]
-            })
+            }),
+            zIndexOffset: 1000
         });
 
         labelMarkers.push(labelMarker);
     });
 
     if (labelMarkers.length > 0) {
-        layer.labelGroup = L.layerGroup(labelMarkers).addTo(map);
+        layer.labelGroup = L.layerGroup(labelMarkers);
+        if (layer.visible) {
+            layer.labelGroup.addTo(map);
+        }
     }
 }
 

@@ -1,4 +1,3 @@
-
 /* Teable GIS System - Modern UI Styles */
 
 /* Base Styles */
@@ -337,11 +336,11 @@ body {
     .action-card {
         padding: 1.5rem;
     }
-    
+
     .action-card h5 {
         font-size: 1rem;
     }
-    
+
     .action-card p {
         font-size: 0.85rem;
     }
@@ -351,12 +350,12 @@ body {
     .action-card {
         padding: 1.25rem;
     }
-    
+
     .action-icon {
         height: 60px;
         margin-bottom: 1rem;
     }
-    
+
     .action-card .btn {
         font-size: 0.85rem;
         padding: 0.5rem 0.75rem;
@@ -368,23 +367,23 @@ body {
         margin: 1rem;
         padding: 1.5rem !important;
     }
-    
+
     .stats-card {
         margin-bottom: 1rem;
     }
-    
+
     .table-toolbar {
         gap: 0.5rem;
     }
-    
+
     .toolbar-group {
         flex-wrap: wrap;
     }
-    
+
     .btn {
         padding: 0.5rem 1rem;
     }
-    
+
     .action-card {
         padding: 1rem;
         margin-bottom: 1rem;
@@ -395,17 +394,17 @@ body {
     .navbar-brand {
         font-size: 1rem;
     }
-    
+
     .stats-icon {
         width: 50px;
         height: 50px;
         font-size: 1.25rem;
     }
-    
+
     .action-card {
         padding: 1rem;
     }
-    
+
     .action-icon {
         height: 50px;
     }
@@ -491,13 +490,13 @@ body {
         background: #343a40;
         color: #fff;
     }
-    
+
     .table td {
         background: #495057;
         color: #fff;
         border-color: #6c757d;
     }
-    
+
     .glass-card {
         background: rgba(33, 37, 41, 0.95);
         color: #fff;
@@ -546,4 +545,16 @@ body {
     box-shadow: 2px 0 8px -2px rgba(0,0,0,0.12);
     border-right: 2px solid #e9ecef;
     z-index: 12;
+}
+
+/* Feature label styles */
+.feature-label {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.feature-label div {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    z-index: 1000;
 }
