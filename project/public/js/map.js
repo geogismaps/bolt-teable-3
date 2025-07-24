@@ -437,26 +437,23 @@ function createFeaturePopup(fields, layerConfig) {
     
     // Get the selected popup fields from layer properties
     const selectedFields = layerConfig.properties?.popup?.fields;
-    
-    // Determine which fields to show - ONLY show selected fields if configured
-    let fieldsToShow = [];
-    
-    // Check if popup fields are specifically configured
     const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
     
-    if (isPopupConfigured) {
-        // If popup is configured, use ONLY the selected fields (even if empty array)
-        if (selectedFields && Array.isArray(selectedFields)) {
-            fieldsToShow = selectedFields.filter(field => 
-                field !== layerConfig.geometryField && 
-                allFields.includes(field)
-            );
-        } else {
-            fieldsToShow = []; // No fields selected, show nothing
-        }
-    } else {
-        // If popup is not configured, show all fields as default behavior
+    // Determine which fields to show
+    let fieldsToShow = [];
+    
+    if (isPopupConfigured && selectedFields && Array.isArray(selectedFields)) {
+        // If popup is configured through iTool, use ONLY the selected fields
+        fieldsToShow = selectedFields.filter(field => 
+            field !== layerConfig.geometryField && 
+            allFields.includes(field)
+        );
+    } else if (!isPopupConfigured) {
+        // If popup has never been configured, show all fields as default
         fieldsToShow = allFields;
+    } else {
+        // If popup was configured but no fields selected, show nothing
+        fieldsToShow = [];
     }
 
     // Show the determined fields
@@ -475,8 +472,8 @@ function createFeaturePopup(fields, layerConfig) {
         content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
     });
 
-    // If no fields to show, display a message
-    if (fieldsToShow.length === 0 && layerConfig.properties?.popup?.configured) {
+    // If no fields to show and popup was configured, display a message
+    if (fieldsToShow.length === 0 && isPopupConfigured) {
         content += `<div class="popup-field"><em>No fields selected for display</em></div>`;
     }
 
@@ -2013,53 +2010,56 @@ function applyProperties() {
         selectedPopupFields.push(fieldName);
     });
     
-    // Update popup fields in layer properties - ensure it's always an array
+    // Update popup fields in layer properties and mark as configured
     layer.properties.popup.fields = selectedPopupFields;
-    
-    // ALWAYS mark that popup configuration has been explicitly set
     layer.properties.popup.configured = true;
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
-        // Update the layer properties in the main array
-        mapLayers[layerIndex].properties = { ...layer.properties };
+        // Deep copy the updated properties to ensure changes persist
+        mapLayers[layerIndex].properties = JSON.parse(JSON.stringify(layer.properties));
         mapLayers[layerIndex].name = layer.name;
 
-        // Refresh popup content for all features in this layer to apply new field selections immediately
-        mapLayers[layerIndex].features.forEach((feature, index) => {
-            let recordData = null;
-            
-            // Get the record data for this feature
-            if (feature.recordData) {
-                recordData = feature.recordData;
-            } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
-                recordData = mapLayers[layerIndex].records[index].fields;
-                // Store it on the feature for future use
-                feature.recordData = recordData;
-            }
-            
-            // Create new popup content with updated field selection
-            if (recordData) {
-                const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
+        // Update all existing feature popups with new field configuration
+        if (mapLayers[layerIndex].features) {
+            mapLayers[layerIndex].features.forEach((feature, index) => {
+                let recordData = null;
                 
-                // Update the popup content
-                if (feature.getPopup()) {
-                    feature.getPopup().setContent(newPopupContent);
-                } else {
+                // Get record data from feature or records array
+                if (feature.recordData) {
+                    recordData = feature.recordData;
+                } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
+                    recordData = mapLayers[layerIndex].records[index].fields;
+                    feature.recordData = recordData; // Cache for future use
+                }
+                
+                // Recreate popup with new field configuration
+                if (recordData) {
+                    const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
+                    
+                    // Remove existing popup and bind new one
+                    if (feature.getPopup()) {
+                        feature.unbindPopup();
+                    }
                     feature.bindPopup(newPopupContent);
                 }
-            }
-        });
+            });
+        }
     }
 
-    // Apply changes to map features
+    // Apply visual styling changes to map features
     applyLayerStyling(layer);
 
-    // Update layers list
+    // Update layers list to reflect changes
     updateLayersList();
 
-    showSuccess(`Layer properties applied successfully! Popup will show ${selectedPopupFields.length} selected field(s).`);
+    const fieldCount = selectedPopupFields.length;
+    const message = fieldCount === 0 ? 
+        'Layer properties applied! Popup will show no fields.' : 
+        `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
+    
+    showSuccess(message);
 }
 
 function applyAndCloseProperties() {
