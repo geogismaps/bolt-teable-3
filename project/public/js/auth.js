@@ -162,12 +162,16 @@ class TeableAuth {
             // Ensure system tables exist
             await window.teableAPI.ensureSystemTables();
 
-            // Get user from app_users table
+            // Get user from app_users table - look for space owner with matching email
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records?.find(u => u.fields.email === email);
+            const localUser = users.records?.find(u => 
+                u.fields.email === email && 
+                (u.fields.role === 'owner' || u.fields.role === 'admin') &&
+                u.fields.admin_password_hash // Must have admin password set
+            );
 
             if (!localUser) {
-                throw new Error('Space owner email not found in system users. Please ensure the admin email was configured correctly during setup.');
+                throw new Error('Space owner email not found in system users. Please ensure the admin email was configured correctly during client setup.');
             }
 
             if (!localUser.fields.is_active) {

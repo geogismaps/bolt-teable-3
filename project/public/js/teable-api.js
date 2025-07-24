@@ -617,6 +617,7 @@ class TeableAPI {
                     }
                 },
                 { name: 'is_active', type: 'checkbox' },
+                { name: 'is_space_owner', type: 'checkbox' },
                 { name: 'created_date', type: 'date' },
                 { name: 'last_login', type: 'date' },
                 { name: 'synced_from_teable', type: 'checkbox' },
