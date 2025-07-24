@@ -441,16 +441,16 @@ function createFeaturePopup(fields, layerConfig) {
     // Determine which fields to show
     let fieldsToShow = [];
     
-    // If popup fields are specifically configured and not empty, use ONLY those
-    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
-        // Show only the selected fields that exist in the data
+    // Check if popup fields are configured in layer properties
+    if (layerConfig.properties?.popup?.configured && selectedFields && Array.isArray(selectedFields)) {
+        // If popup configuration exists, use ONLY the selected fields (even if empty array)
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
             allFields.includes(field)
         );
     } else {
-        // If no popup fields are configured, show no fields (empty popup except for title)
-        fieldsToShow = [];
+        // If no popup configuration exists at all, show all fields as fallback
+        fieldsToShow = allFields;
     }
 
     // Show the determined fields
@@ -2002,8 +2002,11 @@ function applyProperties() {
         selectedPopupFields.push(fieldName);
     });
     
-    // Update popup fields in layer properties
+    // Update popup fields in layer properties - ensure it's always an array
     layer.properties.popup.fields = selectedPopupFields;
+    
+    // Mark that popup configuration has been set
+    layer.properties.popup.configured = true;
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
