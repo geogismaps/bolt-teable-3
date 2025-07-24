@@ -449,8 +449,8 @@ function createFeaturePopup(fields, layerConfig) {
             allFields.includes(field)
         );
     } else {
-        // If no popup fields are configured, show all available fields as fallback
-        fieldsToShow = allFields;
+        // If no popup fields are configured, show no fields (empty popup except for title)
+        fieldsToShow = [];
     }
 
     // Show the determined fields
