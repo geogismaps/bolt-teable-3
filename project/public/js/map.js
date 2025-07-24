@@ -429,70 +429,242 @@ async function createLayerFromData(records, layerConfig) {
 }
 
 function createFeaturePopup(fields, layerConfig) {
-    let content = `<div class="feature-popup">`;
-    content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
+    const popupSettings = layerConfig.properties?.popup || {};
+    const template = popupSettings.template || 'default';
+    const maxWidth = popupSettings.maxWidth || 300;
+    const maxFieldLength = popupSettings.maxFieldLength || 100;
+    const showEmptyFields = popupSettings.showEmptyFields || false;
+    const showFieldIcons = popupSettings.showFieldIcons !== false;
+    const highlightLinks = popupSettings.highlightLinks !== false;
+    const showCopyButtons = popupSettings.showCopyButtons || false;
+    const enableSearch = popupSettings.enableSearch || false;
 
-    // Get all available fields (excluding geometry field)
-    const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
+    let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
     
-    // Get the selected popup fields from layer properties
+    // Popup header
+    content += `<div class="popup-header d-flex justify-content-between align-items-center mb-2">`;
+    content += `<h6 class="popup-title mb-0">${layerConfig.name}</h6>`;
+    
+    // Add search if enabled
+    if (enableSearch) {
+        content += `<input type="text" class="form-control form-control-sm" placeholder="Search..." 
+                   onkeyup="filterPopupFields(this.value)" style="width: 120px;">`;
+    }
+    content += `</div>`;
+
+    // Get fields to display
+    const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
     const selectedFields = layerConfig.properties?.popup?.fields;
     const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
     
-    // Determine which fields to show
     let fieldsToShow = [];
-    
     if (isPopupConfigured && selectedFields && Array.isArray(selectedFields)) {
-        // If popup is configured through iTool, use ONLY the selected fields
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
             allFields.includes(field)
         );
     } else if (!isPopupConfigured) {
-        // If popup has never been configured, show all fields as default
         fieldsToShow = allFields;
-    } else {
-        // If popup was configured but no fields selected, show nothing
-        fieldsToShow = [];
     }
 
-    // Show the determined fields
+    // Apply template
+    if (template === 'custom' && popupSettings.customTemplate) {
+        content += renderCustomTemplate(popupSettings.customTemplate, fields, fieldsToShow);
+    } else if (template === 'table') {
+        content += renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+    } else if (template === 'card') {
+        content += renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+    } else {
+        content += renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+    }
+
+    // Add controls if enabled
+    const controls = popupSettings.controls || {};
+    if (controls.showZoomControls !== false || controls.showCenterControl !== false || 
+        controls.showExportControl || controls.showEditControl) {
+        content += createPopupControls(controls);
+    }
+
+    content += '</div>';
+    return content;
+}
+
+function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+    let content = '<div class="popup-fields">';
+    
     fieldsToShow.forEach(key => {
         let value = fields[key];
         
-        // Handle null, undefined, or empty values
-        if (value === null || value === undefined) {
-            value = '<em>No data</em>';
-        } else if (value === '') {
-            value = '<em>Empty</em>';
-        } else if (typeof value === 'string' && value.length > 100) {
-            value = value.substring(0, 100) + '...';
+        // Skip empty fields if not showing them
+        if (!showEmptyFields && (value === null || value === undefined || value === '')) {
+            return;
         }
         
-        content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
+        // Format value
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const fieldType = getFieldType(value);
+        const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
+        
+        content += `<div class="popup-field d-flex align-items-start mb-2" data-field="${key}">`;
+        content += `<div class="field-label flex-shrink-0 me-2"><strong>${fieldIcon}${key}:</strong></div>`;
+        content += `<div class="field-value flex-grow-1">${formattedValue}</div>`;
+        
+        if (showCopyButtons) {
+            content += `<button class="btn btn-xs btn-outline-secondary ms-1" onclick="copyToClipboard('${value}')" title="Copy">
+                        <i class="fas fa-copy"></i></button>`;
+        }
+        content += `</div>`;
     });
-
-    // If no fields to show and popup was configured, display a message
-    if (fieldsToShow.length === 0 && isPopupConfigured) {
-        content += `<div class="popup-field"><em>No fields selected for display</em></div>`;
+    
+    if (fieldsToShow.length === 0) {
+        content += `<div class="text-muted text-center py-2"><em>No fields selected for display</em></div>`;
     }
+    
+    content += '</div>';
+    return content;
+}
 
-    // Add zoom controls to popup
-    content += `
-        <div class="popup-controls mt-2">
-            <button class="btn btn-xs btn-outline-primary me-1" onclick="window.zoomToCurrentPopupFeature('close')" title="Zoom Close">
+function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+    let content = '<div class="popup-table-wrapper" style="max-height: 300px; overflow-y: auto;">';
+    content += '<table class="table table-sm table-bordered mb-0">';
+    
+    fieldsToShow.forEach(key => {
+        let value = fields[key];
+        
+        if (!showEmptyFields && (value === null || value === undefined || value === '')) {
+            return;
+        }
+        
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const fieldType = getFieldType(value);
+        const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
+        
+        content += `<tr data-field="${key}">`;
+        content += `<td class="fw-bold" style="width: 40%;">${fieldIcon}${key}</td>`;
+        content += `<td>${formattedValue}`;
+        
+        if (showCopyButtons) {
+            content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
+                        <i class="fas fa-copy"></i></button>`;
+        }
+        content += `</td></tr>`;
+    });
+    
+    content += '</table></div>';
+    return content;
+}
+
+function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+    let content = '<div class="popup-cards">';
+    
+    fieldsToShow.forEach(key => {
+        let value = fields[key];
+        
+        if (!showEmptyFields && (value === null || value === undefined || value === '')) {
+            return;
+        }
+        
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const fieldType = getFieldType(value);
+        const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
+        
+        content += `<div class="card mb-2" data-field="${key}">`;
+        content += `<div class="card-body p-2">`;
+        content += `<h6 class="card-title mb-1">${fieldIcon}${key}</h6>`;
+        content += `<div class="card-text">${formattedValue}`;
+        
+        if (showCopyButtons) {
+            content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
+                        <i class="fas fa-copy"></i></button>`;
+        }
+        content += `</div></div></div>`;
+    });
+    
+    content += '</div>';
+    return content;
+}
+
+function renderCustomTemplate(template, fields, fieldsToShow) {
+    let content = template;
+    
+    // Replace field placeholders
+    fieldsToShow.forEach(field => {
+        const placeholder = `{{${field}}}`;
+        const value = formatFieldValue(fields[field], true, 200);
+        content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+    });
+    
+    return content;
+}
+
+function formatFieldValue(value, highlightLinks, maxLength) {
+    if (value === null || value === undefined) {
+        return '<em class="text-muted">No data</em>';
+    }
+    
+    if (value === '') {
+        return '<em class="text-muted">Empty</em>';
+    }
+    
+    let formattedValue = String(value);
+    
+    // Truncate if too long
+    if (maxLength && formattedValue.length > maxLength) {
+        formattedValue = formattedValue.substring(0, maxLength) + '...';
+    }
+    
+    // Highlight links
+    if (highlightLinks && typeof value === 'string') {
+        if (value.match(/^https?:\/\//)) {
+            formattedValue = `<a href="${value}" target="_blank" class="text-primary">${formattedValue}</a>`;
+        } else if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+            formattedValue = `<a href="mailto:${value}" class="text-primary">${formattedValue}</a>`;
+        }
+    }
+    
+    return formattedValue;
+}
+
+function createPopupControls(controls) {
+    let content = '<div class="popup-controls mt-3 pt-2 border-top">';
+    content += '<div class="d-flex gap-1 flex-wrap">';
+    
+    if (controls.showZoomControls !== false) {
+        content += `
+            <button class="btn btn-xs btn-outline-primary" onclick="window.zoomToCurrentPopupFeature('close')" title="Zoom Close">
                 <i class="fas fa-search-plus"></i>
             </button>
-            <button class="btn btn-xs btn-outline-secondary me-1" onclick="window.zoomToCurrentPopupFeature('medium')" title="Zoom Medium">
+            <button class="btn btn-xs btn-outline-secondary" onclick="window.zoomToCurrentPopupFeature('medium')" title="Zoom Medium">
                 <i class="fas fa-search"></i>
             </button>
+        `;
+    }
+    
+    if (controls.showCenterControl !== false) {
+        content += `
             <button class="btn btn-xs btn-outline-info" onclick="window.centerCurrentPopupFeature()" title="Center">
                 <i class="fas fa-crosshairs"></i>
             </button>
-        </div>
-    `;
-
-    content += '</div>';
+        `;
+    }
+    
+    if (controls.showExportControl) {
+        content += `
+            <button class="btn btn-xs btn-outline-success" onclick="exportCurrentFeature()" title="Export Feature">
+                <i class="fas fa-download"></i>
+            </button>
+        `;
+    }
+    
+    if (controls.showEditControl) {
+        content += `
+            <button class="btn btn-xs btn-outline-warning" onclick="editCurrentFeature()" title="Edit Feature">
+                <i class="fas fa-edit"></i>
+            </button>
+        `;
+    }
+    
+    content += '</div></div>';
     return content;
 }
 
@@ -1018,8 +1190,55 @@ function populatePropertiesModal(layer) {
 
     // iTool tab
         populatePopupFieldsSelector(layer);
+        const popup = layer.properties?.popup || {};
+        
+        // Basic popup settings
+        const propEnablePopups = document.getElementById('propEnablePopups');
+        const propPopupTemplate = document.getElementById('propPopupTemplate');
         const propMaxPopupWidth = document.getElementById('propMaxPopupWidth');
-        if (propMaxPopupWidth) propMaxPopupWidth.value = layer.properties?.popup?.maxWidth || 300;
+        const propMaxFieldLength = document.getElementById('propMaxFieldLength');
+        const propPopupPosition = document.getElementById('propPopupPosition');
+        
+        if (propEnablePopups) propEnablePopups.checked = popup.enabled !== false;
+        if (propPopupTemplate) propPopupTemplate.value = popup.template || 'default';
+        if (propMaxPopupWidth) propMaxPopupWidth.value = popup.maxWidth || 300;
+        if (propMaxFieldLength) propMaxFieldLength.value = popup.maxFieldLength || 100;
+        if (propPopupPosition) propPopupPosition.value = popup.position || 'auto';
+        
+        // Advanced settings
+        const propShowEmptyFields = document.getElementById('propShowEmptyFields');
+        const propShowFieldIcons = document.getElementById('propShowFieldIcons');
+        const propHighlightLinks = document.getElementById('propHighlightLinks');
+        const propShowTooltips = document.getElementById('propShowTooltips');
+        const propEnableSearch = document.getElementById('propEnableSearch');
+        const propShowCopyButtons = document.getElementById('propShowCopyButtons');
+        const propEnableFieldSorting = document.getElementById('propEnableFieldSorting');
+        const propCustomTemplate = document.getElementById('propCustomTemplate');
+        
+        if (propShowEmptyFields) propShowEmptyFields.checked = popup.showEmptyFields || false;
+        if (propShowFieldIcons) propShowFieldIcons.checked = popup.showFieldIcons !== false;
+        if (propHighlightLinks) propHighlightLinks.checked = popup.highlightLinks !== false;
+        if (propShowTooltips) propShowTooltips.checked = popup.showTooltips || false;
+        if (propEnableSearch) propEnableSearch.checked = popup.enableSearch || false;
+        if (propShowCopyButtons) propShowCopyButtons.checked = popup.showCopyButtons || false;
+        if (propEnableFieldSorting) propEnableFieldSorting.checked = popup.enableFieldSorting || false;
+        if (propCustomTemplate) propCustomTemplate.value = popup.customTemplate || '';
+        
+        // Control settings
+        const controls = popup.controls || {};
+        const propShowZoomControls = document.getElementById('propShowZoomControls');
+        const propShowCenterControl = document.getElementById('propShowCenterControl');
+        const propShowExportControl = document.getElementById('propShowExportControl');
+        const propShowEditControl = document.getElementById('propShowEditControl');
+        
+        if (propShowZoomControls) propShowZoomControls.checked = controls.showZoomControls !== false;
+        if (propShowCenterControl) propShowCenterControl.checked = controls.showCenterControl !== false;
+        if (propShowExportControl) propShowExportControl.checked = controls.showExportControl || false;
+        if (propShowEditControl) propShowEditControl.checked = controls.showEditControl || false;
+        
+        // Handle template change and popup toggle
+        handleTemplateChange();
+        handlePopupToggle();
 
         // Update symbology type display
         updateSymbologyType();
@@ -1096,17 +1315,68 @@ function populatePopupFieldsSelector(layer) {
     let html = '';
     fields.forEach(field => {
         const isSelected = selectedFields.includes(field);
+        const fieldType = getFieldType(layer.records[0].fields[field]);
+        const fieldIcon = getFieldIcon(fieldType);
+        
         html += `
-            <div class="field-checkbox">
-                <input class="form-check-input" type="checkbox" id="popup_field_${field}" 
+            <div class="field-checkbox d-flex align-items-center mb-2">
+                <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
                        ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
-                <label class="form-check-label" for="popup_field_${field}">
+                <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
+                <label class="form-check-label flex-grow-1" for="popup_field_${field}">
                     ${field}
                 </label>
+                <small class="text-muted">(${fieldType})</small>
             </div>
         `;
     });
 
+    container.innerHTML = html;
+    
+    // Update available fields for custom template
+    updateAvailableFieldsHelp(fields);
+}
+
+function getFieldType(value) {
+    if (value === null || value === undefined) return 'empty';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'string') {
+        if (value.match(/^\d{4}-\d{2}-\d{2}/)) return 'date';
+        if (value.match(/^https?:\/\//)) return 'url';
+        if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return 'email';
+        if (value.length > 100) return 'longtext';
+        return 'text';
+    }
+    return 'unknown';
+}
+
+function getFieldIcon(fieldType) {
+    const icons = {
+        'text': 'fas fa-font',
+        'longtext': 'fas fa-align-left',
+        'number': 'fas fa-hashtag',
+        'boolean': 'fas fa-check-square',
+        'date': 'fas fa-calendar',
+        'url': 'fas fa-link',
+        'email': 'fas fa-envelope',
+        'empty': 'fas fa-circle',
+        'unknown': 'fas fa-question-circle'
+    };
+    return icons[fieldType] || 'fas fa-question-circle';
+}
+
+function updateAvailableFieldsHelp(fields) {
+    const container = document.getElementById('availableFieldsHelp');
+    if (!container) return;
+    
+    let html = '<div class="row">';
+    fields.forEach((field, index) => {
+        if (index > 0 && index % 3 === 0) html += '</div><div class="row">';
+        html += `<div class="col-md-4"><code>{{${field}}}</code></div>`;
+    });
+    html += '</div>';
+    
     container.innerHTML = html;
 }
 
@@ -1998,9 +2268,11 @@ function applyProperties() {
     layer.properties.labels.color = document.getElementById('propLabelColor').value;
     layer.properties.labels.background = document.getElementById('propLabelBackground').checked;
 
-    // Update popup properties
+    // Update popup properties with all iTool settings
     if (!layer.properties.popup) layer.properties.popup = {};
-    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
+    
+    // Apply all popup settings
+    updateLayerPopupSettings(layer);
     
     // Collect selected popup fields from checkboxes
     const selectedPopupFields = [];
@@ -2141,6 +2413,130 @@ function applyLabelsToLayer(layer) {
     }
 }
 
+// Additional iTool utility functions
+function filterPopupFields(searchTerm) {
+    const fields = document.querySelectorAll('.popup-field, tr[data-field], .card[data-field]');
+    fields.forEach(field => {
+        const fieldName = field.dataset.field || '';
+        const fieldContent = field.textContent.toLowerCase();
+        const isVisible = fieldName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         fieldContent.includes(searchTerm.toLowerCase());
+        field.style.display = isVisible ? '' : 'none';
+    });
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showSuccess('Copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showSuccess('Copied to clipboard!');
+    });
+}
+
+function previewPopup() {
+    if (!window.currentPropertiesLayer || !window.currentPropertiesLayer.records) {
+        showError('No layer selected or no data available for preview');
+        return;
+    }
+    
+    const layer = window.currentPropertiesLayer;
+    const sampleRecord = layer.records[0];
+    
+    if (!sampleRecord || !sampleRecord.fields) {
+        showError('No sample data available for preview');
+        return;
+    }
+    
+    // Apply current settings to layer temporarily for preview
+    updateLayerPopupSettings(layer);
+    
+    // Generate preview content
+    const previewContent = createFeaturePopup(sampleRecord.fields, layer);
+    
+    // Display in preview area
+    document.getElementById('popupPreview').innerHTML = previewContent;
+}
+
+function updateLayerPopupSettings(layer) {
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = {};
+    
+    // Collect all settings from the form
+    layer.properties.popup.enabled = document.getElementById('propEnablePopups')?.checked !== false;
+    layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
+    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
+    layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
+    layer.properties.popup.position = document.getElementById('propPopupPosition')?.value || 'auto';
+    layer.properties.popup.showEmptyFields = document.getElementById('propShowEmptyFields')?.checked || false;
+    layer.properties.popup.showFieldIcons = document.getElementById('propShowFieldIcons')?.checked !== false;
+    layer.properties.popup.highlightLinks = document.getElementById('propHighlightLinks')?.checked !== false;
+    layer.properties.popup.showTooltips = document.getElementById('propShowTooltips')?.checked || false;
+    layer.properties.popup.enableSearch = document.getElementById('propEnableSearch')?.checked || false;
+    layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
+    layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
+    layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
+    
+    // Controls
+    if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
+    layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
+    layer.properties.popup.controls.showCenterControl = document.getElementById('propShowCenterControl')?.checked !== false;
+    layer.properties.popup.controls.showExportControl = document.getElementById('propShowExportControl')?.checked || false;
+    layer.properties.popup.controls.showEditControl = document.getElementById('propShowEditControl')?.checked || false;
+}
+
+function exportCurrentFeature() {
+    if (!window.currentPopupFeature || !window.currentPopupFeature.recordData) {
+        showError('No feature data available for export');
+        return;
+    }
+    
+    const data = window.currentPopupFeature.recordData;
+    const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'feature_data.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    showSuccess('Feature data exported successfully!');
+}
+
+function editCurrentFeature() {
+    showInfo('Feature editing functionality would be implemented here based on permissions');
+}
+
+// Template change handler
+function handleTemplateChange() {
+    const template = document.getElementById('propPopupTemplate')?.value;
+    const customSection = document.getElementById('customTemplateSection');
+    
+    if (template === 'custom' && customSection) {
+        customSection.style.display = 'block';
+    } else if (customSection) {
+        customSection.style.display = 'none';
+    }
+}
+
+// Popup enable/disable handler
+function handlePopupToggle() {
+    const enabled = document.getElementById('propEnablePopups')?.checked;
+    const configSection = document.getElementById('popupConfigSection');
+    
+    if (configSection) {
+        configSection.style.display = enabled ? 'block' : 'none';
+    }
+}
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -2182,6 +2578,13 @@ window.exportTableData = exportTableData;
 window.clearSelection = clearSelection;
 window.toggleAllRows = toggleAllRows;
 window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.filterPopupFields = filterPopupFields;
+window.copyToClipboard = copyToClipboard;
+window.previewPopup = previewPopup;
+window.exportCurrentFeature = exportCurrentFeature;
+window.editCurrentFeature = editCurrentFeature;
+window.handleTemplateChange = handleTemplateChange;
+window.handlePopupToggle = handlePopupToggle;
 
 // Docked table utility functions
 function toggleDockedTableSize() {
@@ -2340,6 +2743,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 propLabelControls.style.display = this.checked ? 'block' : 'none';
             }
         });
+    }
+
+    // iTool event listeners
+    const popupEnableCheckbox = document.getElementById('propEnablePopups');
+    if (popupEnableCheckbox) {
+        popupEnableCheckbox.addEventListener('change', handlePopupToggle);
+    }
+
+    const popupTemplateSelect = document.getElementById('propPopupTemplate');
+    if (popupTemplateSelect) {
+        popupTemplateSelect.addEventListener('change', handleTemplateChange);
     }
 
      // Tab switching for layer source
