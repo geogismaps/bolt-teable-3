@@ -452,18 +452,21 @@ function createFeaturePopup(fields, layerConfig) {
     }
     content += `</div>`;
 
-    // Get fields to display
+    // Get fields to display - only show selected fields if configured
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
     const selectedFields = layerConfig.properties?.popup?.fields;
     const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
     
     let fieldsToShow = [];
-    if (isPopupConfigured && selectedFields && Array.isArray(selectedFields)) {
+    if (isPopupConfigured && selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
+        // Only show the specifically selected fields
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
-            allFields.includes(field)
+            allFields.includes(field) &&
+            fields.hasOwnProperty(field)
         );
-    } else if (!isPopupConfigured) {
+    } else {
+        // If not configured or no fields selected, show all fields
         fieldsToShow = allFields;
     }
 
@@ -2285,6 +2288,9 @@ function applyProperties() {
     // Update popup fields in layer properties and mark as configured
     layer.properties.popup.fields = selectedPopupFields;
     layer.properties.popup.configured = true;
+    
+    console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
+    console.log(`Total selected fields: ${selectedPopupFields.length}`);
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
