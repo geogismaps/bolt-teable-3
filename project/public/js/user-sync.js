@@ -95,11 +95,11 @@ class UserSyncManager {
                         
                         // Based on your images, let's create the users we can see
                         const knownUsers = [
-                            { email: 'venugis8@gmail.com', name: 'venugis8', role: 'owner' },
-                            { email: 'mybharathabhoomi@gmail.com', name: 'mybharathabhoomi', role: 'editor' },
-                            { email: 'manager@test.com', name: 'manager', role: 'admin' },
-                            { email: 'employee@test.com', name: 'employee', role: 'editor' },
-                            { email: 'public@test.com', name: 'public', role: 'viewer' }
+                            { email: 'venugis8@gmail.com', name: 'venugis8', role: 'Owner' },
+                            { email: 'mybharathabhoomi@gmail.com', name: 'mybharathabhoomi', role: 'Editor' },
+                            { email: 'manager@test.com', name: 'manager', role: 'Admin' },
+                            { email: 'employee@test.com', name: 'employee', role: 'Editor' },
+                            { email: 'public@test.com', name: 'public', role: 'Viewer' }
                         ];
                         
                         console.log('📝 Using known users from space:', knownUsers);
@@ -118,11 +118,11 @@ class UserSyncManager {
                 // Even if API fails, try to create users manually
                 console.log('🔍 API failed, using fallback user creation...');
                 const fallbackUsers = [
-                    { email: 'venugis8@gmail.com', name: 'venugis8', role: 'owner' },
-                    { email: 'mybharathabhoomi@gmail.com', name: 'mybharathabhoomi', role: 'editor' },
-                    { email: 'manager@test.com', name: 'manager', role: 'admin' },
-                    { email: 'employee@test.com', name: 'employee', role: 'editor' },
-                    { email: 'public@test.com', name: 'public', role: 'viewer' }
+                    { email: 'venugis8@gmail.com', name: 'venugis8', role: 'Owner' },
+                    { email: 'mybharathabhoomi@gmail.com', name: 'mybharathabhoomi', role: 'Editor' },
+                    { email: 'manager@test.com', name: 'manager', role: 'Admin' },
+                    { email: 'employee@test.com', name: 'employee', role: 'Editor' },
+                    { email: 'public@test.com', name: 'public', role: 'Viewer' }
                 ];
                 spaceUsers = fallbackUsers;
                 result.details.push('Used fallback user list');
@@ -244,9 +244,15 @@ class UserSyncManager {
             lastName = 'User';
         }
 
-        // Map Teable.io roles directly (no conversion needed)
-        const validRoles = ['owner', 'admin', 'editor', 'commenter', 'viewer'];
-        const userRole = validRoles.includes(spaceUser.role?.toLowerCase()) ? spaceUser.role.toLowerCase() : 'viewer';
+        // Map Teable.io roles to capitalized format (matching table choices)
+        const roleMapping = {
+            'owner': 'Owner',
+            'admin': 'Admin', 
+            'editor': 'Editor',
+            'commenter': 'Commenter',
+            'viewer': 'Viewer'
+        };
+        const userRole = roleMapping[spaceUser.role?.toLowerCase()] || 'Viewer';
 
         const userData = {
             email: spaceUser.email,
@@ -284,9 +290,15 @@ class UserSyncManager {
             lastName = 'User';
         }
         
-        // Map role directly
-        const validRoles = ['owner', 'admin', 'editor', 'commenter', 'viewer'];
-        const spaceRole = validRoles.includes(spaceUser.role?.toLowerCase()) ? spaceUser.role.toLowerCase() : 'viewer';
+        // Map role to capitalized format
+        const roleMapping = {
+            'owner': 'Owner',
+            'admin': 'Admin',
+            'editor': 'Editor', 
+            'commenter': 'Commenter',
+            'viewer': 'Viewer'
+        };
+        const spaceRole = roleMapping[spaceUser.role?.toLowerCase()] || 'Viewer';
 
         // Update name if different
         if (existingAppUser.fields.first_name !== firstName) {
