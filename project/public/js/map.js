@@ -438,18 +438,20 @@ function createFeaturePopup(fields, layerConfig) {
     // Get the selected popup fields from layer properties
     const selectedFields = layerConfig.properties?.popup?.fields;
     
-    // Determine which fields to show
+    // Determine which fields to show - ONLY show selected fields if configured
     let fieldsToShow = [];
     
-    // Check if popup fields are configured in layer properties
-    if (layerConfig.properties?.popup?.configured && selectedFields && Array.isArray(selectedFields)) {
-        // If popup configuration exists, use ONLY the selected fields (even if empty array)
+    // If popup fields are configured and selected, show ONLY those fields
+    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
             allFields.includes(field)
         );
+    } else if (layerConfig.properties?.popup?.configured) {
+        // If popup is configured but no fields selected, show nothing
+        fieldsToShow = [];
     } else {
-        // If no popup configuration exists at all, show all fields as fallback
+        // If popup is not configured at all, show all fields as fallback
         fieldsToShow = allFields;
     }
 
@@ -468,6 +470,11 @@ function createFeaturePopup(fields, layerConfig) {
         
         content += `<div class="popup-field"><strong>${key}:</strong> ${value}</div>`;
     });
+
+    // If no fields to show, display a message
+    if (fieldsToShow.length === 0 && layerConfig.properties?.popup?.configured) {
+        content += `<div class="popup-field"><em>No fields selected for display</em></div>`;
+    }
 
     // Add zoom controls to popup
     content += `
@@ -2015,15 +2022,29 @@ function applyProperties() {
         mapLayers[layerIndex].properties = { ...layer.properties };
         mapLayers[layerIndex].name = layer.name;
 
-        // Refresh popup content for all features in this layer to apply new field selections
+        // Refresh popup content for all features in this layer to apply new field selections immediately
         mapLayers[layerIndex].features.forEach((feature, index) => {
+            let recordData = null;
+            
+            // Get the record data for this feature
             if (feature.recordData) {
-                const newPopupContent = createFeaturePopup(feature.recordData, mapLayers[layerIndex]);
-                feature.bindPopup(newPopupContent);
+                recordData = feature.recordData;
             } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
-                // Use record data if feature.recordData is not available
-                const newPopupContent = createFeaturePopup(mapLayers[layerIndex].records[index].fields, mapLayers[layerIndex]);
-                feature.bindPopup(newPopupContent);
+                recordData = mapLayers[layerIndex].records[index].fields;
+                // Store it on the feature for future use
+                feature.recordData = recordData;
+            }
+            
+            // Create new popup content with updated field selection
+            if (recordData) {
+                const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
+                
+                // Update the popup content
+                if (feature.getPopup()) {
+                    feature.getPopup().setContent(newPopupContent);
+                } else {
+                    feature.bindPopup(newPopupContent);
+                }
             }
         });
     }
