@@ -458,16 +458,20 @@ function createFeaturePopup(fields, layerConfig) {
     const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
     
     let fieldsToShow = [];
-    if (isPopupConfigured && selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
-        // Only show the specifically selected fields
+    
+    // Check if popup fields have been specifically configured
+    if (selectedFields && Array.isArray(selectedFields)) {
+        // Only show the specifically selected fields, even if the array is empty
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
             allFields.includes(field) &&
             fields.hasOwnProperty(field)
         );
+        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} selected fields:`, fieldsToShow);
     } else {
-        // If not configured or no fields selected, show all fields
+        // If popup fields haven't been configured yet, show all fields
         fieldsToShow = allFields;
+        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} fields`);
     }
 
     // Apply template
@@ -2049,6 +2053,9 @@ function updatePopupFieldSelection(fieldName, isSelected) {
         layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
     }
 
+    // Mark as configured when any field selection is made
+    layer.properties.popup.configured = true;
+
     // Update the actual layer reference in mapLayers array immediately
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
@@ -2056,6 +2063,7 @@ function updatePopupFieldSelection(fieldName, isSelected) {
         if (!mapLayers[layerIndex].properties) mapLayers[layerIndex].properties = {};
         if (!mapLayers[layerIndex].properties.popup) mapLayers[layerIndex].properties.popup = {};
         mapLayers[layerIndex].properties.popup.fields = [...layer.properties.popup.fields];
+        mapLayers[layerIndex].properties.popup.configured = true;
 
         console.log(`Updated popup fields for layer "${layer.name}": ${layer.properties.popup.fields.join(', ')}`);
         console.log('Fields will be applied when "Apply" button is clicked.');
