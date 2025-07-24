@@ -1760,25 +1760,16 @@ function updatePopupFieldSelection(fieldName, isSelected) {
         layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
     }
 
-    // Update the actual layer reference in mapLayers array
+    // Update the actual layer reference in mapLayers array immediately
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
-        // Update the layer properties in the main array
-        mapLayers[layerIndex].properties = { ...layer.properties };
-
-        // Refresh popup content for all features in this layer
-        mapLayers[layerIndex].features.forEach((feature, index) => {
-            if (feature.recordData) {
-                const newPopupContent = createFeaturePopup(feature.recordData, mapLayers[layerIndex]);
-                feature.bindPopup(newPopupContent);
-            } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
-                // Use record data if feature.recordData is not available
-                const newPopupContent = createFeaturePopup(mapLayers[layerIndex].records[index].fields, mapLayers[layerIndex]);
-                feature.bindPopup(newPopupContent);
-            }
-        });
+        // Deep copy to ensure changes are reflected
+        if (!mapLayers[layerIndex].properties) mapLayers[layerIndex].properties = {};
+        if (!mapLayers[layerIndex].properties.popup) mapLayers[layerIndex].properties.popup = {};
+        mapLayers[layerIndex].properties.popup.fields = [...layer.properties.popup.fields];
 
         console.log(`Updated popup fields for layer "${layer.name}": ${layer.properties.popup.fields.join(', ')}`);
+        console.log('Fields will be applied when "Apply" button is clicked.');
     }
 }
 
@@ -2002,12 +1993,24 @@ function applyProperties() {
     // Update popup properties
     if (!layer.properties.popup) layer.properties.popup = {};
     layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
+    
+    // Collect selected popup fields from checkboxes
+    const selectedPopupFields = [];
+    const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
+    popupCheckboxes.forEach(checkbox => {
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        selectedPopupFields.push(fieldName);
+    });
+    
+    // Update popup fields in layer properties
+    layer.properties.popup.fields = selectedPopupFields;
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
     if (layerIndex !== -1) {
         // Update the layer properties in the main array
         mapLayers[layerIndex].properties = { ...layer.properties };
+        mapLayers[layerIndex].name = layer.name;
 
         // Refresh popup content for all features in this layer to apply new field selections
         mapLayers[layerIndex].features.forEach((feature, index) => {
@@ -2028,7 +2031,7 @@ function applyProperties() {
     // Update layers list
     updateLayersList();
 
-    showSuccess('Layer properties applied successfully');
+    showSuccess(`Layer properties applied successfully! Popup will show ${selectedPopupFields.length} selected field(s).`);
 }
 
 function applyAndCloseProperties() {
