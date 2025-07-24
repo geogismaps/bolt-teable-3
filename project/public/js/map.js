@@ -1589,7 +1589,12 @@ function showFeatureInfo(layerId, featureIndex) {
         }
     }
 
-    // Create popup content
+    // Ensure we have the latest record data
+    feature.recordData = record.fields;
+    feature.layerId = layerId;
+    feature.featureIndex = featureIndex;
+
+    // Create popup content using current layer configuration (respects popup field selection)
     const popupContent = createFeaturePopup(record.fields, layer);
 
     // Show popup on map
@@ -1602,6 +1607,8 @@ function showFeatureInfo(layerId, featureIndex) {
     } else if (feature.getLatLng) {
         feature.bindPopup(popupContent).openPopup();
     }
+    
+    console.log(`Feature info displayed for feature ${featureIndex} in layer "${layer.name}" with ${layer.properties?.popup?.fields?.length || 0} configured popup fields`);
 }
 
 function exportTableData(layerId) {
@@ -2305,6 +2312,7 @@ function applyProperties() {
     layer.properties.popup.fields = selectedPopupFields;
     layer.properties.popup.configured = true;
     
+    console.log(`Applying popup configuration for layer "${layer.name}"`);
     console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
     console.log(`Total selected fields: ${selectedPopupFields.length}`);
 
@@ -2315,30 +2323,41 @@ function applyProperties() {
         mapLayers[layerIndex].properties = JSON.parse(JSON.stringify(layer.properties));
         mapLayers[layerIndex].name = layer.name;
 
-        // Update all existing feature popups with new field configuration
-        if (mapLayers[layerIndex].features) {
+        // Force update all existing feature popups with new field configuration
+        if (mapLayers[layerIndex].features && mapLayers[layerIndex].records) {
+            console.log(`Updating popups for ${mapLayers[layerIndex].features.length} features`);
+            
             mapLayers[layerIndex].features.forEach((feature, index) => {
-                let recordData = null;
+                // Get the record data for this feature
+                const recordData = mapLayers[layerIndex].records[index]?.fields;
                 
-                // Get record data from feature or records array
-                if (feature.recordData) {
-                    recordData = feature.recordData;
-                } else if (mapLayers[layerIndex].records && mapLayers[layerIndex].records[index]) {
-                    recordData = mapLayers[layerIndex].records[index].fields;
-                    feature.recordData = recordData; // Cache for future use
-                }
-                
-                // Recreate popup with new field configuration
                 if (recordData) {
+                    // Update the cached record data on the feature
+                    feature.recordData = recordData;
+                    feature.layerId = mapLayers[layerIndex].id;
+                    feature.featureIndex = index;
+                    
+                    // Create new popup content with updated field configuration
                     const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
                     
-                    // Remove existing popup and bind new one
+                    // Remove existing popup if it exists
                     if (feature.getPopup()) {
                         feature.unbindPopup();
                     }
+                    
+                    // Bind new popup with updated content
                     feature.bindPopup(newPopupContent);
+                    
+                    // Update click handler to use new configuration
+                    feature.off('click');
+                    feature.on('click', function(e) {
+                        window.currentPopupFeature = this;
+                        handleFeatureClick(this, index, mapLayers[layerIndex]);
+                    });
                 }
             });
+            
+            console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
         }
     }
 
@@ -3308,12 +3327,29 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
             });
         }
         
-        // Create popup content with all fields if no specific selection, or selected fields if configured
-        const popupContent = createFeaturePopup(feature.recordData, layerConfig);
+        // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
+        const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
         
-        // Open popup with updated content
-        if (feature.bindPopup) {
-            feature.bindPopup(popupContent).openPopup();
+        // Ensure we have the record data for this feature
+        let recordData = feature.recordData;
+        if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
+            recordData = currentLayer.records[featureIndex].fields;
+            feature.recordData = recordData; // Cache for future use
+        }
+        
+        if (recordData) {
+            // Create popup content using the current layer configuration (which includes updated popup fields)
+            const popupContent = createFeaturePopup(recordData, currentLayer);
+            
+            // Update the popup with the new content that respects field selection
+            if (feature.getPopup()) {
+                feature.getPopup().setContent(popupContent);
+                feature.openPopup();
+            } else {
+                feature.bindPopup(popupContent).openPopup();
+            }
+            
+            console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
         }
     } else {
         // Reset to original style
