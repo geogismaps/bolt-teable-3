@@ -558,3 +558,34 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     z-index: 1000;
 }
+
+/* Fullscreen Map Styles */
+.fullscreen-map {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: #fff;
+}
+
+.fullscreen-map .leaflet-container {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Docked Attribute Table Styles */
+.docked-attribute-table {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 2px solid #dee2e6;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    height: 30%;
+    display: flex;
+    flex-direction: column;
+}

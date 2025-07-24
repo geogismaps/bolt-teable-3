@@ -3211,7 +3211,82 @@ function exportMap() {
 }
 
 function fullscreenMap() {
-    showInfo('Map fullscreen functionality would be implemented here');
+    const mapContainer = document.getElementById('map');
+    
+    if (!mapContainer) {
+        showError('Map container not found');
+        return;
+    }
+
+    try {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (mapContainer.requestFullscreen) {
+                mapContainer.requestFullscreen();
+            } else if (mapContainer.webkitRequestFullscreen) {
+                mapContainer.webkitRequestFullscreen();
+            } else if (mapContainer.msRequestFullscreen) {
+                mapContainer.msRequestFullscreen();
+            } else if (mapContainer.mozRequestFullScreen) {
+                mapContainer.mozRequestFullScreen();
+            } else {
+                showError('Fullscreen not supported by this browser');
+                return;
+            }
+            
+            // Add fullscreen class for styling
+            mapContainer.classList.add('fullscreen-map');
+            
+            // Show success message
+            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
+            
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+        
+        // Listen for fullscreen changes to update map size and remove class
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        
+    } catch (error) {
+        console.error('Fullscreen error:', error);
+        showError('Failed to toggle fullscreen: ' + error.message);
+    }
+}
+
+function handleFullscreenChange() {
+    const mapContainer = document.getElementById('map');
+    
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.msFullscreenElement && 
+        !document.mozFullScreenElement) {
+        
+        // Exited fullscreen
+        if (mapContainer) {
+            mapContainer.classList.remove('fullscreen-map');
+        }
+        
+        showInfo('Exited fullscreen mode');
+    }
+    
+    // Invalidate map size to ensure proper rendering
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
 }
 
 function handleFeatureClick(feature, featureIndex, layerConfig) {
