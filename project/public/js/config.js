@@ -123,31 +123,44 @@ async function testConnection() {
             console.error('Base access error details:', baseError);
             
             if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
-                showConnectionStatus(`❌ Access Denied (403 Error)
+                showConnectionStatus(`❌ ACCESS DENIED (403 Error)
 
-🔍 TROUBLESHOOTING STEPS:
+🚫 **PERMISSION ISSUE DETECTED**
 
-1. **Check API Token Permissions:**
-   • Go to Teable.io → Settings → API Tokens
-   • Ensure your token has "Base Read" permissions
-   • Token should have access to Space ID: ${spaceId}
+Your API token does not have permission to access this base.
 
-2. **Verify Base ID:**
+📋 **STEP-BY-STEP FIX:**
+
+1. **Go to Teable.io Dashboard**
+   • Open https://app.teable.io
+   • Navigate to your workspace
+
+2. **Check API Token Permissions:**
+   • Go to Settings → API Tokens
+   • Find your current token
+   • Ensure it has these permissions:
+     ✓ Base Read
+     ✓ Record Read
+     ✓ Space Read
+
+3. **Verify Base Location:**
    • Current Base ID: ${baseId}
-   • Go to your base in Teable.io
-   • Check the URL: https://app.teable.io/base/[BASE_ID]
-   • Copy the exact Base ID from the URL
+   • Current Space ID: ${spaceId}
+   • Go to your base in Teable
+   • Check URL: https://app.teable.io/base/${baseId}
+   • Ensure this base exists in space ${spaceId}
 
-3. **Check Space Access:**
-   • Ensure the base exists in Space ID: ${spaceId}
-   • Verify you have access to this space
-   • Space ID format: spcXXXXXXXXXXXXXXXX
+4. **Create New Token (if needed):**
+   • Delete old token
+   • Create new token with proper permissions
+   • Copy the new token here
 
-4. **Token Validity:**
-   • Regenerate your API token if needed
-   • Ensure token wasn't revoked
+⚠️ **COMMON MISTAKES:**
+• Token has space access but not base access
+• Base is in different space than specified
+• Token was revoked or expired
 
-💡 The most common cause is insufficient API token permissions for the specific base.`, 'error');
+Try creating a NEW API token with full permissions and test again.`, 'error');
                 return;
             } else if (baseError.message.includes('404')) {
                 showConnectionStatus(`❌ Base Not Found (404 Error)

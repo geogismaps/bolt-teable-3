@@ -54,8 +54,18 @@ class TeableAPI {
                     status: response.status,
                     statusText: response.statusText,
                     errorText,
-                    headers: Object.fromEntries(response.headers.entries())
+                    headers: Object.fromEntries(response.headers.entries()),
+                    timestamp: new Date().toISOString()
                 });
+                
+                // Additional logging for 403 errors
+                if (response.status === 403) {
+                    console.error('🚫 PERMISSION DENIED - Check these:');
+                    console.error('1. API Token has Base Read permissions');
+                    console.error('2. Base exists in the specified space');
+                    console.error('3. Token has access to this workspace');
+                    console.error('4. Base ID and Space ID are correct');
+                }
                 
                 throw new Error(errorMessage);
             }
