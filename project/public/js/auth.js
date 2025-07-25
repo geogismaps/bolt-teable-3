@@ -243,6 +243,44 @@ class TeableAuth {
         return true;
     }
 
+    requireClientAdmin() {
+        if (!this.requireAuth()) return false;
+
+        const session = this.getCurrentSession();
+        const isClientAdmin = session.role === 'owner' || session.role === 'admin' || session.isConfigAdmin;
+        
+        if (!isClientAdmin) {
+            alert('Access denied. Client administrator privileges required.');
+            window.location.href = 'dashboard.html';
+            return false;
+        }
+        return true;
+    }
+
+    hasClientAccess(feature) {
+        if (!this.isLoggedIn()) return false;
+        
+        const session = this.getCurrentSession();
+        
+        // Super admin has access to everything
+        if (session.isConfigAdmin) return true;
+        
+        // Define feature access based on roles
+        const featureAccess = {
+            'map': ['owner', 'admin', 'editor', 'viewer'],
+            'table': ['owner', 'admin', 'editor', 'viewer'], 
+            'public-map': ['owner', 'admin', 'editor', 'viewer'],
+            'logs': ['owner', 'admin', 'editor', 'viewer'],
+            'map-config': ['owner', 'admin'],
+            'permissions': ['owner', 'admin'],
+            'users': ['owner', 'admin'],
+            'config': ['config_admin']
+        };
+        
+        const allowedRoles = featureAccess[feature] || [];
+        return allowedRoles.includes(session.role) || allowedRoles.includes('config_admin') && session.isConfigAdmin;
+    }
+
     logout() {
         this.currentSession = null;
         localStorage.removeItem('teableAuthSession');

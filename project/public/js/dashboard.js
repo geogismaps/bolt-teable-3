@@ -39,23 +39,32 @@ async function initializeDashboard() {
 function updateUIForUserRole(session) {
     const isAdmin = window.teableAuth.isAdmin();
 
-    // Show/hide admin-only sections
-    const adminSections = document.querySelectorAll('.admin-only');
+    // Show/hide admin-only sections (only for super admin features)
+    const adminSections = document.querySelectorAll('.super-admin-only');
     adminSections.forEach(section => {
-        section.style.display = isAdmin ? 'block' : 'none';
+        section.style.display = session.isConfigAdmin ? 'block' : 'none';
     });
 
-    // Update navigation visibility
-    updateNavigationForRole(isAdmin);
+    // All authenticated users should see all client tabs
+    const clientTabs = document.querySelectorAll('.client-tab');
+    clientTabs.forEach(tab => {
+        tab.style.display = 'block';
+    });
+
+    // Show role-specific features within the client base
+    updateClientFeatures(session);
 
     console.log('UI updated for role:', session.role, 'isAdmin:', isAdmin);
 }
 
-function updateNavigationForRole(isAdmin) {
-    // Update sidebar navigation if it exists
-    const adminNavItems = document.querySelectorAll('.nav-item.admin-only');
-    adminNavItems.forEach(item => {
-        item.style.display = isAdmin ? 'block' : 'none';
+function updateClientFeatures(session) {
+    // Show/hide features based on role within the client base
+    const isClientAdmin = session.role === 'owner' || session.role === 'admin';
+    
+    // User management only for client admins
+    const userMgmtSections = document.querySelectorAll('.client-admin-only');
+    userMgmtSections.forEach(section => {
+        section.style.display = isClientAdmin ? 'block' : 'none';
     });
 }
 
@@ -113,6 +122,44 @@ async function loadDashboardStats() {
         document.getElementById('statUsers').textContent = '0';
         document.getElementById('statRecords').textContent = '0';
         document.getElementById('statActivity').textContent = '0';
+    }
+}
+
+async function loadRecentActivity() {
+    try {
+        if (!window.teableAPI.systemTables.activity) {
+            console.log('Activity table not available');
+            return;
+        }
+
+        const activityData = await window.teableAPI.getRecords(window.teableAPI.systemTables.activity, { 
+            limit: 10,
+            sort: [{ field: 'timestamp', order: 'desc' }]
+        });
+        
+        const activities = activityData.records || [];
+        console.log('Recent activities loaded:', activities.length);
+        
+    } catch (error) {
+        console.error('Error loading recent activity:', error);
+    }
+}
+
+async function loadSystemHealth() {
+    try {
+        const session = window.teableAuth.getCurrentSession();
+        const clientConfig = window.teableAuth.clientConfig;
+        
+        // Basic health check - verify API connectivity
+        const tables = await window.teableAPI.getTables();
+        const isHealthy = tables && (tables.length > 0 || Array.isArray(tables));
+        
+        console.log('System health check:', isHealthy ? 'Healthy' : 'Issues detected');
+        console.log('Client:', clientConfig?.clientName || 'Unknown');
+        console.log('Base ID:', clientConfig?.baseId || 'Unknown');
+        
+    } catch (error) {
+        console.error('System health check failed:', error);
     }
 }
 
