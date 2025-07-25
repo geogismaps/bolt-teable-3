@@ -308,9 +308,14 @@ async function handleConfigSubmit(event) {
         console.log('🔄 Testing connection before creating configuration...');
         await testConnectionForSubmit(formData);
         
-        // Create space owner if needed
-        console.log('🔄 Setting up space owner...');
-        await setupSpaceOwner(formData);
+        // Try to create space owner (optional)
+        console.log('🔄 Setting up space owner (optional)...');
+        const userResult = await setupSpaceOwner(formData);
+        if (userResult) {
+            console.log('✅ User setup completed');
+        } else {
+            console.log('ℹ️ User setup skipped - no Users table found or creation failed');
+        }
         
         // Save configuration
         console.log('🔄 Saving client configuration...');
@@ -391,55 +396,82 @@ async function setupSpaceOwner(formData) {
     });
     
     try {
-        // First, check if user already exists
-        const existingUsers = await api.getRecords('Users');
-        const existingUser = existingUsers.find(user => 
-            user.fields && user.fields.Email === formData.adminEmail
+        // First, check if Users table exists by trying to get tables
+        const tables = await api.getTables();
+        const usersTable = tables.find(table => 
+            table.name === 'Users' || table.name === 'users' || table.name === 'User'
         );
         
-        if (existingUser) {
-            console.log('✅ User already exists:', existingUser.fields.Email);
-            return existingUser;
+        if (!usersTable) {
+            console.log('ℹ️ No Users table found in this base - skipping user creation');
+            return null;
         }
         
-        // Get valid options for Owner field
-        const tableInfo = await api.getTable('Users');
-        const ownerField = tableInfo.fields.find(field => field.name === 'Owner');
+        console.log(`✅ Found Users table: ${usersTable.name}`);
         
-        let ownerValue = formData.clientName;
-        
-        // If Owner field has options, use the first available option or create new one
-        if (ownerField && ownerField.options && ownerField.options.choices) {
-            const existingChoice = ownerField.options.choices.find(choice => 
-                choice.name.toLowerCase() === formData.clientName.toLowerCase()
-            );
+        // Try to check if user already exists
+        try {
+            const existingUsers = await api.getRecords(usersTable.id || usersTable.name);
+            const records = existingUsers.records || existingUsers;
             
-            if (existingChoice) {
-                ownerValue = existingChoice.name;
-            } else if (ownerField.options.choices.length > 0) {
-                // Use first available choice
-                ownerValue = ownerField.options.choices[0].name;
+            if (Array.isArray(records)) {
+                const existingUser = records.find(user => 
+                    user.fields && (
+                        user.fields.Email === formData.adminEmail ||
+                        user.fields.email === formData.adminEmail
+                    )
+                );
+                
+                if (existingUser) {
+                    console.log('✅ User already exists:', existingUser.fields.Email || existingUser.fields.email);
+                    return existingUser;
+                }
             }
+        } catch (recordError) {
+            console.log('ℹ️ Could not check existing users - will try to create new user');
         }
         
-        // Create new user record
+        // Try to get table structure
+        let tableInfo = null;
+        try {
+            tableInfo = await api.getTable(usersTable.id || usersTable.name);
+        } catch (tableError) {
+            console.log('ℹ️ Could not get table structure - using basic user data');
+        }
+        
+        // Create basic user data
         const userData = {
             Email: formData.adminEmail,
-            Password: formData.adminPassword,
             Role: 'Admin',
-            Owner: ownerValue,
-            'Created Date': new Date().toISOString(),
+            'Created Date': new Date().toISOString().split('T')[0],
             Status: 'Active'
         };
         
+        // Add password if supported
+        if (formData.adminPassword) {
+            userData.Password = formData.adminPassword;
+        }
+        
+        // Add owner/client information
+        userData.Owner = formData.clientName;
+        userData.Client = formData.clientName;
+        
         console.log('🔄 Creating user with data:', userData);
-        const newUser = await api.createRecord('Users', userData);
-        console.log('✅ Space owner created successfully');
-        return newUser;
+        
+        try {
+            const newUser = await api.createRecord(usersTable.id || usersTable.name, userData);
+            console.log('✅ Space owner created successfully');
+            return newUser;
+        } catch (createError) {
+            console.log('⚠️ Could not create user record - this is optional and configuration will still work');
+            console.log('User creation error:', createError.message);
+            return null;
+        }
         
     } catch (error) {
-        console.error('❌ Create record failed:', error);
-        throw new Error(`Failed to set up space owner: ${error.message}`);
+        console.log('⚠️ User setup failed but configuration will continue:', error.message);
+        // Don't throw error - user creation is optional
+        return null;
     }
 }
 
