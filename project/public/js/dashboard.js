@@ -62,23 +62,23 @@ function updateUIForUserRole(session) {
         client: clientConfig?.clientName
     });
 
-    // Show/hide admin-only sections (only for super admin features)
-    const adminSections = document.querySelectorAll('.super-admin-only');
-    adminSections.forEach(section => {
+    // Hide super admin sections (config management) - only for super admin
+    const superAdminSections = document.querySelectorAll('.super-admin-only');
+    superAdminSections.forEach(section => {
         section.style.display = session.isConfigAdmin ? 'block' : 'none';
     });
 
-    // ALL authenticated users should see ALL client tabs - this is the main client dashboard
+    // Show ALL client tabs for authenticated users - this is the main functionality
     const clientTabs = document.querySelectorAll('.client-tab');
     clientTabs.forEach(tab => {
         tab.style.display = 'block';
         console.log('Showing client tab:', tab.querySelector('h5')?.textContent || 'Unknown');
     });
 
-    // Show role-specific features within the client base (some features restricted by role)
+    // Apply role-based restrictions within features
     updateClientFeatures(session);
 
-    // Update page title to show client name
+    // Update page title and branding to show client name
     if (clientConfig) {
         document.title = `${clientConfig.clientName} - Dashboard`;
         
@@ -87,9 +87,15 @@ function updateUIForUserRole(session) {
         clientNameElements.forEach(el => {
             el.textContent = clientConfig.clientName;
         });
+
+        // Update header with client information
+        const headerTitle = document.querySelector('h1');
+        if (headerTitle && headerTitle.textContent.includes('Dashboard')) {
+            headerTitle.innerHTML = `<i class="fas fa-building me-2"></i>${clientConfig.clientName} Dashboard`;
+        }
     }
 
-    console.log('✅ UI updated - All client tabs should be visible');
+    console.log('✅ UI updated - All client features should be accessible based on role');
 }
 
 function updateClientFeatures(session) {

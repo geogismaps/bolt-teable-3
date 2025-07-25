@@ -91,15 +91,17 @@ class TeableAuth {
         try {
             // Check if credentials match the client config admin
             if (credentials.email === this.clientConfig.adminEmail) {
-                // For config admin, grant full owner access
+                // Simple password check - in production, use proper hashing
+                // For now, we'll accept any password for the admin email from config
                 const session = {
                     email: credentials.email,
-                    firstName: 'Admin',
-                    lastName: 'User',
+                    firstName: this.clientConfig.clientName.split(' ')[0] || 'Admin',
+                    lastName: 'Admin',
                     role: 'owner',
                     userType: 'space_owner',
                     baseId: this.clientConfig.baseId,
                     spaceId: this.clientConfig.spaceId,
+                    clientName: this.clientConfig.clientName,
                     loginTime: new Date().toISOString(),
                     authMethod: 'config_admin',
                     isConfigAdmin: true
@@ -109,7 +111,7 @@ class TeableAuth {
                 return { success: true, session };
             }
 
-            return { success: false, message: 'Invalid credentials' };
+            return { success: false, message: 'Invalid email or password' };
 
         } catch (error) {
             console.error('Teable authentication error:', error);

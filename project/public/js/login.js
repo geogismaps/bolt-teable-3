@@ -29,10 +29,15 @@ function loadClientConfigs() {
         selector.appendChild(option);
     });
 
-    // Check if there's a pre-selected config (from config page redirect)
-    const selectedConfigId = localStorage.getItem('selectedClientConfig');
+    // Check for URL parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    const configFromUrl = urlParams.get('config');
+    
+    let selectedConfigId = configFromUrl || localStorage.getItem('selectedClientConfig');
+    
     if (selectedConfigId && configs.find(c => c.id === selectedConfigId)) {
         selector.value = selectedConfigId;
+        localStorage.setItem('selectedClientConfig', selectedConfigId);
         onClientConfigChange();
 
         // Show a welcome message for the selected client
@@ -104,11 +109,11 @@ async function handleLogin(event) {
 
         if (authResult.success) {
             console.log('✅ Login successful:', authResult.session);
-            showAlert('Login successful! Redirecting...', 'success');
+            showAlert('Login successful! Loading your dashboard...', 'success');
 
-            // Redirect to dashboard after a short delay
+            // Redirect to dashboard in same tab after a short delay
             setTimeout(() => {
-                window.location.href = 'dashboard.html';
+                window.location.replace('dashboard.html');
             }, 1000);
         } else {
             throw new Error(authResult.message || 'Login failed');

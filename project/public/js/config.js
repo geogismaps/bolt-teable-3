@@ -663,9 +663,6 @@ Now testing API connection...`, 'info');
 
 function accessClientDashboard(configId) {
     try {
-        // Set the selected client configuration
-        localStorage.setItem('selectedClientConfig', configId);
-        
         // Get the config details
         const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
         const selectedConfig = configs.find(config => config.id === configId);
@@ -675,17 +672,11 @@ function accessClientDashboard(configId) {
             return;
         }
         
-        // Initialize the auth module with this config
-        if (window.teableAuth) {
-            window.teableAuth.selectClientConfig(configId);
-        }
+        showConfigAlert(`Opening ${selectedConfig.clientName} dashboard in new tab...`, 'info');
         
-        showConfigAlert(`Accessing ${selectedConfig.clientName} dashboard...`, 'info');
-        
-        // Redirect to login page to authenticate for this client
-        setTimeout(() => {
-            window.location.href = 'login.html';
-        }, 1000);
+        // Open login page in new tab with config ID as parameter
+        const loginUrl = `login.html?config=${configId}`;
+        window.open(loginUrl, '_blank');
         
     } catch (error) {
         console.error('Error accessing client dashboard:', error);

@@ -21,20 +21,49 @@
                         </div>
 
                         <!-- Client Selector -->
-                        <div class="mb-4">
+                        <div class="mb-4" id="configSelection">
                             <label class="form-label fw-semibold">
                                 <i class="fas fa-building me-2"></i>Select Client
                             </label>
-                            <select class="form-select" id="clientSelector" onchange="onClientChange()">
+                            <select class="form-select" id="clientConfigSelector" onchange="onClientConfigChange()">
                                 <option value="">Choose a client configuration...</option>
                             </select>
                         </div>
 
-                        <!-- Login Form -->
-                        <form id="loginForm" style="display: none;">
-                            <!-- User Type Selection -->
-                            <div class="mb-4">
-                                <label class="form-label fw-semibold">Login As</label>
+                        <!-- Login Section -->
+                        <div id="loginSection" style="display: none;">
+                            <!-- Selected Config Info -->
+                            <div class="alert alert-info mb-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-building fa-2x me-3"></i>
+                                    <div>
+                                        <h6 class="mb-1" id="selectedConfigName">Client Name</h6>
+                                        <small id="selectedConfigUrl">Teable URL</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Login Form -->
+                            <form id="loginForm">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label fw-semibold">
+                                        <i class="fas fa-envelope me-2"></i>Email Address
+                                    </label>
+                                    <input type="email" class="form-control" id="email" required>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label for="password" class="form-label fw-semibold">
+                                        <i class="fas fa-lock me-2"></i>Password
+                                    </label>
+                                    <input type="password" class="form-control" id="password" required>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary w-100 py-2">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                                </button>
+                            </form>
+                        </div>
                                 <div class="btn-group w-100" role="group" aria-label="User type">
                                     <input type="radio" class="btn-check" name="userType" id="spaceOwner" value="space_owner" checked>
                                     <label class="btn btn-outline-primary" for="spaceOwner">
