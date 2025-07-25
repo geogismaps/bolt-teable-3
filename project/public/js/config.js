@@ -39,10 +39,20 @@ function setupPasswordToggle() {
 }
 
 async function testConnection() {
-    const baseUrl = document.getElementById('baseUrl').value.trim();
-    const spaceId = document.getElementById('spaceId').value.trim();
-    const baseId = document.getElementById('baseId').value.trim();
-    const apiToken = document.getElementById('apiToken').value.trim();
+    const baseUrlEl = document.getElementById('baseUrl');
+    const spaceIdEl = document.getElementById('spaceId');
+    const baseIdEl = document.getElementById('baseId');
+    const apiTokenEl = document.getElementById('apiToken');
+    
+    if (!baseUrlEl || !spaceIdEl || !baseIdEl || !apiTokenEl) {
+        showConnectionStatus('Form elements not found. Please check the HTML structure.', 'error');
+        return;
+    }
+    
+    const baseUrl = baseUrlEl.value.trim();
+    const spaceId = spaceIdEl.value.trim();
+    const baseId = baseIdEl.value.trim();
+    const apiToken = apiTokenEl.value.trim();
     
     const statusDiv = document.getElementById('connectionStatus');
     
@@ -111,15 +121,27 @@ async function handleConfigSubmit(event) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating Configuration...';
         
-        // Get form data
+        // Get form data with null checks
+        const clientNameEl = document.getElementById('clientName');
+        const adminEmailEl = document.getElementById('adminEmail');
+        const adminPasswordEl = document.getElementById('adminPassword');
+        const baseUrlEl = document.getElementById('baseUrl');
+        const spaceIdEl = document.getElementById('spaceId');
+        const baseIdEl = document.getElementById('baseId');
+        const apiTokenEl = document.getElementById('apiToken');
+        
+        if (!clientNameEl || !adminEmailEl || !adminPasswordEl || !baseUrlEl || !spaceIdEl || !baseIdEl || !apiTokenEl) {
+            throw new Error('Cannot read properties of null (reading \'value\') - Form elements not found');
+        }
+        
         const formData = {
-            clientName: document.getElementById('clientName').value.trim(),
-            adminEmail: document.getElementById('adminEmail').value.trim(),
-            adminPassword: document.getElementById('adminPassword').value.trim(),
-            baseUrl: document.getElementById('baseUrl').value.trim(),
-            spaceId: document.getElementById('spaceId').value.trim(),
-            baseId: document.getElementById('baseId').value.trim(),
-            apiToken: document.getElementById('apiToken').value.trim()
+            clientName: clientNameEl.value.trim(),
+            adminEmail: adminEmailEl.value.trim(),
+            adminPassword: adminPasswordEl.value.trim(),
+            baseUrl: baseUrlEl.value.trim(),
+            spaceId: spaceIdEl.value.trim(),
+            baseId: baseIdEl.value.trim(),
+            apiToken: apiTokenEl.value.trim()
         };
         
         // Validate form data
