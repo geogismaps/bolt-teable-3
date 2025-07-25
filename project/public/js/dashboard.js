@@ -3,56 +3,60 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
+    // Check authentication first
     if (!window.teableAuth.requireAuth()) return;
-    
+
+    // For dashboard, allow all authenticated users but show different content based on role
     initializeDashboard();
 });
 
 async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
-        
-        // Display user info
-        displayUserInfo(session);
-        
-        // Show admin features if user is admin or creator
-        if (session.isAdmin || session.role === 'creator') {
-            document.getElementById('quickActions').style.display = 'block';
-            document.getElementById('mapConfigCard').style.display = 'block';
-            document.getElementById('logsCard').style.display = 'block';
-        } else {
-            // Hide admin-only cards for non-admin users
-            const adminCards = document.querySelectorAll('#mapConfigCard, #logsCard');
-            adminCards.forEach(card => {
-                card.style.display = 'none';
-            });
+        document.getElementById('userDisplay').textContent = 
+            `${session.firstName} ${session.lastName} (${session.role})`;
+
+        // Initialize API with client config
+        const clientConfig = window.teableAuth.clientConfig;
+        if (clientConfig && window.teableAPI) {
+            window.teableAPI.init(clientConfig);
         }
 
-        // Initialize API
-        if (session.userType === 'space_owner') {
-            // API should already be initialized from login
-            window.teableAPI.init(window.teableAuth.clientConfig);
-        }
+        // Show/hide admin features based on role
+        updateUIForUserRole(session);
 
         // Load dashboard data
         await loadDashboardStats();
-        
+        await loadRecentActivity();
+        await loadSystemHealth();
+
     } catch (error) {
         console.error('Dashboard initialization failed:', error);
-        showError('Failed to load dashboard: ' + error.message);
+        showError('Failed to initialize dashboard: ' + error.message);
     }
 }
 
-function displayUserInfo(session) {
-    const displayName = `${session.firstName} ${session.lastName} (${session.role})`;
-    document.getElementById('userDisplay').textContent = displayName;
-    
-    // Update hero section user info
-    const heroDisplay = document.getElementById('userDisplayHero');
-    if (heroDisplay) {
-        heroDisplay.textContent = `${session.firstName} ${session.lastName}`;
-    }
+function updateUIForUserRole(session) {
+    const isAdmin = window.teableAuth.isAdmin();
+
+    // Show/hide admin-only sections
+    const adminSections = document.querySelectorAll('.admin-only');
+    adminSections.forEach(section => {
+        section.style.display = isAdmin ? 'block' : 'none';
+    });
+
+    // Update navigation visibility
+    updateNavigationForRole(isAdmin);
+
+    console.log('UI updated for role:', session.role, 'isAdmin:', isAdmin);
+}
+
+function updateNavigationForRole(isAdmin) {
+    // Update sidebar navigation if it exists
+    const adminNavItems = document.querySelectorAll('.nav-item.admin-only');
+    adminNavItems.forEach(item => {
+        item.style.display = isAdmin ? 'block' : 'none';
+    });
 }
 
 async function loadDashboardStats() {
@@ -66,7 +70,7 @@ async function loadDashboardStats() {
             !t.name.startsWith('system_') &&
             t.name !== 'data_change_logs'
         );
-        
+
         document.getElementById('statTables').textContent = userTables.length;
 
         // Load users count
@@ -78,7 +82,7 @@ async function loadDashboardStats() {
         // Count total records (sample from first few tables)
         let totalRecords = 0;
         const tablesToSample = userTables.slice(0, 3); // Sample first 3 tables
-        
+
         for (const table of tablesToSample) {
             try {
                 const records = await window.teableAPI.getRecords(table.id, { limit: 1000 });
@@ -87,7 +91,7 @@ async function loadDashboardStats() {
                 console.log('Failed to count records for table:', table.name);
             }
         }
-        
+
         document.getElementById('statRecords').textContent = totalRecords;
 
         // Activity count
@@ -114,9 +118,9 @@ async function loadDashboardStats() {
 
 function showProfile() {
     const session = window.teableAuth.getCurrentSession();
-    
+
     alert(`Profile Information:
-    
+
 Name: ${session.firstName} ${session.lastName}
 Email: ${session.email}
 Role: ${session.role}
@@ -133,9 +137,9 @@ function showError(message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.insertBefore(alertDiv, document.body.firstChild);
-    
+
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();

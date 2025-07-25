@@ -94,10 +94,22 @@
                         <div class="text-center mt-4">
                             <hr>
                             <small class="text-muted">System Administrator?</small><br>
-                            <a href="config.html" class="btn btn-outline-secondary btn-sm mt-2">
-                                <i class="fas fa-cogs me-1"></i>Super Admin Config
+                            <a href="config.html" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-cogs me-1"></i>Need Setup? Go to Configuration
                             </a>
+                            <button type="button" class="btn btn-outline-info" onclick="goBackToLogin()">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Login
+                            </button>
                         </div>
+
+                        <script>
+                        function goBackToLogin() {
+                            document.getElementById('configSelection').style.display = 'block';
+                            document.getElementById('loginSection').style.display = 'none';
+                            document.getElementById('clientConfigSelector').value = '';
+                            localStorage.removeItem('selectedClientConfig');
+                        }
+                        </script>
                     </div>
                 </div>
             </div>

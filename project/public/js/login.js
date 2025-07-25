@@ -4,153 +4,152 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     loadClientConfigs();
-    setupUserTypeToggle();
-    setupLoginForm();
+
+    // Handle login form submission
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
 });
 
 function loadClientConfigs() {
-    const configs = window.teableAuth.getClientConfigs();
-    const selector = document.getElementById('clientSelector');
-    
+    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+    const selector = document.getElementById('clientConfigSelector');
+
+    if (!selector) return;
+
+    // Clear existing options
     selector.innerHTML = '<option value="">Choose a client configuration...</option>';
-    
+
+    if (configs.length === 0) {
+        selector.innerHTML = '<option value="">No configurations available - Contact administrator</option>';
+        selector.disabled = true;
+        return;
+    }
+
+    // Add configurations
     configs.forEach(config => {
         const option = document.createElement('option');
         option.value = config.id;
         option.textContent = `${config.clientName} (${config.adminEmail})`;
         selector.appendChild(option);
     });
-    
-    // Auto-select if only one config
-    if (configs.length === 1) {
-        selector.value = configs[0].id;
-        onClientChange();
+
+    // Select previously selected config
+    const savedConfig = localStorage.getItem('selectedClientConfig');
+    if (savedConfig) {
+        selector.value = savedConfig;
+        onClientConfigChange();
     }
 }
 
-function onClientChange() {
-    const configId = document.getElementById('clientSelector').value;
-    const loginForm = document.getElementById('loginForm');
-    
+function onClientConfigChange() {
+    const selector = document.getElementById('clientConfigSelector');
+    const configId = selector.value;
+
     if (configId) {
-        const configs = window.teableAuth.getClientConfigs();
-        const config = configs.find(c => c.id === configId);
-        
-        if (config) {
-            // Save as current client config
-            window.teableAuth.saveClientConfig({
-                baseUrl: config.baseUrl,
-                spaceId: config.spaceId,
-                baseId: config.baseId,
-                accessToken: config.accessToken
-            });
-            
-            // Show login form
-            loginForm.style.display = 'block';
-            
-            // Clear previous values
-            document.getElementById('loginEmail').value = '';
-            document.getElementById('loginPassword').value = '';
+        // Save selection and update auth module
+        window.teableAuth.selectClientConfig(configId);
+
+        // Show login form
+        document.getElementById('configSelection').style.display = 'none';
+        document.getElementById('loginSection').style.display = 'block';
+
+        // Update config info
+        const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+        const selectedConfig = configs.find(c => c.id === configId);
+        if (selectedConfig) {
+            document.getElementById('selectedConfigName').textContent = selectedConfig.clientName;
+            document.getElementById('selectedConfigUrl').textContent = selectedConfig.baseUrl;
+
+            // Pre-fill admin email if it matches
+            const emailField = document.getElementById('email');
+            if (emailField && selectedConfig.adminEmail) {
+                emailField.value = selectedConfig.adminEmail;
+            }
         }
     } else {
-        loginForm.style.display = 'none';
+        // Hide login form
+        document.getElementById('configSelection').style.display = 'block';
+        document.getElementById('loginSection').style.display = 'none';
     }
-}
-
-function setupUserTypeToggle() {
-    const userTypeRadios = document.querySelectorAll('input[name="userType"]');
-    userTypeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            const spaceOwnerHelp = document.getElementById('spaceOwnerHelp');
-            const appUserHelp = document.getElementById('appUserHelp');
-            
-            if (this.value === 'space_owner') {
-                spaceOwnerHelp.style.display = 'block';
-                appUserHelp.style.display = 'none';
-            } else {
-                spaceOwnerHelp.style.display = 'none';
-                appUserHelp.style.display = 'block';
-            }
-        });
-    });
-}
-
-function setupLoginForm() {
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
 }
 
 async function handleLogin(event) {
     event.preventDefault();
-    
+
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
     try {
-        const email = document.getElementById('loginEmail').value.trim();
-        const password = document.getElementById('loginPassword').value;
-        const userType = document.querySelector('input[name="userType"]:checked').value;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Signing in...';
+
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
 
         if (!email || !password) {
             throw new Error('Please enter both email and password');
         }
 
-        // Show loading modal
-        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-        loadingModal.show();
+        // Check if we have a client config selected
+        const selectedConfigId = localStorage.getItem('selectedClientConfig');
+        if (!selectedConfigId) {
+            throw new Error('Please select a client configuration first');
+        }
 
-        try {
-            // Attempt login
-            const session = await window.teableAuth.login(email, password, userType);
-            
-            // Hide loading modal
-            loadingModal.hide();
-            
-            // Redirect to dashboard
-            window.location.href = 'dashboard.html';
-            
-        } catch (error) {
-            loadingModal.hide();
-            throw error;
+        console.log('🔐 Attempting login with:', { email, configId: selectedConfigId });
+
+        const authResult = await window.teableAuth.login({ email, password });
+
+        if (authResult.success) {
+            console.log('✅ Login successful:', authResult.session);
+            showAlert('Login successful! Redirecting...', 'success');
+
+            // Redirect to dashboard after a short delay
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 1000);
+        } else {
+            throw new Error(authResult.message || 'Login failed');
         }
 
     } catch (error) {
-        console.error('Login failed:', error);
-        showLoginError(error.message);
+        console.error('❌ Login error:', error);
+        showAlert('Login failed: ' + error.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
-function fillDemoCredentials() {
-    document.getElementById('loginEmail').value = 'admin@system.local';
-    document.getElementById('loginPassword').value = 'admin123';
-    document.querySelector('input[name="userType"][value="app_user"]').checked = true;
-    
-    // Trigger user type change
-    const event = new Event('change');
-    document.querySelector('input[name="userType"][value="app_user"]').dispatchEvent(event);
-}
-
-function showLoginError(message) {
+function showAlert(message, type) {
     // Remove existing alerts
     const existingAlerts = document.querySelectorAll('.alert');
     existingAlerts.forEach(alert => alert.remove());
-    
+
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
     const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
     alertDiv.innerHTML = `
-        <i class="fas fa-exclamation-triangle me-2"></i>
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
-    // Insert before login form
-    const loginForm = document.getElementById('loginForm');
-    loginForm.parentNode.insertBefore(alertDiv, loginForm);
-    
-    // Auto-remove after 8 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 8000);
+
+    // Insert at the top of the form
+    const container = document.querySelector('.card-body');
+    container.insertBefore(alertDiv, container.firstChild);
+
+    // Auto-remove success alerts
+    if (type === 'success') {
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
 }
 
 // Make functions globally available
-window.onClientChange = onClientChange;
-window.fillDemoCredentials = fillDemoCredentials;
+window.onClientConfigChange = onClientConfigChange;
