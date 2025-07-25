@@ -13,12 +13,25 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
+        const clientConfig = window.teableAuth.clientConfig;
+        
+        // Update user display with client information
         document.getElementById('userDisplay').textContent = 
             `${session.firstName} ${session.lastName} (${session.role})`;
-
-        // Initialize API with client config
-        const clientConfig = window.teableAuth.clientConfig;
-        if (clientConfig && window.teableAPI) {
+            
+        // Show client information
+        if (clientConfig) {
+            const clientInfo = document.getElementById('clientInfo');
+            if (clientInfo) {
+                clientInfo.innerHTML = `
+                    <div class="alert alert-primary">
+                        <strong><i class="fas fa-building me-2"></i>${clientConfig.clientName}</strong><br>
+                        <small>Base: ${clientConfig.baseId} | Space: ${clientConfig.spaceId}</small>
+                    </div>
+                `;
+            }
+            
+            // Initialize API with client config
             window.teableAPI.init(clientConfig);
         }
 
@@ -30,6 +43,8 @@ async function initializeDashboard() {
         await loadRecentActivity();
         await loadSystemHealth();
 
+        console.log(`✅ Dashboard initialized for client: ${clientConfig?.clientName || 'Unknown'}`);
+
     } catch (error) {
         console.error('Dashboard initialization failed:', error);
         showError('Failed to initialize dashboard: ' + error.message);
@@ -38,6 +53,14 @@ async function initializeDashboard() {
 
 function updateUIForUserRole(session) {
     const isAdmin = window.teableAuth.isAdmin();
+    const clientConfig = window.teableAuth.clientConfig;
+
+    console.log('Updating UI for:', {
+        role: session.role,
+        isAdmin: isAdmin,
+        isConfigAdmin: session.isConfigAdmin,
+        client: clientConfig?.clientName
+    });
 
     // Show/hide admin-only sections (only for super admin features)
     const adminSections = document.querySelectorAll('.super-admin-only');
@@ -45,16 +68,28 @@ function updateUIForUserRole(session) {
         section.style.display = session.isConfigAdmin ? 'block' : 'none';
     });
 
-    // All authenticated users should see all client tabs
+    // ALL authenticated users should see ALL client tabs - this is the main client dashboard
     const clientTabs = document.querySelectorAll('.client-tab');
     clientTabs.forEach(tab => {
         tab.style.display = 'block';
+        console.log('Showing client tab:', tab.querySelector('h5')?.textContent || 'Unknown');
     });
 
-    // Show role-specific features within the client base
+    // Show role-specific features within the client base (some features restricted by role)
     updateClientFeatures(session);
 
-    console.log('UI updated for role:', session.role, 'isAdmin:', isAdmin);
+    // Update page title to show client name
+    if (clientConfig) {
+        document.title = `${clientConfig.clientName} - Dashboard`;
+        
+        // Update any client name placeholders
+        const clientNameElements = document.querySelectorAll('.client-name-placeholder');
+        clientNameElements.forEach(el => {
+            el.textContent = clientConfig.clientName;
+        });
+    }
+
+    console.log('✅ UI updated - All client tabs should be visible');
 }
 
 function updateClientFeatures(session) {

@@ -21,13 +21,7 @@ function loadClientConfigs() {
     // Clear existing options
     selector.innerHTML = '<option value="">Choose a client configuration...</option>';
 
-    if (configs.length === 0) {
-        selector.innerHTML = '<option value="">No configurations available - Contact administrator</option>';
-        selector.disabled = true;
-        return;
-    }
-
-    // Add configurations
+    // Add config options
     configs.forEach(config => {
         const option = document.createElement('option');
         option.value = config.id;
@@ -35,11 +29,17 @@ function loadClientConfigs() {
         selector.appendChild(option);
     });
 
-    // Select previously selected config
-    const savedConfig = localStorage.getItem('selectedClientConfig');
-    if (savedConfig) {
-        selector.value = savedConfig;
+    // Check if there's a pre-selected config (from config page redirect)
+    const selectedConfigId = localStorage.getItem('selectedClientConfig');
+    if (selectedConfigId && configs.find(c => c.id === selectedConfigId)) {
+        selector.value = selectedConfigId;
         onClientConfigChange();
+
+        // Show a welcome message for the selected client
+        const selectedConfig = configs.find(c => c.id === selectedConfigId);
+        if (selectedConfig) {
+            showAlert(`Welcome to ${selectedConfig.clientName}! Please sign in to access your dashboard.`, 'info');
+        }
     }
 }
 

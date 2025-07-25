@@ -511,26 +511,60 @@ function loadExistingConfigs() {
     }
     
     container.innerHTML = configs.map(config => `
-        <div class="card mb-3">
+        <div class="card mb-3 client-config-card" style="cursor: pointer; transition: all 0.3s ease;">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h6 class="card-title">${config.clientName}</h6>
-                        <p class="card-text">
+                <div class="d-flex justify-content-between align-items-start" onclick="accessClientDashboard('${config.id}')">
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-2">
+                            <i class="fas fa-building text-primary me-2"></i>
+                            ${config.clientName}
+                        </h6>
+                        <p class="card-text mb-2">
                             <small class="text-muted">
-                                Email: ${config.adminEmail}<br>
-                                Base URL: ${config.baseUrl}<br>
-                                Created: ${new Date(config.createdAt).toLocaleDateString()}
+                                <i class="fas fa-envelope me-1"></i>Email: ${config.adminEmail}<br>
+                                <i class="fas fa-link me-1"></i>Base URL: ${config.baseUrl}<br>
+                                <i class="fas fa-calendar me-1"></i>Created: ${new Date(config.createdAt).toLocaleDateString()}
                             </small>
                         </p>
+                        <div class="mt-2">
+                            <span class="badge bg-primary me-1">
+                                <i class="fas fa-database me-1"></i>Base: ${config.baseId}
+                            </span>
+                            <span class="badge bg-info me-1">
+                                <i class="fas fa-cube me-1"></i>Space: ${config.spaceId}
+                            </span>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary btn-sm me-2" onclick="event.stopPropagation(); accessClientDashboard('${config.id}')">
+                                <i class="fas fa-tachometer-alt me-1"></i>Access Dashboard
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm me-2" onclick="event.stopPropagation(); viewClientDetails('${config.id}')">
+                                <i class="fas fa-info-circle me-1"></i>Details
+                            </button>
+                        </div>
                     </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig('${config.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteConfig('${config.id}')" title="Delete Configuration">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     `).join('');
+    
+    // Add hover effects
+    const cards = container.querySelectorAll('.client-config-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+        });
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '';
+        });
+    });
 }
 
 function deleteConfig(configId) {
@@ -627,7 +661,132 @@ Now testing API connection...`, 'info');
     setTimeout(() => testConnection(), 2000);
 }
 
+function accessClientDashboard(configId) {
+    try {
+        // Set the selected client configuration
+        localStorage.setItem('selectedClientConfig', configId);
+        
+        // Get the config details
+        const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+        const selectedConfig = configs.find(config => config.id === configId);
+        
+        if (!selectedConfig) {
+            showConfigAlert('Configuration not found!', 'error');
+            return;
+        }
+        
+        // Initialize the auth module with this config
+        if (window.teableAuth) {
+            window.teableAuth.selectClientConfig(configId);
+        }
+        
+        showConfigAlert(`Accessing ${selectedConfig.clientName} dashboard...`, 'info');
+        
+        // Redirect to login page to authenticate for this client
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error accessing client dashboard:', error);
+        showConfigAlert('Failed to access client dashboard: ' + error.message, 'error');
+    }
+}
+
+function viewClientDetails(configId) {
+    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+    const config = configs.find(c => c.id === configId);
+    
+    if (!config) {
+        showConfigAlert('Configuration not found!', 'error');
+        return;
+    }
+    
+    const detailsModal = `
+        <div class="modal fade" id="clientDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-building me-2"></i>
+                            ${config.clientName} - Configuration Details
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-info-circle text-primary me-2"></i>Basic Information</h6>
+                                <table class="table table-borderless table-sm">
+                                    <tr><td><strong>Client Name:</strong></td><td>${config.clientName}</td></tr>
+                                    <tr><td><strong>Admin Email:</strong></td><td>${config.adminEmail}</td></tr>
+                                    <tr><td><strong>Created:</strong></td><td>${new Date(config.createdAt).toLocaleString()}</td></tr>
+                                    <tr><td><strong>Configuration ID:</strong></td><td><code>${config.id}</code></td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-database text-info me-2"></i>Teable Configuration</h6>
+                                <table class="table table-borderless table-sm">
+                                    <tr><td><strong>Base URL:</strong></td><td><a href="${config.baseUrl}" target="_blank">${config.baseUrl}</a></td></tr>
+                                    <tr><td><strong>Space ID:</strong></td><td><code>${config.spaceId}</code></td></tr>
+                                    <tr><td><strong>Base ID:</strong></td><td><code>${config.baseId}</code></td></tr>
+                                    <tr><td><strong>API Token:</strong></td><td><code>${config.accessToken.substring(0, 8)}...****</code></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-12">
+                                <h6><i class="fas fa-cogs text-success me-2"></i>Available Features</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-map text-primary me-2"></i>Interactive Map</li>
+                                            <li><i class="fas fa-table text-info me-2"></i>Data Management</li>
+                                            <li><i class="fas fa-globe text-success me-2"></i>Public Map</li>
+                                            <li><i class="fas fa-clipboard-list text-warning me-2"></i>Activity Logs</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-shield-alt text-danger me-2"></i>Permissions Management</li>
+                                            <li><i class="fas fa-users text-dark me-2"></i>User Management</li>
+                                            <li><i class="fas fa-cog text-secondary me-2"></i>Map Configuration</li>
+                                            <li><i class="fas fa-lock text-primary me-2"></i>Role-Based Access</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" onclick="accessClientDashboard('${config.id}'); bootstrap.Modal.getInstance(document.getElementById('clientDetailsModal')).hide();">
+                            <i class="fas fa-sign-in-alt me-1"></i>Access Dashboard
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if present
+    const existingModal = document.getElementById('clientDetailsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', detailsModal);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('clientDetailsModal'));
+    modal.show();
+}
+
 // Make functions globally available
 window.testConnection = testConnection;
 window.verifyConfiguration = verifyConfiguration;
 window.deleteConfig = deleteConfig;
+window.accessClientDashboard = accessClientDashboard;
+window.viewClientDetails = viewClientDetails;
