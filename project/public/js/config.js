@@ -61,6 +61,44 @@ async function testConnection() {
         return;
     }
     
+    // Validate ID formats first
+    if (!spaceId.startsWith('spc')) {
+        showConnectionStatus(`❌ Invalid Space ID format
+        
+Space ID should start with "spc" but you entered: "${spaceId}"
+
+**How to find Space ID:**
+1. Go to https://app.teable.io
+2. Look at the URL: /space/[SPACE_ID]
+3. Copy the part that starts with "spc"`, 'error');
+        return;
+    }
+    
+    if (!baseId.startsWith('bse')) {
+        showConnectionStatus(`❌ Invalid Base ID format
+        
+Base ID should start with "bse" but you entered: "${baseId}"
+
+**How to find Base ID:**
+1. Go to your base in Teable
+2. Look at the URL: /base/[BASE_ID] 
+3. Copy the part that starts with "bse"`, 'error');
+        return;
+    }
+    
+    if (apiToken.length < 20) {
+        showConnectionStatus(`❌ API token seems too short
+        
+API tokens are usually longer than 20 characters.
+Your token: ${apiToken.length} characters
+
+**How to get a valid token:**
+1. Go to Settings → API Tokens in Teable
+2. Create a new token with proper permissions
+3. Copy the full token (it's quite long)`, 'error');
+        return;
+    }
+    
     showConnectionStatus('Testing connection...', 'info');
     
     try {
@@ -129,46 +167,54 @@ async function testConnection() {
 
 Your API token does not have permission to access this base.
 
-📋 **STEP-BY-STEP FIX:**
+📋 **IMMEDIATE SOLUTIONS:**
 
-1. **Go to Teable.io Dashboard**
-   • Open https://app.teable.io
-   • Navigate to your workspace
+**Option 1: Create New API Token**
+1. Go to https://app.teable.io
+2. Navigate to Settings → API Tokens
+3. Delete your current token
+4. Create NEW token with these permissions:
+   ✅ Base Read ✅ Record Read ✅ Space Read ✅ Record Write
+5. Copy the new token and paste it here
 
-2. **Check API Token Permissions:**
-   • Go to Settings → API Tokens
-   • Find your current token
-   • Ensure it has these permissions:
-     ✓ Base Read
-     ✓ Record Read
-     ✓ Space Read
+**Option 2: Verify Base & Space IDs**
+• Current Base ID: ${baseId}
+• Current Space ID: ${spaceId}
+• Check if this base exists in this space
+• Go to: https://app.teable.io/base/${baseId}
 
-3. **Verify Base Location:**
-   • Current Base ID: ${baseId}
-   • Current Space ID: ${spaceId}
-   • Go to your base in Teable
-   • Check URL: https://app.teable.io/base/${baseId}
-   • Ensure this base exists in space ${spaceId}
+**Option 3: Check Token Scope**
+• Ensure token was created in the correct workspace
+• Token must have access to space: ${spaceId}
+• Base must exist in the specified space
 
-4. **Create New Token (if needed):**
-   • Delete old token
-   • Create new token with proper permissions
-   • Copy the new token here
+⚠️ **MOST COMMON FIXES:**
+1. Create a BRAND NEW API token (old one might be restricted)
+2. Verify Base ID from the actual Teable URL
+3. Ensure token has "Base Read" permissions
 
-⚠️ **COMMON MISTAKES:**
-• Token has space access but not base access
-• Base is in different space than specified
-• Token was revoked or expired
-
-Try creating a NEW API token with full permissions and test again.`, 'error');
+🔄 **After making changes, click "Test Connection" again.**`, 'error');
                 return;
             } else if (baseError.message.includes('404')) {
                 showConnectionStatus(`❌ Base Not Found (404 Error)
 
-🔍 POSSIBLE ISSUES:
-• Base ID "${baseId}" doesn't exist
-• Base might be in a different space
-• Check the URL in Teable.io to get the correct Base ID`, 'error');
+🔍 **HOW TO FIX:**
+
+1. **Verify Base ID:**
+   • Current Base ID: ${baseId}
+   • Go to https://app.teable.io
+   • Navigate to your base
+   • Copy Base ID from URL: /base/[BASE_ID]
+
+2. **Check Space Location:**
+   • Ensure base exists in Space: ${spaceId}
+   • Base might be in a different space
+
+3. **Double-check IDs:**
+   • Base ID should start with "bse"
+   • Space ID should start with "spc"
+
+Try updating the Base ID and test again.`, 'error');
                 return;
             } else {
                 throw baseError;
