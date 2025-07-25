@@ -33,8 +33,24 @@ class TeableAPI {
             const response = await fetch(url, defaultOptions);
             
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+                let errorText = '';
+                try {
+                    const errorData = await response.json();
+                    errorText = errorData.message || JSON.stringify(errorData);
+                } catch {
+                    errorText = await response.text();
+                }
+                
+                const errorMessage = `HTTP ${response.status}: ${errorText || response.statusText}`;
+                console.error('API Error Details:', {
+                    url,
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();

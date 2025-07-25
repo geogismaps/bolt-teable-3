@@ -121,7 +121,18 @@ async function testConnection() {
             }
         } catch (baseError) {
             if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
-                showConnectionStatus('❌ Connection failed: API token does not have permission to access the specified base. Please verify the Base ID and token permissions.', 'error');
+                showConnectionStatus(`❌ Connection failed: Access denied to the specified base. 
+
+Possible causes:
+• API token doesn't have permission to access this base
+• Base ID is incorrect
+• Token was revoked or expired
+• Insufficient permissions for the space
+
+Please verify:
+1. Your Base ID is correct: ${baseId}
+2. Your API token has proper permissions
+3. The token has access to the specified space`, 'error');
                 return;
             } else if (baseError.message.includes('404')) {
                 showConnectionStatus('❌ Connection failed: Base not found. Please check your Base ID.', 'error');
