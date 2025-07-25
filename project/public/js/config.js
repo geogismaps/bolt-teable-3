@@ -72,17 +72,78 @@ async function testConnection() {
             accessToken: apiToken
         });
         
-        // Test connection by trying to get base info
-        const baseInfo = await testApi.getBase();
-        
-        if (baseInfo && baseInfo.id) {
-            showConnectionStatus('✅ Connection successful! Base found: ' + baseInfo.name, 'success');
-        } else {
-            showConnectionStatus('❌ Connection failed: Invalid response from server', 'error');
+        // First test basic connectivity by trying to get spaces
+        console.log('Testing basic API connectivity...');
+        let spacesResponse;
+        try {
+            spacesResponse = await testApi.getSpaces();
+            console.log('✅ API connectivity successful');
+        } catch (spaceError) {
+            if (spaceError.message.includes('403') || spaceError.message.includes('Forbidden')) {
+                showConnectionStatus('❌ Connection failed: API token does not have permission to access this Teable instance. Please verify your API token has the correct permissions.', 'error');
+                return;
+            } else if (spaceError.message.includes('401') || spaceError.message.includes('Unauthorized')) {
+                showConnectionStatus('❌ Connection failed: Invalid API token. Please check your API token.', 'error');
+                return;
+            } else if (spaceError.message.includes('404')) {
+                showConnectionStatus('❌ Connection failed: Invalid Teable instance URL. Please check your URL.', 'error');
+                return;
+            } else {
+                throw spaceError;
+            }
         }
+        
+        // Test space access
+        console.log('Testing space access...');
+        try {
+            const spaceInfo = await testApi.getSpace();
+            console.log('✅ Space access successful:', spaceInfo.name);
+        } catch (spaceError) {
+            if (spaceError.message.includes('403') || spaceError.message.includes('Forbidden')) {
+                showConnectionStatus('❌ Connection failed: API token does not have permission to access the specified space. Please verify the Space ID and token permissions.', 'error');
+                return;
+            } else if (spaceError.message.includes('404')) {
+                showConnectionStatus('❌ Connection failed: Space not found. Please check your Space ID.', 'error');
+                return;
+            } else {
+                throw spaceError;
+            }
+        }
+        
+        // Test base access
+        console.log('Testing base access...');
+        try {
+            const baseInfo = await testApi.getBase();
+            if (baseInfo && baseInfo.id) {
+                showConnectionStatus(`✅ Connection successful! Base found: "${baseInfo.name}" - All credentials are valid and have proper permissions.`, 'success');
+            } else {
+                showConnectionStatus('❌ Connection failed: Invalid response from server', 'error');
+            }
+        } catch (baseError) {
+            if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
+                showConnectionStatus('❌ Connection failed: API token does not have permission to access the specified base. Please verify the Base ID and token permissions.', 'error');
+                return;
+            } else if (baseError.message.includes('404')) {
+                showConnectionStatus('❌ Connection failed: Base not found. Please check your Base ID.', 'error');
+                return;
+            } else {
+                throw baseError;
+            }
+        }
+        
     } catch (error) {
         console.error('Connection test failed:', error);
-        showConnectionStatus('❌ Connection failed: ' + error.message, 'error');
+        let errorMessage = 'Unknown error occurred';
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            errorMessage = 'Network error: Cannot reach the Teable server. Please check your internet connection and URL.';
+        } else if (error.message.includes('CORS')) {
+            errorMessage = 'CORS error: The Teable server is blocking requests from this domain.';
+        } else {
+            errorMessage = error.message;
+        }
+        
+        showConnectionStatus('❌ Connection failed: ' + errorMessage, 'error');
     }
 }
 
