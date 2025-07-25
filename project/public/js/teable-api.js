@@ -29,7 +29,14 @@ class TeableAPI {
         };
 
         try {
-            console.log('Making request to:', url);
+            console.log('🔍 API Request Details:', {
+                url: url,
+                method: defaultOptions.method || 'GET',
+                headers: {
+                    'Authorization': defaultOptions.headers.Authorization ? 'Bearer [HIDDEN]' : 'None',
+                    'Content-Type': defaultOptions.headers['Content-Type']
+                }
+            });
             const response = await fetch(url, defaultOptions);
             
             if (!response.ok) {

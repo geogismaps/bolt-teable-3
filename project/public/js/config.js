@@ -120,22 +120,42 @@ async function testConnection() {
                 showConnectionStatus('❌ Connection failed: Invalid response from server', 'error');
             }
         } catch (baseError) {
+            console.error('Base access error details:', baseError);
+            
             if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
-                showConnectionStatus(`❌ Connection failed: Access denied to the specified base. 
+                showConnectionStatus(`❌ Access Denied (403 Error)
 
-Possible causes:
-• API token doesn't have permission to access this base
-• Base ID is incorrect
-• Token was revoked or expired
-• Insufficient permissions for the space
+🔍 TROUBLESHOOTING STEPS:
 
-Please verify:
-1. Your Base ID is correct: ${baseId}
-2. Your API token has proper permissions
-3. The token has access to the specified space`, 'error');
+1. **Check API Token Permissions:**
+   • Go to Teable.io → Settings → API Tokens
+   • Ensure your token has "Base Read" permissions
+   • Token should have access to Space ID: ${spaceId}
+
+2. **Verify Base ID:**
+   • Current Base ID: ${baseId}
+   • Go to your base in Teable.io
+   • Check the URL: https://app.teable.io/base/[BASE_ID]
+   • Copy the exact Base ID from the URL
+
+3. **Check Space Access:**
+   • Ensure the base exists in Space ID: ${spaceId}
+   • Verify you have access to this space
+   • Space ID format: spcXXXXXXXXXXXXXXXX
+
+4. **Token Validity:**
+   • Regenerate your API token if needed
+   • Ensure token wasn't revoked
+
+💡 The most common cause is insufficient API token permissions for the specific base.`, 'error');
                 return;
             } else if (baseError.message.includes('404')) {
-                showConnectionStatus('❌ Connection failed: Base not found. Please check your Base ID.', 'error');
+                showConnectionStatus(`❌ Base Not Found (404 Error)
+
+🔍 POSSIBLE ISSUES:
+• Base ID "${baseId}" doesn't exist
+• Base might be in a different space
+• Check the URL in Teable.io to get the correct Base ID`, 'error');
                 return;
             } else {
                 throw baseError;
@@ -460,6 +480,59 @@ function showConfigAlert(message, type) {
     }, 8000);
 }
 
+// Add verification helper function
+async function verifyConfiguration() {
+    const baseUrlEl = document.getElementById('baseUrl');
+    const spaceIdEl = document.getElementById('spaceId'); 
+    const baseIdEl = document.getElementById('baseId');
+    const apiTokenEl = document.getElementById('apiToken');
+    
+    const baseUrl = baseUrlEl.value.trim();
+    const spaceId = spaceIdEl.value.trim(); 
+    const baseId = baseIdEl.value.trim();
+    const apiToken = apiTokenEl.value.trim();
+    
+    showConnectionStatus('🔍 Verifying configuration step by step...', 'info');
+    
+    // Step 1: Check URL format
+    try {
+        new URL(baseUrl);
+        console.log('✅ URL format is valid');
+    } catch {
+        showConnectionStatus('❌ Invalid URL format. Please use: https://app.teable.io', 'error');
+        return;
+    }
+    
+    // Step 2: Check ID formats
+    if (!spaceId.startsWith('spc')) {
+        showConnectionStatus('⚠️ Space ID should start with "spc". Current: ' + spaceId, 'error');
+        return;
+    }
+    
+    if (!baseId.startsWith('bse')) {
+        showConnectionStatus('⚠️ Base ID should start with "bse". Current: ' + baseId, 'error');
+        return;
+    }
+    
+    // Step 3: Check token format
+    if (apiToken.length < 10) {
+        showConnectionStatus('⚠️ API token seems too short. Please check your token.', 'error');
+        return;
+    }
+    
+    showConnectionStatus(`✅ Configuration format looks good:
+• URL: ${baseUrl}
+• Space ID: ${spaceId} ✓
+• Base ID: ${baseId} ✓
+• Token: ${apiToken.substring(0, 8)}... ✓
+
+Now testing API connection...`, 'info');
+    
+    // Continue with connection test
+    setTimeout(() => testConnection(), 2000);
+}
+
 // Make functions globally available
 window.testConnection = testConnection;
+window.verifyConfiguration = verifyConfiguration;
 window.deleteConfig = deleteConfig;
