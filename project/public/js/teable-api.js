@@ -80,9 +80,27 @@ class TeableAPI {
 
     async getBase() {
         try {
+            // Try the correct Teable API endpoint for base information
             const response = await this.makeRequest(`/base/${this.baseId}`);
             return response;
         } catch (error) {
+            // If the standard endpoint fails, try alternative endpoints
+            if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                console.log('🔍 Trying alternative base access method...');
+                try {
+                    // Try getting base through tables endpoint as fallback
+                    const tablesResponse = await this.makeRequest(`/base/${this.baseId}/table`);
+                    if (tablesResponse) {
+                        return {
+                            id: this.baseId,
+                            name: 'Base (verified through tables)',
+                            spaceId: this.spaceId
+                        };
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback method also failed:', fallbackError);
+                }
+            }
             throw new Error(`Failed to get base: ${error.message}`);
         }
     }

@@ -161,39 +161,43 @@ Your token: ${apiToken.length} characters
             console.error('Base access error details:', baseError);
             
             if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
-                showConnectionStatus(`❌ ACCESS DENIED (403 Error)
+                showConnectionStatus(`❌ ACCESS DENIED (403 Error) - PERMISSION ISSUE DETECTED
 
-🚫 **PERMISSION ISSUE DETECTED**
+🚫 **YOUR API TOKEN LACKS REQUIRED PERMISSIONS**
 
-Your API token does not have permission to access this base.
+**STEP-BY-STEP FIX:**
 
-📋 **IMMEDIATE SOLUTIONS:**
+**1. CREATE NEW API TOKEN (RECOMMENDED)**
+   • Go to https://app.teable.io/settings/tokens
+   • Click "Create New Token"
+   • Name it: "GIS System Access"
+   • **CRITICAL:** Select these permissions:
+     ✅ Base Read ✅ Record Read ✅ Record Write ✅ Record Delete
+     ✅ Space Read ✅ Table Read ✅ Field Read
+   • Copy the FULL token (starts with "tbl_" usually)
 
-**Option 1: Create New API Token**
-1. Go to https://app.teable.io
-2. Navigate to Settings → API Tokens
-3. Delete your current token
-4. Create NEW token with these permissions:
-   ✅ Base Read ✅ Record Read ✅ Space Read ✅ Record Write
-5. Copy the new token and paste it here
+**2. VERIFY YOUR IDS ARE CORRECT**
+   • Base ID: ${baseId} (should start with "bse")
+   • Space ID: ${spaceId} (should start with "spc")
+   • **How to find correct IDs:**
+     - Go to your Teable base
+     - URL shows: .../space/YOUR_SPACE_ID/base/YOUR_BASE_ID
+     - Copy these exact values
 
-**Option 2: Verify Base & Space IDs**
-• Current Base ID: ${baseId}
-• Current Space ID: ${spaceId}
-• Check if this base exists in this space
-• Go to: https://app.teable.io/base/${baseId}
+**3. CHECK TOKEN WORKSPACE**
+   • Ensure token was created in the SAME workspace where your base exists
+   • Token must have access to Space: ${spaceId}
 
-**Option 3: Check Token Scope**
-• Ensure token was created in the correct workspace
-• Token must have access to space: ${spaceId}
-• Base must exist in the specified space
+**4. COMMON MISTAKES TO AVOID**
+   ❌ Using a token from different workspace
+   ❌ Token created without "Base Read" permission
+   ❌ Copying partial token (tokens are usually 40+ characters)
+   ❌ Using wrong Base ID or Space ID
 
-⚠️ **MOST COMMON FIXES:**
-1. Create a BRAND NEW API token (old one might be restricted)
-2. Verify Base ID from the actual Teable URL
-3. Ensure token has "Base Read" permissions
+**5. TEST AGAIN**
+   After creating new token with proper permissions, paste it above and click "Test Connection"
 
-🔄 **After making changes, click "Test Connection" again.**`, 'error');
+**If still failing:** Your base might be in a different space or workspace than expected.`, 'error');
                 return;
             } else if (baseError.message.includes('404')) {
                 showConnectionStatus(`❌ Base Not Found (404 Error)
