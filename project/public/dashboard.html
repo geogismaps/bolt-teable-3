@@ -153,12 +153,11 @@
         .enhanced-action-card {
             background: white;
             border-radius: 20px;
-            padding: 1.75rem;
+            padding: 2rem;
             text-align: center;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
             height: 100%;
-            min-height: 280px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -190,33 +189,33 @@
         }
         
         .action-icon-enhanced {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.25rem;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 1.5rem;
             background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border-radius: 20px;
+            border-radius: 25px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.2rem;
+            font-size: 2.5rem;
             position: relative;
             z-index: 1;
         }
         
         .enhanced-action-card h5 {
             font-weight: 700;
-            margin-bottom: 0.75rem;
+            margin-bottom: 1rem;
             color: #2c3e50;
-            font-size: 1.15rem;
+            font-size: 1.25rem;
             z-index: 1;
             position: relative;
         }
         
         .enhanced-action-card p {
             color: #6c757d;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            line-height: 1.5;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
             flex-grow: 1;
             z-index: 1;
             position: relative;
@@ -306,25 +305,12 @@
             
             .enhanced-action-card {
                 padding: 1.5rem;
-                min-height: 260px;
             }
             
             .action-icon-enhanced {
-                width: 70px;
-                height: 70px;
-                font-size: 1.8rem;
-            }
-        }
-        
-        @media (min-width: 992px) {
-            .row.g-3 {
-                --bs-gutter-x: 1rem;
-            }
-        }
-        
-        @media (min-width: 1200px) {
-            .enhanced-action-card {
-                min-height: 300px;
+                width: 80px;
+                height: 80px;
+                font-size: 2rem;
             }
         }
     </style>
@@ -454,60 +440,60 @@
                     <small class="text-muted">Choose an action to get started</small>
                 </div>
                 
-                <div class="row g-3" id="quickActions">
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6">
+                <div class="row g-4" id="quickActions">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-users text-primary"></i>
                             </div>
                             <h5>User Management</h5>
-                            <p>Add, edit, and manage system users with comprehensive role-based permissions</p>
+                            <p>Add, edit, and manage system users with comprehensive role-based permissions and access controls</p>
                             <button class="btn btn-primary enhanced-btn" onclick="window.location.href='users.html'">
                                 <i class="fas fa-user-cog me-1"></i>Manage Users
                             </button>
                         </div>
                     </div>
                     
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-shield-alt text-success"></i>
                             </div>
                             <h5>Field Permissions</h5>
-                            <p>Configure granular field-level permissions for tables and users with advanced security</p>
+                            <p>Configure granular field-level permissions for tables and users with advanced security settings</p>
                             <button class="btn btn-success enhanced-btn" onclick="window.location.href='permissions.html'">
                                 <i class="fas fa-key me-1"></i>Set Permissions
                             </button>
                         </div>
                     </div>
                     
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-table text-info"></i>
                             </div>
                             <h5>Data Management</h5>
-                            <p>View and edit table data with advanced filtering, sorting, and bulk operations</p>
+                            <p>View and edit table data with advanced filtering, sorting, and bulk operations capabilities</p>
                             <button class="btn btn-info enhanced-btn" onclick="window.location.href='table.html'">
                                 <i class="fas fa-database me-1"></i>Manage Data
                             </button>
                         </div>
                     </div>
                     
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6" id="mapConfigCard">
+                    <div class="col-xl-4 col-lg-6 col-md-6" id="mapConfigCard">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-cog text-warning"></i>
                             </div>
                             <h5>Map Configuration</h5>
-                            <p>Configure public map settings, layers, styling, and permissions for visualization</p>
+                            <p>Configure public map settings, layers, styling, and permissions for optimal visualization</p>
                             <button class="btn btn-warning enhanced-btn" onclick="window.location.href='map-config.html'">
                                 <i class="fas fa-map-marked-alt me-1"></i>Configure Map
                             </button>
                         </div>
                     </div>
                     
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6" id="logsCard">
+                    <div class="col-xl-4 col-lg-6 col-md-6" id="logsCard">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-history text-danger"></i>
@@ -520,7 +506,7 @@
                         </div>
                     </div>
                     
-                    <div class="col-xl-4 col-lg-4 col-md-6 col-sm-6">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
                         <div class="enhanced-action-card">
                             <div class="action-icon-enhanced">
                                 <i class="fas fa-map text-primary"></i>
