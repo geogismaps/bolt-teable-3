@@ -32,6 +32,9 @@ const baseMaps = {
     }
 };
 
+// Current base layer reference
+let currentBaseLayer = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication
     if (!window.teableAuth.requireAuth()) return;
@@ -45,18 +48,24 @@ async function initializeMap() {
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Initialize API if needed
-        if (currentUser.userType === 'space_owner') {
+        // Initialize API if needed - check if teableAPI exists first
+        if (window.teableAPI && currentUser.userType === 'space_owner') {
             window.teableAPI.init(window.teableAuth.clientConfig);
         }
 
-        // Initialize Leaflet map with India center view
+        // Initialize Leaflet map with India center view and proper zoom for India
         map = L.map('map').setView([20.5937, 78.9629], 5);
 
-        // Add default base layer (OpenStreetMap)
-        L.tileLayer(baseMaps.openstreetmap.url, {
+        // Add default base layer (OpenStreetMap) and store reference
+        currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution
         }).addTo(map);
+
+        // Set the default basemap selector value
+        const basemapSelector = document.getElementById('basemapSelector');
+        if (basemapSelector) {
+            basemapSelector.value = 'openstreetmap';
+        }
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
@@ -77,6 +86,12 @@ async function initializeMap() {
 
 async function loadAvailableTables() {
     try {
+        // Check if API is available
+        if (!window.teableAPI) {
+            console.warn('Teable API not available, skipping table loading');
+            return;
+        }
+
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
 
@@ -125,6 +140,15 @@ async function loadTableFields() {
     }
 
     try {
+        // Check if API is available
+        if (!window.teableAPI) {
+            console.warn('Teable API not available');
+            if (geometrySelector) {
+                geometrySelector.innerHTML = '<option value="">API not available</option>';
+            }
+            return;
+        }
+
         // Get sample records to detect fields
         const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
 
@@ -211,6 +235,11 @@ async function addLayerFromTable() {
 
         if (!tableId || !layerName) {
             throw new Error('Please select a table and enter a layer name');
+        }
+
+        // Check if API is available
+        if (!window.teableAPI) {
+            throw new Error('Teable API not available. Please check your configuration.');
         }
 
         // Get table data
@@ -1005,21 +1034,22 @@ function removeLayer(layerId) {
 function changeBasemap() {
     const basemapType = document.getElementById('basemapSelector').value;
 
-    // Remove current base layer
-    map.eachLayer(layer => {
-        if (layer._url && layer._url.includes('tile')) {
-            map.removeLayer(layer);
-        }
-    });
+    // Remove current base layer if it exists
+    if (currentBaseLayer) {
+        map.removeLayer(currentBaseLayer);
+    }
 
     // Add new base layer
     const basemap = baseMaps[basemapType];
     if (basemap) {
-        L.tileLayer(basemap.url, {
+        currentBaseLayer = L.tileLayer(basemap.url, {
             attribution: basemap.attribution
         }).addTo(map);
 
         showSuccess(`Switched to ${basemapType} basemap`);
+        console.log(`Basemap changed to: ${basemapType}`);
+    } else {
+        showError(`Basemap type "${basemapType}" not found`);
     }
 }
 
