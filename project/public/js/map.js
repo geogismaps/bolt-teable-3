@@ -37,10 +37,10 @@ let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for all dependencies to load
-    if (typeof window.teableAuth === 'undefined') {
-        console.log('Waiting for teableAuth to load...');
+    if (typeof window.teableAuth === 'undefined' || typeof window.teableAPI === 'undefined') {
+        console.log('Waiting for dependencies to load...');
         setTimeout(() => {
-            initializeMap();
+            document.dispatchEvent(new Event('DOMContentLoaded'));
         }, 500);
         return;
     }
@@ -48,18 +48,46 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check authentication
     if (!window.teableAuth.requireAuth()) return;
 
+    // Additional check for client configuration
+    const clientConfig = window.teableAuth.clientConfig;
+    if (!clientConfig) {
+        console.error('❌ No client configuration found. Please set up your Teable connection.');
+        showError('No client configuration found. Please contact your administrator to set up the Teable connection.');
+        return;
+    }
+
+    console.log('🚀 Starting map initialization...');
     initializeMap();
 });
 
 async function initializeMap() {
     try {
         currentUser = window.teableAuth.getCurrentSession();
+        if (!currentUser) {
+            throw new Error('No user session found');
+        }
+
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Initialize API if needed - check if teableAPI exists first
-        if (window.teableAPI && currentUser.userType === 'space_owner') {
-            window.teableAPI.init(window.teableAuth.clientConfig);
+        // Get client configuration
+        const clientConfig = window.teableAuth.clientConfig;
+        if (!clientConfig) {
+            throw new Error('No client configuration found');
+        }
+
+        console.log('Initializing map with config:', {
+            clientName: clientConfig.clientName,
+            baseId: clientConfig.baseId,
+            hasToken: !!clientConfig.accessToken
+        });
+
+        // Initialize API with client config - do this for all users
+        if (window.teableAPI) {
+            window.teableAPI.init(clientConfig);
+            console.log('✅ Teable API initialized');
+        } else {
+            throw new Error('Teable API not available');
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
@@ -79,30 +107,52 @@ async function initializeMap() {
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
 
-        // Load available tables
+        // Load available tables after API is properly initialized
         await loadAvailableTables();
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('Map initialized successfully with India center view');
+        console.log('✅ Map initialized successfully with India center view');
 
     } catch (error) {
-        console.error('Map initialization failed:', error);
+        console.error('❌ Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
 }
 
 async function loadAvailableTables() {
     try {
-        // Check if API is available
+        // Check if API is available and properly configured
         if (!window.teableAPI) {
             console.warn('Teable API not available, skipping table loading');
             return;
         }
 
+        // Check if client config is available
+        const clientConfig = window.teableAuth?.clientConfig;
+        if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken) {
+            console.warn('Client configuration not available, skipping table loading');
+            const tableSelector = document.getElementById('newLayerTable');
+            if (tableSelector) {
+                tableSelector.innerHTML = '<option value="">Configuration required...</option>';
+            }
+            return;
+        }
+
+        // Ensure API is initialized with proper config
+        window.teableAPI.init(clientConfig);
+
+        console.log('Loading tables with config:', {
+            baseUrl: clientConfig.baseUrl,
+            baseId: clientConfig.baseId,
+            hasToken: !!clientConfig.accessToken
+        });
+
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
+
+        console.log('Raw tables response:', tables);
 
         // Filter out system tables
         const userTables = tables.filter(t => 
@@ -128,11 +178,17 @@ async function loadAvailableTables() {
             tableSelector.addEventListener('change', loadTableFields);
         }
 
-        console.log(`Loaded ${userTables.length} available tables`);
+        console.log(`✅ Loaded ${userTables.length} available tables`);
 
     } catch (error) {
-        console.error('Error loading tables:', error);
+        console.error('❌ Error loading tables:', error);
         showError('Failed to load tables: ' + error.message);
+        
+        // Show error in selector
+        const tableSelector = document.getElementById('newLayerTable');
+        if (tableSelector) {
+            tableSelector.innerHTML = '<option value="">Error loading tables</option>';
+        }
     }
 }
 
