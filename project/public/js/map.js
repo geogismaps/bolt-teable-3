@@ -20,15 +20,15 @@ const baseMaps = {
     },
     satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: '© Esri'
+        attribution: '© Esri | World Imagery'
     },
     terrain: {
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenTopoMap contributors'
+        attribution: '© OpenTopoMap (CC-BY-SA)'
     },
     dark: {
         url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        attribution: '© CartoDB'
+        attribution: '© CartoDB | Dark Theme'
     }
 };
 
@@ -36,31 +36,27 @@ const baseMaps = {
 let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait for all dependencies to load
-    if (typeof window.teableAuth === 'undefined') {
-        console.log('Waiting for auth to load...');
-        setTimeout(() => {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-        }, 500);
-        return;
-    }
-
-    // Initialize basic map first, then try to enhance with data if possible
+    // Initialize basic map immediately - don't wait for auth
     console.log('🚀 Starting map initialization...');
     initializeBasicMap();
     
     // Try to load additional features if auth and config are available
     setTimeout(() => {
         try {
-            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
+            if (window.teableAuth && typeof window.teableAuth.isLoggedIn === 'function' && window.teableAuth.isLoggedIn()) {
                 const clientConfig = window.teableAuth.clientConfig;
                 if (clientConfig && clientConfig.baseUrl && clientConfig.accessToken && window.teableAPI) {
                     console.log('Enhancing map with data features...');
                     enhanceMapWithData();
+                } else {
+                    console.log('Client configuration incomplete - continuing in basic mode');
                 }
+            } else {
+                console.log('User not authenticated - continuing in basic mode');
             }
         } catch (error) {
             console.log('Enhanced features not available:', error.message);
+            // Continue with basic map functionality
         }
     }, 1000);
 });
@@ -72,20 +68,30 @@ function initializeBasicMap() {
         // Set user display to show basic info
         const userDisplay = document.getElementById('userDisplay');
         if (userDisplay) {
-            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
-                const session = window.teableAuth.getCurrentSession();
-                userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role})`;
-            } else {
+            try {
+                if (window.teableAuth && window.teableAuth.isLoggedIn()) {
+                    const session = window.teableAuth.getCurrentSession();
+                    userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role})`;
+                } else {
+                    userDisplay.textContent = 'Guest User (Basic Mode)';
+                }
+            } catch (authError) {
                 userDisplay.textContent = 'Guest User (Basic Mode)';
             }
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
-        map = L.map('map').setView([20.5937, 78.9629], 5);
+        map = L.map('map', {
+            center: [20.5937, 78.9629], // India center coordinates
+            zoom: 5, // Good zoom level to see India
+            zoomControl: true,
+            attributionControl: true
+        });
 
         // Add default base layer (OpenStreetMap) and store reference
         currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-            attribution: baseMaps.openstreetmap.attribution
+            attribution: baseMaps.openstreetmap.attribution,
+            maxZoom: 19
         }).addTo(map);
 
         // Set the default basemap selector value
@@ -101,9 +107,9 @@ function initializeBasicMap() {
         setupGeoJSONDragDrop();
 
         // Show success message
-        showSuccess('Map initialized successfully! You can switch basemaps and upload GeoJSON files.');
+        showSuccess('Map initialized with OpenStreetMap focused on India region!');
 
-        console.log('✅ Basic map initialized successfully');
+        console.log('✅ Basic map initialized successfully with India focus');
 
     } catch (error) {
         console.error('❌ Basic map initialization failed:', error);
@@ -1234,22 +1240,62 @@ function removeLayer(layerId) {
 function changeBasemap() {
     const basemapType = document.getElementById('basemapSelector').value;
 
-    // Remove current base layer if it exists
-    if (currentBaseLayer) {
-        map.removeLayer(currentBaseLayer);
-    }
+    try {
+        console.log('Changing basemap to:', basemapType);
 
-    // Add new base layer
-    const basemap = baseMaps[basemapType];
-    if (basemap) {
-        currentBaseLayer = L.tileLayer(basemap.url, {
-            attribution: basemap.attribution
-        }).addTo(map);
+        // Remove current base layer if it exists
+        if (currentBaseLayer) {
+            map.removeLayer(currentBaseLayer);
+        }
 
-        showSuccess(`Switched to ${basemapType} basemap`);
-        console.log(`Basemap changed to: ${basemapType}`);
-    } else {
-        showError(`Basemap type "${basemapType}" not found`);
+        // Add new base layer
+        const basemap = baseMaps[basemapType];
+        if (basemap) {
+            currentBaseLayer = L.tileLayer(basemap.url, {
+                attribution: basemap.attribution,
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+            }).addTo(map);
+
+            // Update success message with proper basemap names
+            const basemapNames = {
+                'openstreetmap': 'OpenStreetMap',
+                'satellite': 'Satellite Imagery',
+                'terrain': 'Terrain',
+                'dark': 'Dark Mode'
+            };
+
+            showSuccess(`Switched to ${basemapNames[basemapType] || basemapType} basemap`);
+            console.log(`✅ Basemap changed to: ${basemapType}`);
+        } else {
+            console.error(`Basemap type "${basemapType}" not found`);
+            showError(`Basemap type "${basemapType}" not found`);
+            
+            // Fallback to OpenStreetMap
+            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                attribution: baseMaps.openstreetmap.attribution,
+                maxZoom: 19
+            }).addTo(map);
+            
+            document.getElementById('basemapSelector').value = 'openstreetmap';
+        }
+    } catch (error) {
+        console.error('Error changing basemap:', error);
+        showError('Failed to change basemap: ' + error.message);
+        
+        // Fallback to OpenStreetMap
+        try {
+            if (currentBaseLayer) {
+                map.removeLayer(currentBaseLayer);
+            }
+            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                attribution: baseMaps.openstreetmap.attribution,
+                maxZoom: 19
+            }).addTo(map);
+            document.getElementById('basemapSelector').value = 'openstreetmap';
+        } catch (fallbackError) {
+            console.error('Fallback basemap failed:', fallbackError);
+        }
     }
 }
 
@@ -1453,8 +1499,18 @@ document.addEventListener('fullscreenchange', function() {
 
 // Additional utility functions
 function resetMapView() {
-    map.setView([20.5937, 78.9629], 5);
-    showSuccess('Map view reset to India');
+    try {
+        // Reset to India center with appropriate zoom
+        map.setView([20.5937, 78.9629], 5, {
+            animate: true,
+            duration: 1.0
+        });
+        showSuccess('Map view reset to India region');
+        console.log('✅ Map view reset to India coordinates');
+    } catch (error) {
+        console.error('Error resetting map view:', error);
+        showError('Failed to reset map view');
+    }
 }
 
 function zoomToAllLayers() {
