@@ -19,11 +19,11 @@ function App() {
           
           <div className="space-y-3">
             <a 
-              href="/config.html" 
+              href="/super-admin.html" 
               className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
             >
-              <i className="fas fa-cog mr-2"></i>
-              Super Admin Config
+              <i className="fas fa-crown mr-2"></i>
+              Super Admin Portal
             </a>
             
             <a 
