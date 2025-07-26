@@ -96,7 +96,7 @@ class TeableAuth {
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
             const localUser = users.records?.find(u => 
                 u.fields.email === email.toLowerCase() && 
-                u.fields.role === 'Owner' &&
+                (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
                 u.fields.admin_password_hash // Must have admin password set
             );
 

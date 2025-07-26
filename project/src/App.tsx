@@ -16,7 +16,7 @@ function App() {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Teable GIS System</h2>
           <p className="text-gray-600 mb-6">Redirecting to configuration...</p>
-          
+
           <div className="space-y-3">
             <a 
               href="/super-admin.html" 
@@ -25,7 +25,7 @@ function App() {
               <i className="fas fa-crown mr-2"></i>
               Super Admin Portal
             </a>
-            
+
             <a 
               href="/login.html" 
               className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
@@ -33,7 +33,7 @@ function App() {
               <i className="fas fa-sign-in-alt mr-2"></i>
               User Login
             </a>
-            
+
             <a 
               href="/dashboard.html" 
               className="block w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
@@ -42,7 +42,7 @@ function App() {
               Dashboard
             </a>
           </div>
-          
+
           <div className="mt-6 text-sm text-gray-500">
             <p>Complete Teable.io GIS System</p>
             <p>Mixed Authentication • Field Permissions • Map Views</p>

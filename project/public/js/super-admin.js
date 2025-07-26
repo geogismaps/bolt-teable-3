@@ -134,8 +134,6 @@ async function handleClientCreation(event) {
         const config = {
             clientName: document.getElementById('clientName').value.trim(),
             ownerEmail: document.getElementById('ownerEmail').value.trim(),
-            ownerFirstName: document.getElementById('ownerFirstName').value.trim(),
-            ownerLastName: document.getElementById('ownerLastName').value.trim(),
             ownerPassword: document.getElementById('ownerPassword').value.trim(),
             baseUrl: document.getElementById('teableUrl').value.trim(),
             spaceId: document.getElementById('spaceId').value.trim(),
@@ -144,9 +142,8 @@ async function handleClientCreation(event) {
         };
 
         // Validation
-        if (!config.clientName || !config.ownerEmail || !config.ownerFirstName || 
-            !config.ownerLastName || !config.ownerPassword || !config.baseUrl || 
-            !config.baseId || !config.accessToken) {
+        if (!config.clientName || !config.ownerEmail || !config.ownerPassword || 
+            !config.baseUrl || !config.baseId || !config.accessToken) {
             throw new Error('Please fill in all required fields');
         }
 
@@ -177,12 +174,16 @@ async function handleClientCreation(event) {
         console.log('Creating Owner user...');
         const ownerPasswordHash = await window.teableAPI.hashPassword(config.ownerPassword);
         
+        // Extract name from email if no separate name provided
+        const emailParts = config.ownerEmail.split('@')[0];
+        const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
+        
         const ownerUserData = {
             email: config.ownerEmail,
             password_hash: ownerPasswordHash,
-            first_name: config.ownerFirstName,
-            last_name: config.ownerLastName,
-            role: 'owner', // Using Teable.io nomenclature
+            first_name: firstName,
+            last_name: 'Owner',
+            role: 'Owner', // Using Teable.io nomenclature with proper case
             is_active: true,
             created_date: new Date().toISOString().split('T')[0],
             last_login: null,
@@ -277,11 +278,15 @@ async function testConnectionInternal(config) {
     // Initialize API temporarily
     window.teableAPI.init(config);
 
-    // Test basic API connectivity
+    // Test the actual API connection using the testConnection method
     try {
-        const result = await window.teableAPI.request('/api/base');
-        console.log('API connection test successful:', result);
-        return true;
+        const result = await window.teableAPI.testConnection();
+        if (result.success) {
+            console.log('API connection test successful:', result);
+            return true;
+        } else {
+            throw new Error(result.error);
+        }
     } catch (error) {
         throw new Error(`API connection failed: ${error.message}`);
     }
@@ -353,8 +358,6 @@ function editConfig(index) {
         // Populate form with existing data
         document.getElementById('clientName').value = config.clientName || '';
         document.getElementById('ownerEmail').value = config.ownerEmail || '';
-        document.getElementById('ownerFirstName').value = config.ownerFirstName || '';
-        document.getElementById('ownerLastName').value = config.ownerLastName || '';
         document.getElementById('teableUrl').value = config.baseUrl || '';
         document.getElementById('spaceId').value = config.spaceId || '';
         document.getElementById('baseId').value = config.baseId || '';
@@ -442,11 +445,12 @@ function showSuccessModal(config) {
             <div class="col-md-6">
                 <h6><i class="fas fa-user me-2"></i>Owner Details</h6>
                 <ul class="list-unstyled">
-                    <li><strong>Name:</strong> ${config.ownerFirstName} ${config.ownerLastName}</li>
                     <li><strong>Email:</strong> ${config.ownerEmail}</li>
                     <li><strong>Role:</strong> Owner (Full Access)</li>
+                    <li><strong>Status:</strong> Active</li>
                 </ul>
-            </div>
+            </div></div>
+        </div>
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i>System Setup</h6>
                 <ul class="list-unstyled">
