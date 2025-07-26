@@ -50,9 +50,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Additional check for client configuration
     const clientConfig = window.teableAuth.clientConfig;
-    if (!clientConfig) {
+    if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken) {
         console.error('❌ No client configuration found. Please set up your Teable connection.');
-        showError('No client configuration found. Please contact your administrator to set up the Teable connection.');
+        showError('No client configuration found. Please set up your Teable connection first by going to Configuration page.');
         return;
     }
 
@@ -83,11 +83,16 @@ async function initializeMap() {
         });
 
         // Initialize API with client config - do this for all users
-        if (window.teableAPI) {
-            window.teableAPI.init(clientConfig);
-            console.log('✅ Teable API initialized');
+        if (window.teableAPI && clientConfig) {
+            try {
+                window.teableAPI.init(clientConfig);
+                console.log('✅ Teable API initialized');
+            } catch (initError) {
+                console.error('Failed to initialize Teable API:', initError);
+                throw new Error('Failed to initialize Teable API: ' + initError.message);
+            }
         } else {
-            throw new Error('Teable API not available');
+            throw new Error('Teable API not available or client configuration missing');
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
@@ -131,12 +136,13 @@ async function loadAvailableTables() {
 
         // Check if client config is available
         const clientConfig = window.teableAuth?.clientConfig;
-        if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken) {
-            console.warn('Client configuration not available, skipping table loading');
+        if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken || !clientConfig.baseId) {
+            console.warn('Client configuration not complete, skipping table loading');
             const tableSelector = document.getElementById('newLayerTable');
             if (tableSelector) {
-                tableSelector.innerHTML = '<option value="">Configuration required...</option>';
+                tableSelector.innerHTML = '<option value="">Please configure Teable connection first</option>';
             }
+            showError('Please set up your Teable configuration first by visiting the Configuration page.');
             return;
         }
 
