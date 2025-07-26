@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize basic map first, then try to enhance with data if possible
     console.log('🚀 Starting map initialization...');
     initializeBasicMap();
-    
+
     // Try to load additional features if auth and config are available
     setTimeout(() => {
         try {
@@ -114,20 +114,20 @@ function initializeBasicMap() {
 async function enhanceMapWithData() {
     try {
         console.log('🔧 Enhancing map with data features...');
-        
+
         const clientConfig = window.teableAuth.clientConfig;
-        
+
         // Initialize API with client config
         if (window.teableAPI && typeof window.teableAPI.init === 'function') {
             window.teableAPI.init(clientConfig);
             console.log('✅ Teable API initialized');
-            
+
             // Load available tables
             await loadAvailableTables();
-            
+
             showInfo('Enhanced features loaded! You can now add layers from Teable tables.');
         }
-        
+
     } catch (error) {
         console.warn('Could not enhance map with data features:', error.message);
         showWarning('Map is running in basic mode. Some features may not be available.');
@@ -176,10 +176,21 @@ async function initializeMap() {
         // Initialize Leaflet map with India center view and proper zoom for India
         map = L.map('map').setView([20.5937, 78.9629], 5);
 
-        // Add default base layer (OpenStreetMap) and store reference
-        currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-            attribution: baseMaps.openstreetmap.attribution
-        }).addTo(map);
+        // Wait for map to be ready before adding layers
+        setTimeout(() => {
+            // Add default base layer (OpenStreetMap) and store reference
+            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                attribution: baseMaps.openstreetmap.attribution
+            });
+
+            // Ensure map exists before adding layer
+            if (map && typeof map.addLayer === 'function') {
+                currentBaseLayer.addTo(map);
+            } else {
+                console.error('Map object invalid, cannot add basemap layer');
+                return;
+            }
+        }, 100);
 
         // Set the default basemap selector value
         const basemapSelector = document.getElementById('basemapSelector');

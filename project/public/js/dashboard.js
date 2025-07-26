@@ -14,11 +14,11 @@ async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
         const clientConfig = window.teableAuth.clientConfig;
-        
+
         // Update user display with client information
         document.getElementById('userDisplay').textContent = 
             `${session.firstName} ${session.lastName} (${session.role})`;
-            
+
         // Show client information
         if (clientConfig) {
             const clientInfo = document.getElementById('clientInfo');
@@ -30,9 +30,20 @@ async function initializeDashboard() {
                     </div>
                 `;
             }
-            
-            // Initialize API with client config
-            window.teableAPI.init(clientConfig);
+
+            // Initialize API with client config - only if available
+            if (window.teableAPI && typeof window.teableAPI.init === 'function') {
+                try {
+                    window.teableAPI.init(clientConfig);
+                    console.log('✅ Teable API initialized for dashboard');
+                } catch (initError) {
+                    console.error('Failed to initialize Teable API:', initError);
+                    showError('API initialization failed - some features may not be available');
+                }
+            } else {
+                console.warn('Teable API not available');
+                showWarning('API not available - dashboard running in basic mode');
+            }
         }
 
         // Show/hide admin features based on role
@@ -81,7 +92,7 @@ function updateUIForUserRole(session) {
     // Update page title and branding to show client name
     if (clientConfig) {
         document.title = `${clientConfig.clientName} - Dashboard`;
-        
+
         // Update any client name placeholders
         const clientNameElements = document.querySelectorAll('.client-name-placeholder');
         clientNameElements.forEach(el => {
@@ -101,7 +112,7 @@ function updateUIForUserRole(session) {
 function updateClientFeatures(session) {
     // Show/hide features based on role within the client base
     const isClientAdmin = session.role === 'owner' || session.role === 'admin';
-    
+
     // User management only for client admins
     const userMgmtSections = document.querySelectorAll('.client-admin-only');
     userMgmtSections.forEach(section => {
@@ -177,10 +188,10 @@ async function loadRecentActivity() {
             limit: 10,
             sort: [{ field: 'timestamp', order: 'desc' }]
         });
-        
+
         const activities = activityData.records || [];
         console.log('Recent activities loaded:', activities.length);
-        
+
     } catch (error) {
         console.error('Error loading recent activity:', error);
     }
@@ -190,15 +201,15 @@ async function loadSystemHealth() {
     try {
         const session = window.teableAuth.getCurrentSession();
         const clientConfig = window.teableAuth.clientConfig;
-        
+
         // Basic health check - verify API connectivity
         const tables = await window.teableAPI.getTables();
         const isHealthy = tables && (tables.length > 0 || Array.isArray(tables));
-        
+
         console.log('System health check:', isHealthy ? 'Healthy' : 'Issues detected');
         console.log('Client:', clientConfig?.clientName || 'Unknown');
         console.log('Base ID:', clientConfig?.baseId || 'Unknown');
-        
+
     } catch (error) {
         console.error('System health check failed:', error);
     }
@@ -220,6 +231,24 @@ Admin: ${session.isAdmin ? 'Yes' : 'No'}`);
 function showError(message) {
     const alertDiv = document.createElement('div');
     alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.insertBefore(alertDiv, document.body.firstChild);
+
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 8000);
+}
+
+function showWarning(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-warning alert-dismissible fade show';
     alertDiv.innerHTML = `
         <i class="fas fa-exclamation-triangle me-2"></i>
         ${message}
