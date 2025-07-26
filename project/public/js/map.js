@@ -60,6 +60,47 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeMap();
 });
 
+function initializeBasicMap() {
+    try {
+        console.log('🗺️ Initializing map in basic mode...');
+
+        // Set user display to show basic info
+        const userDisplay = document.getElementById('userDisplay');
+        if (userDisplay) {
+            userDisplay.textContent = 'Guest User (Basic Mode)';
+        }
+
+        // Initialize Leaflet map with India center view and proper zoom for India
+        map = L.map('map').setView([20.5937, 78.9629], 5);
+
+        // Add default base layer (OpenStreetMap) and store reference
+        currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+            attribution: baseMaps.openstreetmap.attribution
+        }).addTo(map);
+
+        // Set the default basemap selector value
+        const basemapSelector = document.getElementById('basemapSelector');
+        if (basemapSelector) {
+            basemapSelector.value = 'openstreetmap';
+        }
+
+        // Initialize measurement group
+        measurementGroup = L.layerGroup().addTo(map);
+
+        // Setup drag and drop for GeoJSON
+        setupGeoJSONDragDrop();
+
+        // Show info about basic mode
+        showInfo('Map initialized in basic mode. Please configure your Teable connection to load table data.');
+
+        console.log('✅ Basic map initialized successfully');
+
+    } catch (error) {
+        console.error('❌ Basic map initialization failed:', error);
+        showError('Failed to initialize map: ' + error.message);
+    }
+}
+
 async function initializeMap() {
     try {
         currentUser = window.teableAuth.getCurrentSession();
@@ -189,7 +230,7 @@ async function loadAvailableTables() {
     } catch (error) {
         console.error('❌ Error loading tables:', error);
         showError('Failed to load tables: ' + error.message);
-        
+
         // Show error in selector
         const tableSelector = document.getElementById('newLayerTable');
         if (tableSelector) {
@@ -240,22 +281,22 @@ async function loadTableFields() {
             // Enhanced geometry field detection
             let detectedGeometryField = null;
             let confidence = 0;
-            
+
             const geometryFieldCandidates = fields.map(field => {
                 const fieldLower = field.toLowerCase();
                 let score = 0;
-                
+
                 // Primary geometry field indicators
                 if (fieldLower === 'geometry' || fieldLower === 'geom') score += 10;
                 if (fieldLower === 'wkt' || fieldLower === 'shape') score += 9;
                 if (fieldLower.includes('polygon') || fieldLower.includes('point')) score += 8;
                 if (fieldLower.includes('coordinates') || fieldLower.includes('location')) score += 7;
-                
+
                 // Secondary indicators
                 if (fieldLower.includes('geom')) score += 5;
                 if (fieldLower.includes('wkt')) score += 5;
                 if (fieldLower.includes('shape')) score += 4;
-                
+
                 return { field, score };
             }).filter(item => item.score > 0)
               .sort((a, b) => b.score - a.score);
@@ -299,7 +340,7 @@ async function loadTableFields() {
                     showSuccess(`Auto-detected geometry field: ${detectedGeometryField} (${confidenceText} confidence)`);
                 }
             }
-            
+
             if (linkedTablesInfo) {
                 const hasGeometry = detectedGeometryField ? 'Yes' : 'No';
                 linkedTablesInfo.innerHTML = `
