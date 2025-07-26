@@ -61,7 +61,7 @@ class TeableAuth {
 
             this.currentSession = session;
             this.saveSession();
-            
+
             // Log activity
             try {
                 await window.teableAPI.logActivity(
@@ -302,7 +302,7 @@ class TeableAuth {
      */
     hasRoleOrHigher(requiredRole) {
         if (!this.currentSession) return false;
-        
+
         const roleHierarchy = {
             'Viewer': 1,
             'Commenter': 2,
@@ -310,10 +310,10 @@ class TeableAuth {
             'Admin': 4,
             'Owner': 5
         };
-        
+
         const userLevel = roleHierarchy[this.currentSession.role] || 0;
         const requiredLevel = roleHierarchy[requiredRole] || 0;
-        
+
         return userLevel >= requiredLevel;
     }
 
@@ -334,12 +334,12 @@ class TeableAuth {
             const sessionData = localStorage.getItem('teable_session');
             if (sessionData) {
                 this.currentSession = JSON.parse(sessionData);
-                
+
                 // Check if session is expired (24 hours)
                 const loginTime = new Date(this.currentSession.loginTime);
                 const now = new Date();
                 const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-                
+
                 if (hoursDiff > 24) {
                     console.log('Session expired, logging out');
                     this.logout();
@@ -370,14 +370,40 @@ class TeableAuth {
      */
     loadClientConfig() {
         try {
-            const configData = localStorage.getItem('teable_client_config');
-            if (configData) {
-                this.clientConfig = JSON.parse(configData);
+            // First try to load current client config (set by super-admin)
+            let configString = localStorage.getItem('currentClientConfig');
+
+            // Fallback to legacy clientConfig
+            if (!configString) {
+                configString = localStorage.getItem('clientConfig');
             }
+
+            if (configString) {
+                this.clientConfig = JSON.parse(configString);
+
+                // Ensure required properties exist
+                if (!this.clientConfig.baseUrl && this.clientConfig.teableUrl) {
+                    this.clientConfig.baseUrl = this.clientConfig.teableUrl;
+                }
+                if (!this.clientConfig.accessToken && this.clientConfig.apiToken) {
+                    this.clientConfig.accessToken = this.clientConfig.apiToken;
+                }
+
+                console.log('Client configuration loaded:', {
+                    baseUrl: this.clientConfig.baseUrl,
+                    spaceId: this.clientConfig.spaceId,
+                    baseId: this.clientConfig.baseId,
+                    hasAccessToken: !!this.clientConfig.accessToken
+                });
+
+                return this.clientConfig;
+            }
+            return null;
         } catch (error) {
-            console.error('Failed to load client config:', error);
+            console.error('Error loading client config:', error);
+            return null;
         }
-    }
+    },
 
     /**
      * Get available client configurations
@@ -419,12 +445,12 @@ class TeableAuth {
             window.location.href = 'login.html';
             return false;
         }
-        
+
         // Ensure API is configured for authenticated users
         if (this.clientConfig && !window.teableAPI.config.baseUrl) {
             window.teableAPI.init(this.clientConfig);
         }
-        
+
         return true;
     }
 
@@ -450,7 +476,7 @@ window.teableAuth.init();
 window.togglePasswordVisibility = function(inputId) {
     const input = document.getElementById(inputId);
     const icon = input.nextElementSibling?.querySelector('i');
-    
+
     if (input.type === 'password') {
         input.type = 'text';
         if (icon) icon.className = 'fas fa-eye-slash';

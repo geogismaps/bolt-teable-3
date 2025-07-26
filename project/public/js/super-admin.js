@@ -1,4 +1,3 @@
-
 /**
  * Super Admin Portal - Client Configuration and Management
  */
@@ -8,7 +7,7 @@ let allConfigs = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeSuperAdmin();
-    
+
     // Setup form handler
     const configForm = document.getElementById('clientConfigForm');
     if (configForm) {
@@ -20,9 +19,9 @@ async function initializeSuperAdmin() {
     try {
         loadExistingConfigs();
         updateStats();
-        
+
         console.log('Super Admin portal initialized');
-        
+
     } catch (error) {
         console.error('Super Admin initialization failed:', error);
         showAlert('danger', 'Failed to initialize Super Admin portal: ' + error.message);
@@ -34,7 +33,7 @@ function loadExistingConfigs() {
         const configs = getStoredConfigs();
         allConfigs = configs;
         displayExistingConfigs(configs);
-        
+
     } catch (error) {
         console.error('Failed to load existing configs:', error);
     }
@@ -52,7 +51,7 @@ function getStoredConfigs() {
 
 function displayExistingConfigs(configs) {
     const container = document.getElementById('existingConfigs');
-    
+
     if (configs.length === 0) {
         container.innerHTML = `
             <div class="text-center text-muted py-3">
@@ -67,7 +66,7 @@ function displayExistingConfigs(configs) {
     configs.forEach((config, index) => {
         const statusClass = config.status === 'active' ? 'success' : 'warning';
         const statusIcon = config.status === 'active' ? 'check-circle' : 'exclamation-triangle';
-        
+
         html += `
             <div class="config-card mb-3 p-3 border rounded">
                 <div class="d-flex justify-content-between align-items-start">
@@ -117,11 +116,11 @@ function displayExistingConfigs(configs) {
 function updateStats() {
     try {
         const configs = getStoredConfigs();
-        
+
         document.getElementById('totalClients').textContent = configs.length;
         document.getElementById('totalUsers').textContent = configs.reduce((sum, config) => sum + (config.userCount || 0), 0);
         document.getElementById('totalSpaces').textContent = configs.filter(c => c.spaceId).length;
-        
+
     } catch (error) {
         console.error('Failed to update stats:', error);
     }
@@ -173,11 +172,11 @@ async function handleClientCreation(event) {
         // Create Owner user in app_users table
         console.log('Creating Owner user...');
         const ownerPasswordHash = await window.teableAPI.hashPassword(config.ownerPassword);
-        
+
         // Extract name from email if no separate name provided
         const emailParts = config.ownerEmail.split('@')[0];
         const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
-        
+
         const ownerUserData = {
             email: config.ownerEmail,
             password_hash: ownerPasswordHash,
@@ -255,14 +254,45 @@ async function testConnection() {
             throw new Error('Please fill in URL, Base ID, and API Token first');
         }
 
-        await testConnectionInternal(config);
-        
+        // Ensure baseUrl is properly formatted
+        if (!config.baseUrl.startsWith('http://') && !config.baseUrl.startsWith('https://')) {
+            config.baseUrl = 'https://' + config.baseUrl;
+        }
+
         document.getElementById('connectionStatus').innerHTML = `
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle me-2"></i>Connection successful! 
-                Ready to create client configuration.
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>Testing connection...
             </div>
         `;
+
+        // Test with proper API endpoint structure
+        const testUrl = `${config.baseUrl}/api/base/${config.baseId}`;
+        console.log('Testing connection to:', testUrl);
+
+        const response = await fetch(testUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${config.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('connectionStatus').innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>Connection successful! 
+                    Base: ${data.name || 'Connected'} (ID: ${config.baseId})
+                </div>
+            `;
+
+            // Store test config temporarily for auto setup
+            window.testConfig = config;
+
+        } else {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        }
 
     } catch (error) {
         console.error('Connection test failed:', error);
@@ -324,14 +354,14 @@ function activateConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-        
+
         if (!config) {
             throw new Error('Configuration not found');
         }
 
         // Set as active configuration
         localStorage.setItem('teable_client_config', JSON.stringify(config));
-        
+
         // Update status
         configs.forEach(c => c.status = 'inactive');
         config.status = 'active';
@@ -350,7 +380,7 @@ function editConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-        
+
         if (!config) {
             throw new Error('Configuration not found');
         }
@@ -383,7 +413,7 @@ async function testConfigConnection(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-        
+
         if (!config) {
             throw new Error('Configuration not found');
         }
@@ -401,7 +431,7 @@ function deleteConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-        
+
         if (!config) {
             throw new Error('Configuration not found');
         }
@@ -440,7 +470,7 @@ function showSuccessModal(config) {
             <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
             <h4>Client "${config.clientName}" Created Successfully!</h4>
         </div>
-        
+
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-user me-2"></i>Owner Details</h6>
@@ -461,7 +491,7 @@ function showSuccessModal(config) {
                 </ul>
             </div>
         </div>
-        
+
         <div class="alert alert-info mt-3">
             <h6><i class="fas fa-info-circle me-2"></i>Next Steps</h6>
             <ol class="mb-0">
@@ -494,7 +524,7 @@ function resetForm() {
 function showLoadingState(show) {
     const form = document.getElementById('clientConfigForm');
     const inputs = form.querySelectorAll('input, button');
-    
+
     inputs.forEach(input => {
         input.disabled = show;
     });
@@ -549,7 +579,7 @@ function backupData() {
 function togglePasswordVisibility(inputId) {
     const input = document.getElementById(inputId);
     const icon = input.nextElementSibling?.querySelector('i');
-    
+
     if (input.type === 'password') {
         input.type = 'text';
         if (icon) icon.className = 'fas fa-eye-slash';
@@ -601,31 +631,185 @@ style.textContent = `
         display: flex;
         align-items: center;
     }
-    
+
     .stat-icon {
         font-size: 2rem;
         margin-right: 1rem;
         opacity: 0.8;
     }
-    
+
     .stat-content h3 {
         font-size: 2.5rem;
         font-weight: bold;
         margin: 0;
     }
-    
+
     .stat-content p {
         margin: 0;
         opacity: 0.9;
     }
-    
+
     .config-card {
         transition: all 0.3s ease;
     }
-    
+
     .config-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 `;
 document.head.appendChild(style);
+
+async function createClient() {
+    try {
+        showLoadingState(true);
+
+        const config = {
+            clientName: document.getElementById('clientName').value.trim(),
+            ownerEmail: document.getElementById('ownerEmail').value.trim(),
+            ownerPassword: document.getElementById('ownerPassword').value.trim(),
+            baseUrl: document.getElementById('teableUrl').value.trim(),
+            spaceId: document.getElementById('spaceId').value.trim(),
+            baseId: document.getElementById('baseId').value.trim(),
+            accessToken: document.getElementById('apiToken').value.trim()
+        };
+
+        // Validate required fields
+        if (!config.clientName || !config.ownerEmail || !config.ownerPassword || 
+            !config.baseUrl || !config.spaceId || !config.baseId || !config.accessToken) {
+            throw new Error('Please fill in all required fields');
+        }
+
+        // Validate email format
+        if (!config.ownerEmail.includes('@')) {
+            throw new Error('Please enter a valid email address');
+        }
+
+        // Validate password strength
+        if (config.ownerPassword.length < 6) {
+            throw new Error('Password must be at least 6 characters long');
+        }
+
+        // Ensure baseUrl ends with proper format
+        if (!config.baseUrl.startsWith('http://') && !config.baseUrl.startsWith('https://')) {
+            config.baseUrl = 'https://' + config.baseUrl;
+        }
+
+        // Store configuration with proper structure for teable API
+        const configKey = `client_${Date.now()}`;
+        const clientConfig = {
+            id: configKey,
+            clientName: config.clientName,
+            ownerEmail: config.ownerEmail,
+            ownerPassword: config.ownerPassword,
+            baseUrl: config.baseUrl,
+            spaceId: config.spaceId,
+            baseId: config.baseId,
+            accessToken: config.accessToken,
+            createdAt: new Date().toISOString(),
+            status: 'active'
+        };
+
+        // Save individual client config
+        localStorage.setItem(configKey, JSON.stringify(clientConfig));
+
+        // Set as current client config for immediate use
+        localStorage.setItem('currentClientConfig', JSON.stringify(clientConfig));
+
+        // Update clients list
+        const existingClients = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+        existingClients.push(clientConfig);
+        localStorage.setItem('clientConfigs', JSON.stringify(existingClients));
+
+        // Initialize teable API with new configuration
+        if (window.teableAPI) {
+            window.teableAPI.init(clientConfig);
+        }
+
+        // Show success
+        showSuccess(clientConfig);
+
+    } catch (error) {
+        console.error('Error creating client:', error);
+        showLoadingState(false);
+        showAlert('danger', 'Failed to create client: ' + error.message);
+    }
+}
+
+function showSuccess(clientConfig) {
+    const successContent = document.getElementById('successContent');
+    const proceedBtn = document.getElementById('proceedBtn');
+
+    successContent.innerHTML = `
+        <div class="row">
+            <div class="col-md-8">
+                <h6 class="fw-bold text-success">
+                    <i class="fas fa-building me-2"></i>${clientConfig.clientName}
+                </h6>
+                <div class="mb-3">
+                    <strong>Owner Email:</strong> ${clientConfig.ownerEmail}<br>
+                    <strong>Teable URL:</strong> ${clientConfig.baseUrl}<br>
+                    <strong>Space ID:</strong> ${clientConfig.spaceId}<br>
+                    <strong>Base ID:</strong> ${clientConfig.baseId}<br>
+                    <strong>Created:</strong> ${new Date(clientConfig.createdAt).toLocaleString()}
+                </div>
+
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle me-2"></i>Configuration Complete!</h6>
+                    <ul class="mb-0">
+                        <li>Client configuration saved to localStorage</li>
+                        <li>Ready for user access with map integration</li>
+                        <li>Authentication system configured</li>
+                        <li>Map system with permissions enabled</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Next Steps:</strong>
+                    <ol class="mb-0">
+                        <li>Use the owner email and password to login</li>
+                        <li>Access the map system with full permissions</li>
+                        <li>Configure user permissions as needed</li>
+                        <li>Setup public map access if required</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-header">
+                        <h6 class="mb-0">Access Your System</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="login.html" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-sign-in-alt me-1"></i>Login Portal
+                            </a>
+                            <a href="dashboard.html" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+                            </a>
+                            <a href="map.html" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-map me-1"></i>Interactive Map
+                            </a>
+                            <a href="table.html" class="btn btn-sm btn-outline-warning">
+                                <i class="fas fa-table me-1"></i>Data Tables
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    proceedBtn.onclick = () => {
+        // Set flag to indicate this is a new client
+        localStorage.setItem('newClientSetup', 'true');
+        window.location.href = 'login.html';
+    };
+
+    const modal = new bootstrap.Modal(document.getElementById('successModal'));
+    modal.show();
+
+    // Update the statistics
+    updateStats();
+    loadExistingConfigs();
+}
