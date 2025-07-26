@@ -908,8 +908,7 @@ function updateLayersList() {
                         </div>
                     </div>
                     <div class="layer-controls">
-                        <button class="btn-zoom" onclick```python
-="zoomToLayer('${layer.id}')" title="Zoom to Layer">
+                        <button class="btn-zoom" onclick="zoomToLayer('${layer.id}')" title="Zoom to Layer">
                             <i class="fas fa-search-plus"></i>
                         </button>
                         <button class="btn-table" onclick="showAttributeTable('${layer.id}')" title="Attribute Table">
@@ -2349,263 +2348,133 @@ function applyProperties() {
                     // Bind new popup with updated content
                     feature.bindPopup(newPopupContent);
 
-                    // Update click handler to use new configuration
-                    feature.off('click');
-                    feature.on('click', function(e) {
-                        window.currentPopupFeature = this;
-                        handleFeatureClick(this, index, mapLayers[layerIndex]);
-                    });
+                    // Apply updated styling if feature supports it
+                    if (feature.setStyle) {
+                        const symbology = mapLayers[layerIndex].properties.symbology;
+                        feature.setStyle({
+                            fillColor: symbology.fillColor,
+                            color: symbology.borderColor,
+                            weight: symbology.borderWidth,
+                            fillOpacity: symbology.fillOpacity
+                        });
+                    }
                 }
             });
 
-            console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
+            console.log(`✅ Updated ${mapLayers[layerIndex].features.length} feature popups with new configuration`);
         }
-    }
 
-    // Apply visual styling changes to map features
-    applyLayerStyling(layer);
+        // Apply label updates if needed
+        applyLabelsToLayer(mapLayers[layerIndex]);
 
-    // Apply labels if enabled
-    if (layer.properties.labels && layer.properties.labels.enabled) {
-        applyLabelsToLayer(layer);
-    } else {
-        // Remove labels if disabled
-        if (layer.labelGroup) {
-            map.removeLayer(layer.labelGroup);
-            layer.labelGroup = null;
-        }
-    }
+        // Update layer list display
+        updateLayersList();
 
-    // Update layers list to reflect changes
-    updateLayersList();
-
-    const fieldCount = selectedPopupFields.length;
-    const message = fieldCount === 0 ? 
-        'Layer properties applied! Popup will show no fields.' : 
-        `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
-
-    showSuccess(message);
-}
-
-function applyAndCloseProperties() {
-    applyProperties();
-    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
-    if (modal) {
-        modal.hide();
+        showSuccess(`Properties applied to layer "${layer.name}" successfully!`);
     }
 }
 
-function cancelProperties() {
-    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
-    if (modal) {
-        modal.hide();
-    }
-}
+function updateLayerPopupSettings(layer) {
+    // Basic settings
+    layer.properties.popup.enabled = document.getElementById('propEnablePopups').checked;
+    layer.properties.popup.template = document.getElementById('propPopupTemplate').value;
+    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth').value);
+    layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength').value);
+    layer.properties.popup.position = document.getElementById('propPopupPosition').value;
 
-function applyLayerStyling(layer) {
-    if (!layer.features || !layer.properties) return;
+    // Advanced settings
+    layer.properties.popup.showEmptyFields = document.getElementById('propShowEmptyFields').checked;
+    layer.properties.popup.showFieldIcons = document.getElementById('propShowFieldIcons').checked;
+    layer.properties.popup.highlightLinks = document.getElementById('propHighlightLinks').checked;
+    layer.properties.popup.showTooltips = document.getElementById('propShowTooltips').checked;
+    layer.properties.popup.enableSearch = document.getElementById('propEnableSearch').checked;
+    layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons').checked;
+    layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting').checked;
+    layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate').value;
 
-    const symbology = layer.properties.symbology;
-
-    layer.features.forEach(feature => {
-        if (feature.setStyle) {
-            feature.setStyle({
-                fillColor: symbology.fillColor || '#3498db',
-                color: symbology.borderColor || '#2c3e50',
-                weight: symbology.borderWidth || 2,
-                fillOpacity: symbology.fillOpacity || 0.7
-            });
-        }
-    });
-
-    // Apply labels if enabled
-    if (layer.properties.labels && layer.properties.labels.enabled) {
-        applyLabelsToLayer(layer);
-    }
+    // Control settings
+    if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
+    layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls').checked;
+    layer.properties.popup.controls.showCenterControl = document.getElementById('propShowCenterControl').checked;
+    layer.properties.popup.controls.showExportControl = document.getElementById('propShowExportControl').checked;
+    layer.properties.popup.controls.showEditControl = document.getElementById('propShowEditControl').checked;
 }
 
 function applyLabelsToLayer(layer) {
-    // Remove existing labels
+    // Remove existing labels if any
     if (layer.labelGroup) {
         map.removeLayer(layer.labelGroup);
         layer.labelGroup = null;
     }
 
-    const labels = layer.properties.labels;
-    if (!labels.enabled || !labels.field) return;
+    const labels = layer.properties?.labels;
+    if (!labels || !labels.enabled || !labels.field) {
+        return;
+    }
 
-    const labelMarkers = [];
+    // Create label group
+    const labelFeatures = [];
 
     layer.features.forEach((feature, index) => {
         const record = layer.records[index];
-        if (!record || !record.fields[labels.field]) return;
+        if (!record) return;
+
+        const labelText = record.fields[labels.field];
+        if (!labelText) return;
 
         let labelPosition;
         if (feature.getLatLng) {
+            // Point feature
             labelPosition = feature.getLatLng();
         } else if (feature.getBounds) {
+            // Polygon feature - use center
             labelPosition = feature.getBounds().getCenter();
         } else {
             return;
         }
 
-        const labelText = String(record.fields[labels.field]);
-        const fontSize = labels.fontSize || 12;
-        const color = labels.color || '#333333';
-        const background = labels.background !== false;
-
-        const labelMarker = L.marker(labelPosition, {
-            icon: L.divIcon({
-                className: 'feature-label',
-                html: `<div style="
-                    font-size: ${fontSize}px;
-                    color: ${color};
-                    font-weight: bold;
-                    text-align: center;
-                    white-space: nowrap;
-                    pointer-events: none;
-                    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-                    ${background ? `
-                        background: rgba(255,255,255,0.8);
-                        padding: 2px 6px;
-                        border-radius: 3px;
-                        border: 1px solid rgba(0,0,0,0.3);
-                    ` : ''}
-                ">${labelText}</div>`,
-                iconSize: [null, null],
-                iconAnchor: [0, 0]
-            }),
-            zIndexOffset: 1000
+        // Create label marker
+        const labelIcon = L.divIcon({
+            className: 'enhanced-feature-label',
+            html: String(labelText),
+            iconSize: [null, null],
+            iconAnchor: [null, null]
         });
 
-        labelMarkers.push(labelMarker);
+        const labelMarker = L.marker(labelPosition, { icon: labelIcon });
+        labelFeatures.push(labelMarker);
     });
 
-    if (labelMarkers.length > 0) {
-        layer.labelGroup = L.layerGroup(labelMarkers);
+    if (labelFeatures.length > 0) {
+        layer.labelGroup = L.layerGroup(labelFeatures);
         if (layer.visible) {
             layer.labelGroup.addTo(map);
         }
     }
 }
 
-// Additional iTool utility functions
-function filterPopupFields(searchTerm) {
-    const fields = document.querySelectorAll('.popup-field, tr[data-field], .card[data-field]');
-    fields.forEach(field => {
-        const fieldName = field.dataset.field || '';
-        const fieldContent = field.textContent.toLowerCase();
-        const isVisible = fieldName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         fieldContent.includes(searchTerm.toLowerCase());
-        field.style.display = isVisible ? '' : 'none';
-    });
+function applyAndCloseProperties() {
+    applyProperties();
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    modal.hide();
 }
 
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showSuccess('Copied to clipboard!');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showSuccess('Copied to clipboard!');
-    });
+function cancelProperties() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    modal.hide();
 }
 
-function previewPopup() {
-    if (!window.currentPropertiesLayer || !window.currentPropertiesLayer.records) {
-        showError('No layer selected or no data available for preview');
-        return;
-    }
-
-    const layer = window.currentPropertiesLayer;
-    const sampleRecord = layer.records[0];
-
-    if (!sampleRecord || !sampleRecord.fields) {
-        showError('No sample data available for preview');
-        return;
-    }
-
-    // Apply current settings to layer temporarily for preview
-    updateLayerPopupSettings(layer);
-
-    // Generate preview content
-    const previewContent = createFeaturePopup(sampleRecord.fields, layer);
-
-    // Display in preview area
-    document.getElementById('popupPreview').innerHTML = previewContent;
-}
-
-function updateLayerPopupSettings(layer) {
-    if (!layer.properties) layer.properties = {};
-    if (!layer.properties.popup) layer.properties.popup = {};
-
-    // Collect all settings from the form
-    layer.properties.popup.enabled = document.getElementById('propEnablePopups')?.checked !== false;
-    layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
-    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
-    layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
-    layer.properties.popup.position = document.getElementById('propPopupPosition')?.value || 'auto';
-    layer.properties.popup.showEmptyFields = document.getElementById('propShowEmptyFields')?.checked || false;
-    layer.properties.popup.showFieldIcons = document.getElementById('propShowFieldIcons')?.checked !== false;
-    layer.properties.popup.highlightLinks = document.getElementById('propHighlightLinks')?.checked !== false;
-    layer.properties.popup.showTooltips = document.getElementById('propShowTooltips')?.checked || false;
-    layer.properties.popup.enableSearch = document.getElementById('propEnableSearch')?.checked || false;
-    layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
-    layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
-    layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
-
-    // Controls
-    if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
-    layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
-    layer.properties.popup.controls.showCenterControl = document.getElementById('propShowCenterControl')?.checked !== false;
-    layer.properties.popup.controls.showExportControl = document.getElementById('propShowExportControl')?.checked || false;
-    layer.properties.popup.controls.showEditControl = document.getElementById('propShowEditControl')?.checked || false;
-}
-
-function exportCurrentFeature() {
-    if (!window.currentPopupFeature || !window.currentPopupFeature.recordData) {
-        showError('No feature data available for export');
-        return;
-    }
-
-    const data = window.currentPopupFeature.recordData;
-    const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'feature_data.csv';
-    link.click();
-    URL.revokeObjectURL(url);
-
-    showSuccess('Feature data exported successfully!');
-}
-
-function editCurrentFeature() {
-    showInfo('Feature editing functionality would be implemented here based on permissions');
-}
-
-// Template change handler
 function handleTemplateChange() {
-    const template = document.getElementById('propPopupTemplate')?.value;
+    const template = document.getElementById('propPopupTemplate').value;
     const customSection = document.getElementById('customTemplateSection');
 
-    if (template === 'custom' && customSection) {
-        customSection.style.display = 'block';
-    } else if (customSection) {
-        customSection.style.display = 'none';
+    if (customSection) {
+        customSection.style.display = template === 'custom' ? 'block' : 'none';
     }
 }
 
-// Popup enable/disable handler
 function handlePopupToggle() {
-    const enabled = document.getElementById('propEnablePopups')?.checked;
+    const enabled = document.getElementById('propEnablePopups').checked;
     const configSection = document.getElementById('popupConfigSection');
 
     if (configSection) {
@@ -2613,856 +2482,307 @@ function handlePopupToggle() {
     }
 }
 
-// Make functions globally available
-window.toggleSection = toggleSection;
-window.showAddLayerModal = showAddLayerModal;
-window.addNewLayer = addNewLayer;
-window.loadTableFields = loadTableFields;
-window.toggleLayerVisibility = toggleLayerVisibility;
-window.zoomToLayer = zoomToLayer;
-window.showAttributeTable = showAttributeTable;
-window.showLayerProperties = showLayerProperties;
-window.removeLayer = removeLayer;
-window.changeBasemap = changeBasemap;
-window.toggleDockedTableSize = toggleDockedTableSize;
-window.closeDockedTable = closeDockedTable;
-window.startMeasurement = startMeasurement;
-window.clearMeasurements = clearMeasurements;
-window.loadFilterFields = loadFilterFields;
-window.loadFilterValues = loadFilterValues;
-window.addFilterRule = addFilterRule;
-window.removeFilterRule = removeFilterRule;
-window.applyFilters = applyFilters;
-window.clearAllFilters = clearAllFilters;
-window.exportMap = exportMap;
-window.fullscreenMap = fullscreenMap;
-window.switchPropertiesTab = switchPropertiesTab;
-window.updateSymbologyType = updateSymbologyType;
-window.applyProperties = applyProperties;
-window.applyAndCloseProperties = applyAndCloseProperties;
-window.cancelProperties = cancelProperties;
-window.selectAllRows = selectAllRows;
-window.toggleRowSelection = toggleRowSelection;
-window.zoomToSelection = zoomToSelection;
-window.generateGraduatedSymbology = generateGraduatedSymbology;
-window.generateCategorizedSymbology = generateCategorizedSymbology;
-window.selectAllPopupFields = selectAllPopupFields;
-window.deselectAllPopupFields = deselectAllPopupFields;
-window.zoomToFeature = zoomToFeature;
-window.showFeatureInfo = showFeatureInfo;
-window.exportTableData = exportTableData;
-window.clearSelection = clearSelection;
-window.toggleAllRows = toggleAllRows;
-window.updatePopupFieldSelection = updatePopupFieldSelection;
-window.filterPopupFields = filterPopupFields;
-window.copyToClipboard = copyToClipboard;
-window.previewPopup = previewPopup;
-window.exportCurrentFeature = exportCurrentFeature;
-window.editCurrentFeature = editCurrentFeature;
-window.handleTemplateChange = handleTemplateChange;
-window.handlePopupToggle = handlePopupToggle;
-
-// Docked table utility functions
-function toggleDockedTableSize() {
-    const dockedTable =document.getElementById('dockedAttributeTable');
-    const toggleIcon = document.getElementById('tableToggleIcon');
-
-    if (!dockedTable) return;
-
-    if (dockedTable.classList.contains('expanded')) {
-        dockedTable.classList.remove('expanded');
-        toggleIcon.className = 'fas fa-expand-alt';
-    } else {
-        dockedTable.classList.add('expanded');
-        toggleIcon.className = 'fas fa-compress-alt';
+// Event listener for popup enable toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const propEnablePopups = document.getElementById('propEnablePopups');
+    if (propEnablePopups) {
+        propEnablePopups.addEventListener('change', handlePopupToggle);
     }
 
-    adjustMapForDockedTable();
-}
-
-function closeDockedTable() {
-    const dockedTable = document.getElementById('dockedAttributeTable');
-    if (dockedTable) {
-        dockedTable.remove();
-        adjustMapForDockedTable();
-    }
-}
-
-function adjustMapForDockedTable() {
-    const mapElement = document.getElementById('map');
-    const dockedTable = document.getElementById('dockedAttributeTable');
-
-    if (!mapElement) return;
-
-    if (dockedTable) {
-        const isExpanded = dockedTable.classList.contains('expanded');
-        const tableHeight = isExpanded ? '60%' : '30%';
-        const mapHeight = isExpanded ? '40%' : '70%';
-
-        mapElement.style.height = mapHeight;
-        dockedTable.style.height = tableHeight;
-    } else {
-        mapElement.style.height = '100%';
+    const propPopupTemplate = document.getElementById('propPopupTemplate');
+    if (propPopupTemplate) {
+        propPopupTemplate.addEventListener('change', handleTemplateChange);
     }
 
-    // Invalidate map size to ensure proper rendering
-    setTimeout(() => {
-        if (map) {
-            map.invalidateSize();
-        }
-    }, 100);
-}
-
-// Global functions for popup zoom controls
-window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
-    if (!window.currentPopupFeature) return;
-
-    const options = {
-        close: { padding: 0.8, maxZoom: 20, minZoom: 16 },
-        medium: { padding: 0.4, maxZoom: 16, minZoom: 12 },
-        far: { padding: 0.2, maxZoom: 12, minZoom: 8 }
-    };
-
-    zoomToFeature(window.currentPopupFeature, options[zoomType] || options.close);
-};
-
-window.centerCurrentPopupFeature = function() {
-    if (!window.currentPopupFeature) return;
-
-    let center;
-    if (window.currentPopupFeature.getLatLng) {
-        center = window.currentPopupFeature.getLatLng();
-    } else if (window.currentPopupFeature.getBounds) {
-        center = window.currentPopupFeature.getBounds().getCenter();
-    }
-
-    if (center) {
-        map.panTo(center, { animate: true, duration: 0.5 });
-    }
-};
-
-// Additional zoom control functions
-window.resetMapView = function() {
-    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
-    showInfo('Map view reset to default');
-};
-
-window.zoomToAllLayers = function() {
-    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
-
-    if (visibleLayers.length === 0) {
-        showWarning('No visible layers to zoom to');
-        return;
-    }
-
-    // Collect all features from visible layers
-    const allFeatures = [];
-    visibleLayers.forEach(layer => {
-        layer.features.forEach(feature => {
-            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
-                allFeatures.push(feature);
+    const propEnableLabels = document.getElementById('propEnableLabels');
+    if (propEnableLabels) {
+        propEnableLabels.addEventListener('change', function() {
+            const labelControls = document.getElementById('propLabelControls');
+            if (labelControls) {
+                labelControls.style.display = this.checked ? 'block' : 'none';
             }
         });
-    });
-
-    if (allFeatures.length === 0) {
-        showWarning('No valid features found to zoom to');
-        return;
     }
 
-    // Create feature group and fit bounds
-    const group = new L.featureGroup(allFeatures);
-    const bounds = group.getBounds();
-
-    // Calculate adaptive padding
-    const latSpan = bounds.getNorth() - bounds.getSouth();
-    const lngSpan = bounds.getEast() - bounds.getWest();
-    const maxSpan = Math.max(latSpan, lngSpan);
-
-    let padding = maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
-
-    map.fitBounds(bounds.pad(padding), { animate: true, duration: 1 });
-
-    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features`);
-};
-
-// Event listeners for property controls
-document.addEventListener('DOMContentLoaded', function() {
-    // Opacity slider
-    const opacitySlider = document.getElementById('propFillOpacity');
-    if (opacitySlider) {
-        opacitySlider.addEventListener('input', function() {
+    // Add event listeners for opacity and border width sliders
+    const propFillOpacity = document.getElementById('propFillOpacity');
+    if (propFillOpacity) {
+        propFillOpacity.addEventListener('input', function() {
             const fillOpacityValue = document.getElementById('fillOpacityValue');
             if (fillOpacityValue) {
-                fillOpacityValue.textContent = Math.round(this.value * 100) + '%';
+                fillOpacityValue.textContent = Math.round(parseFloat(this.value) * 100) + '%';
             }
         });
     }
 
-    // Border width slider
-    const borderSlider = document.getElementById('propBorderWidth');
-    if (borderSlider) {
-        borderSlider.addEventListener('input', function() {
+    const propBorderWidth = document.getElementById('propBorderWidth');
+    if (propBorderWidth) {
+        propBorderWidth.addEventListener('input', function() {
             const borderWidthValue = document.getElementById('borderWidthValue');
             if (borderWidthValue) {
                 borderWidthValue.textContent = this.value + 'px';
             }
         });
     }
-
-    // Labels checkbox
-    const labelsCheckbox = document.getElementById('propEnableLabels');
-    if (labelsCheckbox) {
-        labelsCheckbox.addEventListener('change', function() {
-            const propLabelControls = document.getElementById('propLabelControls');
-            if (propLabelControls) {
-                propLabelControls.style.display = this.checked ? 'block' : 'none';
-            }
-        });
-    }
-
-    // iTool event listeners
-    const popupEnableCheckbox = document.getElementById('propEnablePopups');
-    if (popupEnableCheckbox) {
-        popupEnableCheckbox.addEventListener('change', handlePopupToggle);
-    }
-
-    const popupTemplateSelect = document.getElementById('propPopupTemplate');
-    if (popupTemplateSelect) {
-        popupTemplateSelect.addEventListener('change', handleTemplateChange);
-    }
-
-     // Tab switching for layer source
-    const tabButtons = document.querySelectorAll('#layerSourceTabs .nav-link');
-    tabButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const targetTab = this.getAttribute('data-bs-target');
-
-            // Update button visibility based on active tab
-            const addLayerBtn = document.getElementById('addLayerBtn');
-            const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-
-            if (targetTab === '#geojson-pane') {
-                if (addLayerBtn) addLayerBtn.style.display = 'none';
-                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'inline-block';
-            } else {
-                if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
-                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
-            }
-        });
-    });
 });
 
-// Measurement tools
-function startMeasurement(type) {
-    clearMeasurements();
-    currentMeasurement = type;
-    measurementPoints = [];
+// Missing function implementations
+function updateMapStatistics() {
+    // Implementation for updating map statistics
+    console.log('Map statistics updated');
+}
 
-    if (type === 'distance') {
-        map.on('click', onDistanceMeasureClick);
-        map.getContainer().style.cursor = 'crosshair';
-        showInfo('Click on the map to start measuring distance');
-    } else if (type === 'area') {
-        map.on('click', onAreaMeasureClick);
-        map.getContainer().style.cursor = 'crosshair';
-        showInfo('Click on the map to start measuring area');
+function adjustMapForDockedTable() {
+    // Adjust map height when docked table is shown
+    const mapElement = document.getElementById('map');
+    if (mapElement) {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 300);
     }
 }
 
-function onDistanceMeasureClick(e) {
-    measurementPoints.push(e.latlng);
+function toggleDockedTableSize() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
 
-    // Add marker
-    const marker = L.circleMarker(e.latlng, {
-        radius: 4,
-        fillColor: '#e74c3c',
-        color: '#c0392b',
-        weight: 2,
-        fillOpacity: 1
-    }).addTo(measurementGroup);
+    if (dockedTable && toggleIcon) {
+        dockedTable.classList.toggle('expanded');
 
-    if (measurementPoints.length > 1) {
-        // Draw line
-        const line = L.polyline(measurementPoints, {
-            color: '#e74c3c',
-            weight: 3
-        }).addTo(measurementGroup);
+        if (dockedTable.classList.contains('expanded')) {
+            toggleIcon.classList.remove('fa-expand-alt');
+            toggleIcon.classList.add('fa-compress-alt');
+        } else {
+            toggleIcon.classList.remove('fa-compress-alt');
+            toggleIcon.classList.add('fa-expand-alt');
+        }
 
-        // Calculate distance
-        const distance = calculateDistance(measurementPoints);
-
-        // Add distance label
-        const midpoint = L.latLng(
-            (measurementPoints[measurementPoints.length - 2].lat + e.latlng.lat) / 2,
-            (measurementPoints[measurementPoints.length - 2].lng + e.latlng.lng) / 2
-        );
-
-        L.marker(midpoint, {
-            icon: L.divIcon({
-                className: 'distance-label',
-                html: `<div class="measurement-result">${distance}</div>`,
-                iconSize: [60, 20],
-                iconAnchor: [30, 10]
-            })
-        }).addTo(measurementGroup);
+        // Invalidate map size after transition
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 350);
     }
 }
 
-function onAreaMeasureClick(e) {
-    measurementPoints.push(e.latlng);
-
-    // Add marker
-    L.circleMarker(e.latlng, {
-        radius: 4,
-        fillColor: '#27ae60',
-        color: '#229954',
-        weight: 2,
-        fillOpacity: 1
-    }).addTo(measurementGroup);
-
-    if (measurementPoints.length > 2) {
-        // Draw polygon
-        const polygon = L.polygon(measurementPoints, {
-            color: '#27ae60',
-            weight: 3,
-            fillOpacity: 0.2
-        }).addTo(measurementGroup);
-
-        // Calculate area
-        const area = calculateArea(measurementPoints);
-
-        // Add area label at centroid
-        const centroid = polygon.getBounds().getCenter();
-        L.marker(centroid, {
-            icon: L.divIcon({
-                className: 'area-label',
-                html: `<div class="measurement-result">${area}</div>`,
-                iconSize: [80, 20],
-                iconAnchor: [40, 10]
-            })
-        }).addTo(measurementGroup);
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        // Invalidate map size to reclaim space
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
     }
 }
 
-function calculateDistance(points) {
-    let totalDistance = 0;
-    for (let i = 1; i < points.length; i++) {
-        totalDistance += points[i - 1].distanceTo(points[i]);
-    }
-
-    if (totalDistance < 1000) {
-        return Math.round(totalDistance) + ' m';
-    } else {
-        return (totalDistance / 1000).toFixed(2) + ' km';
-    }
+function handleFeatureClick(feature, index, layerConfig) {
+    // Implementation for handling feature clicks
+    console.log('Feature clicked:', feature, index, layerConfig);
 }
 
-function calculateArea(points) {
-    if (points.length < 3) return '0 m²';
+// Global functions for popup controls
+window.zoomToCurrentPopupFeature = function(level) {
+    if (!window.currentPopupFeature) return;
 
-    // Simple area calculation using shoelace formula
-    let area = 0;
-    for (let i = 0; i < points.length; i++) {
-        const j = (i + 1) % points.length;
-        area += points[i].lat * points[j].lng;
-        area -= points[j].lat * points[i].lng;
+    const options = {};
+    if (level === 'close') {
+        options.padding = 0.1;
+        options.maxZoom = 18;
+    } else if (level === 'medium') {
+        options.padding = 0.3;
+        options.maxZoom = 15;
     }
-    area = Math.abs(area) / 2;
 
-    // Convert to approximate square meters (rough calculation)
-    area = area * 111320 * 111320 * Math.cos(points[0].lat * Math.PI / 180);
-
-    if (area < 10000) {
-        return Math.round(area) + ' m²';
-    } else {
-        return (area / 10000).toFixed(2) + ' ha';
-    }
-}
-
-function clearMeasurements() {
-    measurementGroup.clearLayers();
-    measurementPoints = [];
-    currentMeasurement = null;
-
-    // Reset cursor
-    map.getContainer().style.cursor = '';
-
-    // Remove event listeners
-    map.off('click', onDistanceMeasureClick);
-    map.off('click', onAreaMeasureClick);
-}
-
-// Filter functionality
-function loadFilterFields() {
-    const layerId = document.getElementById('filterLayer').value;
-    const fieldSelect = document.getElementById('filterField');
-
-    if (fieldSelect) {
-        fieldSelect.innerHTML = '<option value="">Select field...</option>';
-
-        if (!layerId) return;
-
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer || !layer.records || layer.records.length === 0) return;
-
-        const fields = Object.keys(layer.records[0].fields || {});
-        fields.forEach(field => {
-            if (field !== layer.geometryField) {
-                const option = document.createElement('option');
-                option.value = field;
-                option.textContent = field;
-                fieldSelect.appendChild(option);
-            }
+    if (window.currentPopupFeature.getBounds) {
+        const bounds = window.currentPopupFeature.getBounds();
+        map.fitBounds(bounds.pad(options.padding || 0.2), {
+            maxZoom: options.maxZoom || 16
         });
+    } else if (window.currentPopupFeature.getLatLng) {
+        const latlng = window.currentPopupFeature.getLatLng();
+        map.setView(latlng, options.maxZoom || 16);
     }
-}
+};
 
-function loadFilterValues() {
-    const layerId = document.getElementById('filterLayer').value;
-    const fieldName = document.getElementById('filterField').value;
-    const valueSelect = document.getElementById('filterValue');
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
 
-    if (valueSelect) {
-        valueSelect.innerHTML = '<option value="">Select value...</option>';
-
-        if (!layerId || !fieldName) return;
-
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer || !layer.records) return;
-
-        // Get unique values for the field
-        const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
-        uniqueValues.forEach(value => {
-            if (value !== null && value !== undefined) {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = value;
-                valueSelect.appendChild(option);
-            }
-        });
+    if (window.currentPopupFeature.getBounds) {
+        const center = window.currentPopupFeature.getBounds().getCenter();
+        map.setView(center);
+    } else if (window.currentPopupFeature.getLatLng) {
+        const latlng = window.currentPopupFeature.getLatLng();
+        map.setView(latlng);
     }
-}
+};
 
-function addFilterRule() {
-    const layerId = document.getElementById('filterLayer').value;
-    const field = document.getElementById('filterField').value;
-    const operator = document.getElementById('filterOperator').value;
-    const value = document.getElementById('filterValue').value;
+function exportCurrentFeature() {
+    if (!window.currentPopupFeature) return;
 
-    if (!layerId || !field || !operator || !value) {
-        showWarning('Please fill in all filter fields');
-        return;
-    }
-
-    const filter = {
-        id: Date.now().toString(),
-        layerId: layerId,
-        field: field,
-        operator: operator,
-        value: value
+    const data = {
+        recordId: window.currentPopupFeature.recordId,
+        recordData: window.currentPopupFeature.recordData,
+        layerId: window.currentPopupFeature.layerId,
+        featureIndex: window.currentPopupFeature.featureIndex
     };
 
-    currentFilters.push(filter);
-    updateFilterRulesDisplay();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `feature_${data.recordId || 'unknown'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-    // Clear form
-    const filterLayer = document.getElementById('filterLayer');
-    const filterField = document.getElementById('filterField');
-    const filterValue = document.getElementById('filterValue');
-
-    if (filterLayer) filterLayer.value = '';
-    if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
-    if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
+    showSuccess('Feature exported successfully');
 }
 
-function updateFilterRulesDisplay() {
-    const container = document.getElementById('filterRules');
+function editCurrentFeature() {
+    if (!window.currentPopupFeature) return;
 
-    if (!container) return;
-
-    if (currentFilters.length === 0) {
-        container.innerHTML = '<p class="text-muted">No filters applied</p>';
-        return;
-    }
-
-    let html = '';
-    currentFilters.forEach(filter => {
-        const layer = mapLayers.find(l => l.id === filter.layerId);
-        const layerName = layer ? layer.name : 'Unknown Layer';
-
-        html += `
-            <div class="filter-rule">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${layerName}</strong> → ${filter.field} ${filter.operator} "${filter.value}"
-                    </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="removeFilterRule('${filter.id}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
+    showInfo('Feature editing functionality will be implemented in a future version');
 }
 
-function removeFilterRule(filterId) {
-    const index = currentFilters.findIndex(f => f.id === filterId);
-    if (index !== -1) {
-        currentFilters.splice(index, 1);
-        updateFilterRulesDisplay();
-        applyFilters(); // Re-apply remaining filters
-    }
-}
-
-function applyFilters() {
-    if (currentFilters.length === 0) {
-        // Show all features
-        mapLayers.forEach(layer => {
-            if (layer.visible && layer.leafletLayer) {
-                layer.features.forEach(feature => {
-                    if (!layer.leafletLayer.hasLayer(feature)) {
-                        layer.leafletLayer.addLayer(feature);
-                    }
-                });
-            }
+function copyToClipboard(text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+            showSuccess('Copied to clipboard');
+        }).catch(() => {
+            showError('Failed to copy to clipboard');
         });
-        showSuccess('All filters cleared - showing all features');
-        return;
-    }
-
-    let filteredCount = 0;
-    let totalCount = 0;
-
-    mapLayers.forEach(layer => {
-        if (!layer.visible) return;
-
-        const layerFilters = currentFilters.filter(f => f.layerId === layer.id);
-
-        layer.features.forEach(feature => {
-            totalCount++;
-            let showFeature = true;
-
-            // Apply all filters for this layer
-            layerFilters.forEach(filter => {
-                const fieldValue = feature.recordData[filter.field];
-
-                switch (filter.operator) {
-                    case 'equals':
-                        if (String(fieldValue) !== String(filter.value)) showFeature = false;
-                        break;
-                    case 'contains':
-                        if (!String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase())) showFeature = false;
-                        break;
-                    case 'starts_with':
-                        if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
-                        break;
-                }
-            });
-
-            // Show/hide feature based on filter result
-            if (showFeature) {
-                if (!layer.leafletLayer.hasLayer(feature)) {
-                    layer.leafletLayer.addLayer(feature);
-                }
-                filteredCount++;
-            } else {
-                if (layer.leafletLayer.hasLayer(feature)) {
-                    layer.leafletLayer.removeLayer(feature);
-                }
-            }
-        });
-    });
-
-    showSuccess(`Filters applied: showing ${filteredCount} of ${totalCount} features`);
-}
-
-function clearAllFilters() {
-    currentFilters = [];
-    updateFilterRulesDisplay();
-    applyFilters(); // This will show all features
-}
-
-// Populate layer selector in filters
-function updateLayerSelectors() {
-    const filterLayerSelect = document.getElementById('filterLayer');
-
-    if (filterLayerSelect) {
-        filterLayerSelect.innerHTML = '<option value="">Select layer...</option>';
-        mapLayers.forEach(layer => {
-            const option = document.createElement('option');
-            option.value = layer.id;
-            option.textContent = layer.name;
-            filterLayerSelect.appendChild(option);
-        });
-    }
-}
-
-function updateMapStatistics() {
-    const totalLayers = mapLayers.length;
-    const visibleLayers = mapLayers.filter(l => l.visible).length;
-    const totalFeatures = mapLayers.reduce((sum, layer) => sum + layer.featureCount, 0);
-    const visibleFeatures = mapLayers.filter(l => l.visible).reduce((sum, layer) => {
-        if (layer.leafletLayer) {
-            return sum + layer.leafletLayer.getLayers().length;
+    } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showSuccess('Copied to clipboard');
+        } catch (err) {
+            showError('Failed to copy to clipboard');
         }
-        return sum;
-    }, 0);
-
-    const totalLayersElement = document.getElementById('totalLayers');
-    const totalFeaturesElement = document.getElementById('totalFeatures');
-    const visibleFeaturesElement = document.getElementById('visibleFeatures');
-    const filteredFeaturesElement = document.getElementById('filteredFeatures');
-
-    if (totalLayersElement) totalLayersElement.textContent = totalLayers;
-    if (totalFeaturesElement) totalFeaturesElement.textContent = totalFeatures;
-    if (visibleFeaturesElement) visibleFeaturesElement.textContent = visibleFeatures;
-    if (filteredFeaturesElement) filteredFeaturesElement.textContent = totalFeatures - visibleFeatures;
-
-    // Update layer selectors
-    updateLayerSelectors();
+        document.body.removeChild(textArea);
+    }
 }
 
-// Export functionality
+function previewPopup() {
+    if (!window.currentPropertiesLayer) {
+        showError('No layer selected for preview');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+    if (!layer.records || layer.records.length === 0) {
+        showError('No data available for preview');
+        return;
+    }
+
+    // Use first record for preview
+    const sampleRecord = layer.records[0];
+    const previewContent = createFeaturePopup(sampleRecord.fields, layer);
+
+    const previewContainer = document.getElementById('popupPreview');
+    if (previewContainer) {
+        previewContainer.innerHTML = previewContent;
+    }
+}
+
+function filterPopupFields(searchTerm) {
+    const fields = document.querySelectorAll('.popup-field');
+    fields.forEach(field => {
+        const fieldName = field.dataset.field;
+        const fieldValue = field.textContent;
+
+        if (fieldName.toLowerCase().includes(searchTerm.toLowerCase()) ||            fieldValue.toLowerCase().includes(searchTerm.toLowerCase())) {
+            field.style.display = '';
+        } else {
+            field.style.display = 'none';
+        }
+    });
+}
+
+// Export/fullscreen functionality
 function exportMap() {
-    showInfo('Map export functionality would be implemented here');
+    showInfo('Map export functionality will be implemented in a future version');
 }
 
 function fullscreenMap() {
-    const mapContainer = document.getElementById('map');
+    const mapContainer = document.querySelector('.app-container');
 
-    if (!mapContainer) {
-        showError('Map container not found');
-        return;
-    }
-
-    try {
-        if (!document.fullscreenElement) {
-            // Enter fullscreen
-            if (mapContainer.requestFullscreen) {
-                mapContainer.requestFullscreen();
-            } else if (mapContainer.webkitRequestFullscreen) {
-                mapContainer.webkitRequestFullscreen();
-            } else if (mapContainer.msRequestFullscreen) {
-                mapContainer.msRequestFullscreen();
-            } else if (mapContainer.mozRequestFullScreen) {
-                mapContainer.mozRequestFullScreen();
-            } else {
-                showError('Fullscreen not supported by this browser');
-                return;
-            }
-
-            // Add fullscreen class for styling
-            mapContainer.classList.add('fullscreen-map');
-
-            // Show success message
-            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
-
-        } else {
-            // Exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            }
-        }
-
-        // Listen for fullscreen changes to update map size and remove class
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('msfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-
-    } catch (error) {
-        console.error('Fullscreen error:', error);
-        showError('Failed to toggle fullscreen: ' + error.message);
+    if (!document.fullscreenElement) {
+        mapContainer.requestFullscreen().then(() => {
+            // Invalidate map size after entering fullscreen
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+            showSuccess('Entered fullscreen mode');
+        }).catch(err => {
+            console.error('Error entering fullscreen:', err);
+            showError('Failed to enter fullscreen mode');
+        });
+    } else {
+        document.exitFullscreen().then(() => {
+            // Invalidate map size after exiting fullscreen
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+            showSuccess('Exited fullscreen mode');
+        }).catch(err => {
+            console.error('Error exiting fullscreen:', err);
+            showError('Failed to exit fullscreen mode');
+        });
     }
 }
 
-function handleFullscreenChange() {
-    const mapContainer = document.getElementById('map');
-
-    if (!document.fullscreenElement && 
-        !document.webkitFullscreenElement && 
-        !document.msFullscreenElement && 
-        !document.mozFullScreenElement) {
-
-        // Exited fullscreen
-        if (mapContainer) {
-            mapContainer.classList.remove('fullscreen-map');
-        }
-
-        showInfo('Exited fullscreen mode');
-    }
-
-    // Invalidate map size to ensure proper rendering
+// Listen for fullscreen changes
+document.addEventListener('fullscreenchange', function() {
+    // Invalidate map size when fullscreen state changes
     setTimeout(() => {
         if (map) {
             map.invalidateSize();
         }
     }, 100);
+});
+
+// Additional utility functions that might be missing
+function resetMapView() {
+    map.setView([20.5937, 78.9629], 5);
+    showSuccess('Map view reset to default');
 }
 
-function handleFeatureClick(feature, featureIndex, layerConfig) {
-    // Check if the feature is already selected
-    const isSelected = selectedFeatures.includes(feature);
+function zoomToAllLayers() {
+    if (mapLayers.length === 0) {
+        showWarning('No layers available to zoom to');
+        return;
+    }
 
-    // Toggle selection state
-    toggleRowSelection(layerConfig.id, featureIndex, !isSelected);
-
-    // Highlight if selected, reset style if deselected
-    if (!isSelected) {
-        // Highlight in yellow
-        if (feature.setStyle) {
-            feature.setStyle({
-                fillColor: '#ffff00',   // Yellow highlight color
-                color: '#000000',       // Black border
-                weight: 3,              // Thicker border
-                fillOpacity: 0.8        // More opaque when selected
-            });
-        }
-
-        // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
-        const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
-
-        // Ensure we have the record data for this feature
-        let recordData = feature.recordData;
-        if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
-            recordData = currentLayer.records[featureIndex].fields;
-            feature.recordData = recordData; // Cache for future use
-        }
-
-        if (recordData) {
-            // Create popup content using the current layer configuration (which includes updated popup fields)
-            const popupContent = createFeaturePopup(recordData, currentLayer);
-
-            // Update the popup with the new content that respects field selection
-            if (feature.getPopup()) {
-                feature.getPopup().setContent(popupContent);
-                feature.openPopup();
+    let bounds = null;
+    mapLayers.forEach(layer => {
+        if (layer.visible && layer.bounds) {
+            if (!bounds) {
+                bounds = layer.bounds;
             } else {
-                feature.bindPopup(popupContent).openPopup();
+                bounds.extend(layer.bounds);
             }
-
-            console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
         }
+    });
+
+    if (bounds) {
+        map.fitBounds(bounds.pad(0.1));
+        showSuccess('Zoomed to all visible layers');
     } else {
-        // Reset to original style
-        if (feature.setStyle) {
-            const originalStyle = layerConfig.properties?.symbology || {};
-            feature.setStyle({
-                fillColor: originalStyle.fillColor || '#3498db',
-                color: originalStyle.borderColor || '#2c3e50',
-                weight: originalStyle.borderWidth || 2,
-                fillOpacity: originalStyle.fillOpacity || 0.7
-            });
-        }
+        showWarning('No visible layers with valid bounds found');
     }
 }
 
-// Field Permissions Check
-function hasFieldPermission(fieldName, permissionType) {
-    // Mock permission check - replace with actual logic using currentUser and field_permissions
-    // This function should query or reference the field_permissions table to determine
-    // if the current user has the specified permission for the given field.
-
-    // For demonstration purposes, let's assume all fields are viewable for now
-    return true;
-}
-
-async function loadFieldsForStyling(selectId) {
-    const layerId = document.getElementById('styleLayerSelector').value;
-    const fieldSelect = document.getElementById(selectId);
-
-    if (!layerId || !fieldSelect) return;
-
-    try {
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer) return;
-
-        // Get table fields
-        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1 });
-        if (!recordsData.records || recordsData.records.length === 0) return;
-
-        const allFieldNames = Object.keys(recordsData.records[0].fields || {});
-        // Filter fields by user permissions - only show viewable fields for styling
-        const fieldNames = allFieldNames.filter(fieldName => 
-            fieldName !== layer.geometryField && hasFieldPermission(fieldName, 'view')
-        );
-
-        fieldSelect.innerHTML = '<option value="">Select field...</option>';
-
-        if (fieldNames.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No fields available with current permissions';
-            option.disabled = true;
-            fieldSelect.appendChild(option);
-            return;
-        }
-
-        fieldNames.forEach(fieldName => {
-            const option = document.createElement('option');
-            option.value = fieldName;
-            option.textContent = fieldName;
-            fieldSelect.appendChild(option);
-        });
-
-    } catch (error) {
-        console.error('Error loading fields for styling:', error);
-    }
-}
-
-async function loadFieldsForLabelling() {
-    const layerId = document.getElementById('labelLayerSelector').value;
-    const fieldSelect = document.getElementById('labelField');
-
-    if (!layerId || !fieldSelect) return;
-
-    try {
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer) return;
-
-        // Get table fields
-        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1 });
-        if (!recordsData.records || recordsData.records.length === 0) return;
-
-        const allFieldNames = Object.keys(recordsData.records[0].fields || {});
-        // Filter fields by user permissions - only show viewable fields for labelling
-        const fieldNames = allFieldNames.filter(fieldName => 
-            fieldName !== layer.geometryField && hasFieldPermission(fieldName, 'view')
-        );
-
-        fieldSelect.innerHTML = '<option value="">Select field for labels...</option>';
-
-        if (fieldNames.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No fields available with current permissions';
-            option.disabled = true;
-            fieldSelect.appendChild(option);
-            return;
-        }
-
-        fieldNames.forEach(fieldName => {
-            const option = document.createElement('option');
-            option.value = fieldName;
-            option.textContent = fieldName;
-            fieldSelect.appendChild(option);
-        });
-
-        // Restore previous selection if user still has permission to view it
-        if (layer.properties?.labels?.field && fieldNames.includes(layer.properties.labels.field)) {
-            fieldSelect.value = layer.properties.labels.field;
-        }
-
-    } catch (error) {
-        console.error('Error loading fields for labelling:', error);
+// Logout function
+function logout() {
+    if (window.teableAuth && window.teableAuth.logout) {
+        window.teableAuth.logout();
+    } else {
+        window.location.href = 'login.html';
     }
 }
