@@ -51,8 +51,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Additional check for client configuration
     const clientConfig = window.teableAuth.clientConfig;
     if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken) {
-        console.error('❌ No client configuration found. Please set up your Teable connection.');
-        showError('No client configuration found. Please set up your Teable connection first by going to Configuration page.');
+        console.warn('⚠️ No client configuration found. Initializing basic map...');
+        initializeBasicMap();
         return;
     }
 
@@ -124,16 +124,20 @@ async function initializeMap() {
         });
 
         // Initialize API with client config - do this for all users
-        if (window.teableAPI && clientConfig) {
+        if (window.teableAPI && clientConfig && typeof window.teableAPI.init === 'function') {
             try {
                 window.teableAPI.init(clientConfig);
                 console.log('✅ Teable API initialized');
             } catch (initError) {
                 console.error('Failed to initialize Teable API:', initError);
-                throw new Error('Failed to initialize Teable API: ' + initError.message);
+                console.warn('Falling back to basic map mode...');
+                initializeBasicMap();
+                return;
             }
         } else {
-            throw new Error('Teable API not available or client configuration missing');
+            console.warn('Teable API not available or client configuration missing - initializing basic map');
+            initializeBasicMap();
+            return;
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
