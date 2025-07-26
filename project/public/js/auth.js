@@ -1,85 +1,79 @@
 /**
- * Teable Authentication Module
- * Handles authentication with Teable.io and local user management
+ * Mixed Authentication System for Teable GIS
+ * Supports both Space Owner and App User authentication
  */
 
 class TeableAuth {
     constructor() {
         this.currentSession = null;
         this.clientConfig = null;
-        this.initializeAuth();
     }
 
-    initializeAuth() {
-        // Check for existing session
-        const savedSession = localStorage.getItem('teableAuthSession');
-        if (savedSession) {
-            try {
-                this.currentSession = JSON.parse(savedSession);
-                console.log('Loaded existing session:', this.currentSession);
-            } catch (error) {
-                console.error('Error loading saved session:', error);
-                localStorage.removeItem('teableAuthSession');
-            }
-        }
-
-        // Load client config if available
+    /**
+     * Initialize authentication system
+     */
+    init() {
+        this.loadSession();
         this.loadClientConfig();
     }
 
-    loadClientConfig() {
-        const configId = localStorage.getItem('selectedClientConfig');
-        if (configId) {
-            const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
-            this.clientConfig = configs.find(config => config.id === configId);
-            console.log('Loaded client config:', this.clientConfig);
-        }
-    }
-
-    async login(credentials) {
+    /**
+     * Authenticate user (auto-detect type)
+     */
+    async login(email, password, userType = 'auto') {
         try {
-            // Validate input
-            if (!credentials.email || !credentials.password) {
-                throw new Error('Email and password are required');
-            }
-
-            // Get client config
             if (!this.clientConfig) {
-                throw new Error('No client configuration found. Please contact your administrator.');
+                throw new Error('Client configuration not found. Please configure the system first.');
             }
 
-            console.log('Attempting login with config:', this.clientConfig.clientName);
-
-            // Initialize API with client config
-            if (!window.teableAPI) {
-                throw new Error('Teable API not available');
-            }
-
+            // Initialize API with client config for all authentication attempts
             window.teableAPI.init(this.clientConfig);
 
-            // Try to authenticate with Teable.io first (for space owners/admins)
-            let authResult = null;
-            try {
-                console.log('Attempting Teable.io authentication...');
-                authResult = await this.authenticateWithTeable(credentials);
-                if (authResult.success) {
-                    console.log('✅ Teable.io authentication successful');
-                    return authResult;
+            let session = null;
+
+            if (userType === 'space_owner' || userType === 'auto') {
+                try {
+                    session = await this.authenticateSpaceOwner(email, password);
+                    if (session) {
+                        console.log('Space owner authentication successful');
+                    }
+                } catch (error) {
+                    console.log('Space owner auth failed:', error.message);
+                    if (userType === 'space_owner') throw error;
                 }
-            } catch (teableError) {
-                console.log('Teable.io auth failed, trying local auth...', teableError.message);
             }
 
-            // Fall back to local authentication
-            console.log('Attempting local authentication...');
-            authResult = await this.authenticateLocally(credentials);
-
-            if (authResult.success) {
-                console.log('✅ Local authentication successful');
-                return authResult;
-            } else {
-                throw new Error(authResult.message || 'Authentication failed');
+            if (!session && (userType === 'app_user' || userType === 'auto')) {
+                try {
+                    session = await this.authenticateAppUser(email, password);
+                    if (session) {
+                        console.log('App user authentication successful');
+                    }
+                } catch (error) {
+                    console.log('App user auth failed:', error.message);
+                    if (userType === 'app_user') throw error;
+                }
             }
+
+            if (!session) {
+                throw new Error('Authentication failed. Please check your credentials.');
+            }
+
+            this.currentSession = session;
+            this.saveSession();
+            
+            // Log activity
+            try {
+                await window.teableAPI.logActivity(
+                    session.email, 
+                    'user_login', 
+                    `User logged in as ${session.userType}`
+                );
+            } catch (logError) {
+                console.log('Failed to log activity:', logError.message);
+            }
+
+            return session;
 
         } catch (error) {
             console.error('Login failed:', error);
@@ -87,64 +81,149 @@ class TeableAuth {
         }
     }
 
-    async authenticateWithTeable(credentials) {
+    /**
+     * Authenticate Space Owner using clean logic
+     */
+    async authenticateSpaceOwner(email, password) {
         try {
-            // Check if credentials match the client config admin
-            if (credentials.email === this.clientConfig.adminEmail) {
-                // Simple password check - in production, use proper hashing
-                // For now, we'll accept any password for the admin email from config
-                const session = {
-                    email: credentials.email,
-                    firstName: this.clientConfig.clientName.split(' ')[0] || 'Admin',
-                    lastName: 'Admin',
-                    role: 'owner',
-                    userType: 'space_owner',
-                    baseId: this.clientConfig.baseId,
-                    spaceId: this.clientConfig.spaceId,
-                    clientName: this.clientConfig.clientName,
-                    loginTime: new Date().toISOString(),
-                    authMethod: 'config_admin',
-                    isConfigAdmin: true
-                };
+            console.log('🔐 Starting space owner authentication...');
 
-                this.setSession(session);
-                return { success: true, session };
+            // Step 1: Ensure system tables exist
+            await window.teableAPI.ensureSystemTables();
+
+            // Step 2: Get user from local app_users table
+            console.log('🔍 Checking local app_users table...');
+            const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+            const localUser = users.records?.find(u => 
+                u.fields.email === email.toLowerCase() && 
+                u.fields.role === 'Owner' &&
+                u.fields.admin_password_hash // Must have admin password set
+            );
+
+            if (!localUser) {
+                throw new Error('Space owner not found. Please ensure the admin email was configured correctly during client setup.');
             }
 
-            return { success: false, message: 'Invalid email or password' };
+            if (!localUser.fields.is_active) {
+                throw new Error('Space owner account is inactive');
+            }
+
+            // Step 3: Verify admin password
+            if (!localUser.fields.admin_password_hash) {
+                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
+            }
+
+            const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            if (localUser.fields.admin_password_hash !== adminPasswordHash) {
+                throw new Error('Invalid admin password for space owner');
+            }
+
+            // Step 4: Fetch current space owner from Teable.io for verification
+            console.log('🔍 Verifying against live Teable.io space data...');
+            let teableSpaceOwner = null;
+
+            try {
+                const endpoints = [
+                    `/api/space/${this.clientConfig.spaceId}/collaborators`,
+                    `/api/space/${this.clientConfig.spaceId}/collaborator`,
+                    `/api/space/${this.clientConfig.spaceId}`,
+                    `/api/space`
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const result = await window.teableAPI.request(endpoint);
+
+                        // Look for owner role
+                        if (result.collaborators) {
+                            teableSpaceOwner = result.collaborators.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
+                            );
+                        } else if (result.members) {
+                            teableSpaceOwner = result.members.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
+                            );
+                        } else if (result.owner) {
+                            teableSpaceOwner = result.owner;
+                        }
+
+                        if (teableSpaceOwner) break;
+
+                    } catch (endpointError) {
+                        console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+                    }
+                }
+
+                // Verify email matches current space owner
+                if (teableSpaceOwner && teableSpaceOwner.email) {
+                    if (teableSpaceOwner.email.toLowerCase() !== email.toLowerCase()) {
+                        throw new Error(`Authentication failed: You are not the current space owner. Current owner: ${teableSpaceOwner.email}`);
+                    }
+                    console.log('✅ Email verified against live Teable.io space data');
+                } else {
+                    console.log('⚠️ Could not verify against Teable.io - proceeding with local authentication');
+                }
+
+            } catch (teableError) {
+                console.log('⚠️ Could not verify against Teable.io:', teableError.message);
+                // Continue with local authentication
+            }
+
+            // Step 5: Update last login
+            try {
+                await window.teableAPI.updateRecord(
+                    window.teableAPI.systemTables.users,
+                    localUser.id,
+                    { last_login: new Date().toISOString().split('T')[0] }
+                );
+            } catch (updateError) {
+                console.log('Failed to update last login:', updateError.message);
+            }
+
+            console.log('✅ Space owner authentication successful');
+
+            return {
+                userType: 'space_owner',
+                email: localUser.fields.email,
+                firstName: localUser.fields.first_name || 'Space',
+                lastName: localUser.fields.last_name || 'Owner',
+                role: localUser.fields.role,
+                userId: localUser.id,
+                accessToken: this.clientConfig.accessToken,
+                loginTime: new Date().toISOString(),
+                isAdmin: true,
+                teableSpaceOwner: teableSpaceOwner || { email: email, verified: false }
+            };
 
         } catch (error) {
-            console.error('Teable authentication error:', error);
-            return { success: false, message: error.message };
+            throw new Error('Space owner authentication failed: ' + error.message);
         }
     }
 
-    async authenticateLocally(credentials) {
+    /**
+     * Authenticate App User (internal system)
+     */
+    async authenticateAppUser(email, password) {
         try {
             // Ensure system tables exist
             await window.teableAPI.ensureSystemTables();
 
-            // Get users from the system users table
-            const usersData = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const users = usersData.records || [];
+            // Get user from app_users table
+            const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+            const user = users.records?.find(u => u.fields.email === email);
 
-            // Find user by email
-            const user = users.find(u => u.fields.email === credentials.email);
             if (!user) {
-                return { success: false, message: 'User not found' };
+                throw new Error('User not found');
             }
 
-            const userFields = user.fields;
-
-            // Check if user is active
-            if (!userFields.is_active) {
-                return { success: false, message: 'Account is disabled' };
+            if (!user.fields.is_active) {
+                throw new Error('Account is inactive');
             }
 
             // Verify password
-            const isValidPassword = await this.verifyPassword(credentials.password, userFields.password_hash);
-            if (!isValidPassword) {
-                return { success: false, message: 'Invalid password' };
+            const passwordHash = await window.teableAPI.hashPassword(password);
+            if (user.fields.password_hash !== passwordHash) {
+                throw new Error('Invalid password');
             }
 
             // Update last login
@@ -158,152 +237,231 @@ class TeableAuth {
                 console.log('Failed to update last login:', updateError.message);
             }
 
-            // Create session
-            const session = {
-                email: userFields.email,
-                firstName: userFields.first_name || 'User',
-                lastName: userFields.last_name || '',
-                role: userFields.role || 'viewer',
-                userType: userFields.role === 'owner' ? 'space_owner' : 'local_user',
-                baseId: this.clientConfig.baseId,
-                spaceId: this.clientConfig.spaceId,
+            return {
+                userType: 'app_user',
+                email: user.fields.email,
+                firstName: user.fields.first_name,
+                lastName: user.fields.last_name,
+                role: user.fields.role || 'Viewer', // Using Teable.io role
+                userId: user.id,
                 loginTime: new Date().toISOString(),
-                authMethod: 'local',
-                isConfigAdmin: false
+                isAdmin: ['Owner', 'Admin'].includes(user.fields.role)
             };
 
-            this.setSession(session);
+        } catch (error) {
+            throw new Error('App user authentication failed: ' + error.message);
+        }
+    }
 
-            // Log activity
+    /**
+     * Logout current user
+     */
+    async logout() {
+        if (this.currentSession) {
             try {
                 await window.teableAPI.logActivity(
-                    userFields.email,
-                    'user_login',
-                    `User logged in via ${session.authMethod} authentication`
+                    this.currentSession.email,
+                    'user_logout',
+                    'User logged out'
                 );
-            } catch (logError) {
-                console.log('Failed to log activity:', logError.message);
+            } catch (error) {
+                console.error('Failed to log logout activity:', error);
             }
-
-            return { success: true, session };
-
-        } catch (error) {
-            console.error('Local authentication error:', error);
-            return { success: false, message: error.message };
         }
+
+        this.currentSession = null;
+        localStorage.removeItem('teable_session');
+        window.location.href = 'login.html';
     }
 
-    async verifyPassword(plainPassword, hashedPassword) {
-        try {
-            // Simple comparison for now - in production, use proper hashing
-            return plainPassword === hashedPassword || 
-                   await window.teableAPI.verifyPassword(plainPassword, hashedPassword);
-        } catch (error) {
-            console.error('Password verification error:', error);
-            return false;
-        }
-    }
-
-    setSession(session) {
-        this.currentSession = session;
-        localStorage.setItem('teableAuthSession', JSON.stringify(session));
-        console.log('Session created:', session);
-    }
-
+    /**
+     * Get current session
+     */
     getCurrentSession() {
         return this.currentSession;
     }
 
-    isLoggedIn() {
-        return this.currentSession !== null;
-    }
-
+    /**
+     * Check if user is admin (owner or admin role)
+     */
     isAdmin() {
-        if (!this.currentSession) return false;
-        // Config admin has full access, or check role-based admin access
-        if (this.currentSession.isConfigAdmin) return true;
-        const adminRoles = ['owner', 'admin'];
-        return adminRoles.includes(this.currentSession.role);
+        return this.currentSession?.isAdmin || ['Owner', 'Admin'].includes(this.currentSession?.role);
     }
 
+    /**
+     * Check if user has specific role
+     */
+    hasRole(role) {
+        if (!this.currentSession) return false;
+        if (this.isAdmin()) return true;
+        return this.currentSession.role === role;
+    }
+
+    /**
+     * Check role hierarchy (Teable.io style)
+     */
+    hasRoleOrHigher(requiredRole) {
+        if (!this.currentSession) return false;
+        
+        const roleHierarchy = {
+            'Viewer': 1,
+            'Commenter': 2,
+            'Editor': 3,
+            'Admin': 4,
+            'Owner': 5
+        };
+        
+        const userLevel = roleHierarchy[this.currentSession.role] || 0;
+        const requiredLevel = roleHierarchy[requiredRole] || 0;
+        
+        return userLevel >= requiredLevel;
+    }
+
+    /**
+     * Save session to localStorage
+     */
+    saveSession() {
+        if (this.currentSession) {
+            localStorage.setItem('teable_session', JSON.stringify(this.currentSession));
+        }
+    }
+
+    /**
+     * Load session from localStorage
+     */
+    loadSession() {
+        try {
+            const sessionData = localStorage.getItem('teable_session');
+            if (sessionData) {
+                this.currentSession = JSON.parse(sessionData);
+                
+                // Check if session is expired (24 hours)
+                const loginTime = new Date(this.currentSession.loginTime);
+                const now = new Date();
+                const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
+                
+                if (hoursDiff > 24) {
+                    console.log('Session expired, logging out');
+                    this.logout();
+                    return;
+                }
+
+                // Restore API configuration for both user types
+                if (this.clientConfig) {
+                    window.teableAPI.init(this.clientConfig);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load session:', error);
+            localStorage.removeItem('teable_session');
+        }
+    }
+
+    /**
+     * Save client configuration
+     */
+    saveClientConfig(config) {
+        this.clientConfig = config;
+        localStorage.setItem('teable_client_config', JSON.stringify(config));
+    }
+
+    /**
+     * Load client configuration
+     */
+    loadClientConfig() {
+        try {
+            const configData = localStorage.getItem('teable_client_config');
+            if (configData) {
+                this.clientConfig = JSON.parse(configData);
+            }
+        } catch (error) {
+            console.error('Failed to load client config:', error);
+        }
+    }
+
+    /**
+     * Get available client configurations
+     */
+    getClientConfigs() {
+        try {
+            const configs = localStorage.getItem('teable_client_configs');
+            return configs ? JSON.parse(configs) : [];
+        } catch (error) {
+            console.error('Failed to load client configs:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Add client configuration
+     */
+    addClientConfig(config) {
+        try {
+            const configs = this.getClientConfigs();
+            configs.push({
+                ...config,
+                id: Date.now().toString(),
+                created: new Date().toISOString()
+            });
+            localStorage.setItem('teable_client_configs', JSON.stringify(configs));
+            return configs;
+        } catch (error) {
+            console.error('Failed to save client config:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Check authentication status and redirect if needed
+     */
     requireAuth() {
-        if (!this.isLoggedIn()) {
+        if (!this.currentSession) {
             window.location.href = 'login.html';
             return false;
         }
-        return true;
-    }
-
-    requireAdmin() {
-        if (!this.requireAuth()) return false;
-
-        if (!this.isAdmin()) {
-            alert('Access denied. Administrator privileges required.');
-            window.location.href = 'dashboard.html';
-            return false;
-        }
-        return true;
-    }
-
-    requireClientAdmin() {
-        if (!this.requireAuth()) return false;
-
-        const session = this.getCurrentSession();
-        const isClientAdmin = session.role === 'owner' || session.role === 'admin' || session.isConfigAdmin;
         
-        if (!isClientAdmin) {
-            alert('Access denied. Client administrator privileges required.');
-            window.location.href = 'dashboard.html';
-            return false;
-        }
-        return true;
-    }
-
-    hasClientAccess(feature) {
-        if (!this.isLoggedIn()) return false;
-        
-        const session = this.getCurrentSession();
-        
-        // Super admin has access to everything
-        if (session.isConfigAdmin) return true;
-        
-        // Define feature access based on roles
-        const featureAccess = {
-            'map': ['owner', 'admin', 'editor', 'viewer'],
-            'table': ['owner', 'admin', 'editor', 'viewer'], 
-            'public-map': ['owner', 'admin', 'editor', 'viewer'],
-            'logs': ['owner', 'admin', 'editor', 'viewer'],
-            'map-config': ['owner', 'admin'],
-            'permissions': ['owner', 'admin'],
-            'users': ['owner', 'admin'],
-            'config': ['config_admin']
-        };
-        
-        const allowedRoles = featureAccess[feature] || [];
-        return allowedRoles.includes(session.role) || allowedRoles.includes('config_admin') && session.isConfigAdmin;
-    }
-
-    logout() {
-        this.currentSession = null;
-        localStorage.removeItem('teableAuthSession');
-        localStorage.removeItem('selectedClientConfig');
-        window.location.href = 'login.html';
-    }
-
-    selectClientConfig(configId) {
-        localStorage.setItem('selectedClientConfig', configId);
-        this.loadClientConfig();
-
-        // Also initialize the API with the new config
-        if (this.clientConfig && window.teableAPI) {
+        // Ensure API is configured for authenticated users
+        if (this.clientConfig && !window.teableAPI.config.baseUrl) {
             window.teableAPI.init(this.clientConfig);
         }
+        
+        return true;
     }
 
-    getAvailableConfigs() {
-        return JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+    /**
+     * Require admin privileges (owner or admin)
+     */
+    requireAdmin() {
+        if (!this.requireAuth()) return false;
+        if (!this.isAdmin()) {
+            alert('Access denied. Admin privileges required.');
+            window.location.href = 'dashboard.html';
+            return false;
+        }
+        return true;
     }
 }
 
-// Create global instance
+// Initialize global auth instance
 window.teableAuth = new TeableAuth();
+window.teableAuth.init();
+
+// Utility functions for UI
+window.togglePasswordVisibility = function(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = input.nextElementSibling?.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        if (icon) icon.className = 'fas fa-eye';
+    }
+};
+
+window.logout = function() {
+    if (confirm('Are you sure you want to logout?')) {
+        window.teableAuth.logout();
+    }
+};

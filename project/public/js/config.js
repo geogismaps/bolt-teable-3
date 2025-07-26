@@ -1,783 +1,443 @@
-
 /**
- * Configuration Page Functionality
+ * Super Admin Configuration Management
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    setupConfigForm();
     loadExistingConfigs();
-    setupPasswordToggle();
+
+    // Setup form handler
+    const configForm = document.getElementById('configForm');
+    if (configForm) {
+        configForm.addEventListener('submit', handleConfigSubmit);
+    }
 });
-
-function setupConfigForm() {
-    const form = document.getElementById('configForm');
-    if (form) {
-        form.addEventListener('submit', handleConfigSubmit);
-    }
-
-    // Add test connection button event listener
-    const testBtn = document.querySelector('[onclick="testConnection()"]');
-    if (testBtn) {
-        testBtn.onclick = testConnection;
-    }
-}
-
-function setupPasswordToggle() {
-    window.togglePasswordVisibility = function(fieldId) {
-        const field = document.getElementById(fieldId);
-        const button = field.nextElementSibling;
-        const icon = button.querySelector('i');
-        
-        if (field.type === 'password') {
-            field.type = 'text';
-            icon.className = 'fas fa-eye-slash';
-        } else {
-            field.type = 'password';
-            icon.className = 'fas fa-eye';
-        }
-    };
-}
-
-async function testConnection() {
-    const baseUrlEl = document.getElementById('baseUrl');
-    const spaceIdEl = document.getElementById('spaceId');
-    const baseIdEl = document.getElementById('baseId');
-    const apiTokenEl = document.getElementById('apiToken');
-    
-    if (!baseUrlEl || !spaceIdEl || !baseIdEl || !apiTokenEl) {
-        showConnectionStatus('Form elements not found. Please check the HTML structure.', 'error');
-        return;
-    }
-    
-    const baseUrl = baseUrlEl.value.trim();
-    const spaceId = spaceIdEl.value.trim();
-    const baseId = baseIdEl.value.trim();
-    const apiToken = apiTokenEl.value.trim();
-    
-    const statusDiv = document.getElementById('connectionStatus');
-    
-    if (!baseUrl || !spaceId || !baseId || !apiToken) {
-        showConnectionStatus('Please fill in all fields before testing connection.', 'error');
-        return;
-    }
-    
-    // Validate ID formats first
-    if (!spaceId.startsWith('spc')) {
-        showConnectionStatus(`❌ Invalid Space ID format
-        
-Space ID should start with "spc" but you entered: "${spaceId}"
-
-**How to find Space ID:**
-1. Go to https://app.teable.io
-2. Look at the URL: /space/[SPACE_ID]
-3. Copy the part that starts with "spc"`, 'error');
-        return;
-    }
-    
-    if (!baseId.startsWith('bse')) {
-        showConnectionStatus(`❌ Invalid Base ID format
-        
-Base ID should start with "bse" but you entered: "${baseId}"
-
-**How to find Base ID:**
-1. Go to your base in Teable
-2. Look at the URL: /base/[BASE_ID] 
-3. Copy the part that starts with "bse"`, 'error');
-        return;
-    }
-    
-    if (apiToken.length < 20) {
-        showConnectionStatus(`❌ API token seems too short
-        
-API tokens are usually longer than 20 characters.
-Your token: ${apiToken.length} characters
-
-**How to get a valid token:**
-1. Go to Settings → API Tokens in Teable
-2. Create a new token with proper permissions
-3. Copy the full token (it's quite long)`, 'error');
-        return;
-    }
-    
-    showConnectionStatus('Testing connection...', 'info');
-    
-    try {
-        // Initialize API client with test credentials
-        const testApi = new TeableAPI({
-            baseUrl: baseUrl,
-            spaceId: spaceId,
-            baseId: baseId,
-            accessToken: apiToken
-        });
-        
-        // First test basic connectivity by trying to get spaces
-        console.log('Testing basic API connectivity...');
-        let spacesResponse;
-        try {
-            spacesResponse = await testApi.getSpaces();
-            console.log('✅ API connectivity successful');
-        } catch (spaceError) {
-            if (spaceError.message.includes('403') || spaceError.message.includes('Forbidden')) {
-                showConnectionStatus('❌ Connection failed: API token does not have permission to access this Teable instance. Please verify your API token has the correct permissions.', 'error');
-                return;
-            } else if (spaceError.message.includes('401') || spaceError.message.includes('Unauthorized')) {
-                showConnectionStatus('❌ Connection failed: Invalid API token. Please check your API token.', 'error');
-                return;
-            } else if (spaceError.message.includes('404')) {
-                showConnectionStatus('❌ Connection failed: Invalid Teable instance URL. Please check your URL.', 'error');
-                return;
-            } else {
-                throw spaceError;
-            }
-        }
-        
-        // Test space access
-        console.log('Testing space access...');
-        try {
-            const spaceInfo = await testApi.getSpace();
-            console.log('✅ Space access successful:', spaceInfo.name);
-        } catch (spaceError) {
-            if (spaceError.message.includes('403') || spaceError.message.includes('Forbidden')) {
-                showConnectionStatus('❌ Connection failed: API token does not have permission to access the specified space. Please verify the Space ID and token permissions.', 'error');
-                return;
-            } else if (spaceError.message.includes('404')) {
-                showConnectionStatus('❌ Connection failed: Space not found. Please check your Space ID.', 'error');
-                return;
-            } else {
-                throw spaceError;
-            }
-        }
-        
-        // Test base access
-        console.log('Testing base access...');
-        try {
-            const baseInfo = await testApi.getBase();
-            if (baseInfo && baseInfo.id) {
-                showConnectionStatus(`✅ Connection successful! Base found: "${baseInfo.name}" - All credentials are valid and have proper permissions.`, 'success');
-            } else {
-                showConnectionStatus('❌ Connection failed: Invalid response from server', 'error');
-            }
-        } catch (baseError) {
-            console.error('Base access error details:', baseError);
-            
-            if (baseError.message.includes('403') || baseError.message.includes('Forbidden')) {
-                showConnectionStatus(`❌ ACCESS DENIED (403 Error) - PERMISSION ISSUE DETECTED
-
-🚫 **YOUR API TOKEN LACKS REQUIRED PERMISSIONS**
-
-**STEP-BY-STEP FIX:**
-
-**1. CREATE NEW API TOKEN (RECOMMENDED)**
-   • Go to https://app.teable.io/settings/tokens
-   • Click "Create New Token"
-   • Name it: "GIS System Access"
-   • **CRITICAL:** Select these permissions:
-     ✅ Base Read ✅ Record Read ✅ Record Write ✅ Record Delete
-     ✅ Space Read ✅ Table Read ✅ Field Read
-   • Copy the FULL token (starts with "tbl_" usually)
-
-**2. VERIFY YOUR IDS ARE CORRECT**
-   • Base ID: ${baseId} (should start with "bse")
-   • Space ID: ${spaceId} (should start with "spc")
-   • **How to find correct IDs:**
-     - Go to your Teable base
-     - URL shows: .../space/YOUR_SPACE_ID/base/YOUR_BASE_ID
-     - Copy these exact values
-
-**3. CHECK TOKEN WORKSPACE**
-   • Ensure token was created in the SAME workspace where your base exists
-   • Token must have access to Space: ${spaceId}
-
-**4. COMMON MISTAKES TO AVOID**
-   ❌ Using a token from different workspace
-   ❌ Token created without "Base Read" permission
-   ❌ Copying partial token (tokens are usually 40+ characters)
-   ❌ Using wrong Base ID or Space ID
-
-**5. TEST AGAIN**
-   After creating new token with proper permissions, paste it above and click "Test Connection"
-
-**If still failing:** Your base might be in a different space or workspace than expected.`, 'error');
-                return;
-            } else if (baseError.message.includes('404')) {
-                showConnectionStatus(`❌ Base Not Found (404 Error)
-
-🔍 **HOW TO FIX:**
-
-1. **Verify Base ID:**
-   • Current Base ID: ${baseId}
-   • Go to https://app.teable.io
-   • Navigate to your base
-   • Copy Base ID from URL: /base/[BASE_ID]
-
-2. **Check Space Location:**
-   • Ensure base exists in Space: ${spaceId}
-   • Base might be in a different space
-
-3. **Double-check IDs:**
-   • Base ID should start with "bse"
-   • Space ID should start with "spc"
-
-Try updating the Base ID and test again.`, 'error');
-                return;
-            } else {
-                throw baseError;
-            }
-        }
-        
-    } catch (error) {
-        console.error('Connection test failed:', error);
-        let errorMessage = 'Unknown error occurred';
-        
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            errorMessage = 'Network error: Cannot reach the Teable server. Please check your internet connection and URL.';
-        } else if (error.message.includes('CORS')) {
-            errorMessage = 'CORS error: The Teable server is blocking requests from this domain.';
-        } else {
-            errorMessage = error.message;
-        }
-        
-        showConnectionStatus('❌ Connection failed: ' + errorMessage, 'error');
-    }
-}
-
-function showConnectionStatus(message, type) {
-    const statusDiv = document.getElementById('connectionStatus');
-    if (!statusDiv) return;
-    
-    statusDiv.innerHTML = '';
-    
-    const alertClass = type === 'success' ? 'alert-success' : 
-                     type === 'error' ? 'alert-danger' : 'alert-info';
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert ${alertClass} mt-2`;
-    alertDiv.innerHTML = message;
-    
-    statusDiv.appendChild(alertDiv);
-    
-    // Auto-remove after 5 seconds for non-error messages
-    if (type !== 'error') {
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 5000);
-    }
-}
 
 async function handleConfigSubmit(event) {
     event.preventDefault();
-    
-    const submitBtn = event.target.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    
+
     try {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating Configuration...';
-        
-        // Get form data with null checks
-        const clientNameEl = document.getElementById('clientName');
-        const adminEmailEl = document.getElementById('adminEmail');
-        const adminPasswordEl = document.getElementById('adminPassword');
-        const baseUrlEl = document.getElementById('baseUrl');
-        const spaceIdEl = document.getElementById('spaceId');
-        const baseIdEl = document.getElementById('baseId');
-        const apiTokenEl = document.getElementById('apiToken');
-        
-        if (!clientNameEl || !adminEmailEl || !adminPasswordEl || !baseUrlEl || !spaceIdEl || !baseIdEl || !apiTokenEl) {
-            throw new Error('Cannot read properties of null (reading \'value\') - Form elements not found');
-        }
-        
-        const formData = {
-            clientName: clientNameEl.value.trim(),
-            adminEmail: adminEmailEl.value.trim(),
-            adminPassword: adminPasswordEl.value.trim(),
-            baseUrl: baseUrlEl.value.trim(),
-            spaceId: spaceIdEl.value.trim(),
-            baseId: baseIdEl.value.trim(),
-            apiToken: apiTokenEl.value.trim()
+        const config = {
+            clientName: document.getElementById('clientName').value.trim(),
+            adminEmail: document.getElementById('adminEmail').value.trim(),
+            adminPassword: document.getElementById('adminPassword').value.trim(),
+            baseUrl: document.getElementById('teableUrl').value.trim(),
+            spaceId: document.getElementById('spaceId').value.trim(),
+            baseId: document.getElementById('baseId').value.trim(),
+            accessToken: document.getElementById('apiToken').value.trim()
         };
-        
-        // Validate form data
-        if (!validateFormData(formData)) {
-            return;
+
+        // Validation
+        if (!config.clientName || !config.adminEmail || !config.adminPassword || 
+            !config.baseUrl || !config.baseId || !config.accessToken) {
+            throw new Error('Please fill in all required fields including admin password');
         }
-        
+
+        if (!config.adminEmail.includes('@')) {
+            throw new Error('Please enter a valid email address');
+        }
+
+        if (config.adminPassword.length < 6) {
+            throw new Error('Admin password must be at least 6 characters long');
+        }
+
+        // Clean up URL
+        config.baseUrl = config.baseUrl.replace(/\/$/, '');
+
         // Test connection first
-        console.log('🔄 Testing connection before creating configuration...');
-        await testConnectionForSubmit(formData);
-        
-        // Try to create space owner (optional)
-        console.log('🔄 Setting up space owner (optional)...');
-        const userResult = await setupSpaceOwner(formData);
-        if (userResult) {
-            console.log('✅ User setup completed');
-        } else {
-            console.log('ℹ️ User setup skipped - no Users table found or creation failed');
+        showAlert('info', 'Testing connection...');
+
+        // Initialize API for testing
+        if (window.teableAPI) {
+            window.teableAPI.init({
+                baseUrl: config.baseUrl,
+                spaceId: config.spaceId,
+                baseId: config.baseId,
+                accessToken: config.accessToken
+            });
+
+            const connectionResult = await window.teableAPI.testConnection();
+            if (!connectionResult.success) {
+                throw new Error('Connection test failed: ' + connectionResult.error);
+            }
+
+            // Initialize system tables
+            showAlert('info', 'Initializing system tables...');
+            await window.teableAPI.ensureSystemTables();
+
+            // Create default admin
+            await window.teableAPI.createDefaultAdmin();
+
+            // Now set up the space owner with admin credentials
+            showAlert('info', 'Setting up space owner authentication...');
+            await setupSpaceOwner(config);
         }
-        
-        // Save configuration
-        console.log('🔄 Saving client configuration...');
-        const configId = saveClientConfig(formData);
-        
-        showConfigAlert('✅ Client configuration created successfully!', 'success');
-        
-        // Reset form
+
+        // Save configuration (without the password for security)
+        const configToSave = { ...config };
+        delete configToSave.adminPassword; // Don't save password in client config
+
+        const savedConfigs = window.teableAuth.addClientConfig(configToSave);
+
+        // Set as current config
+        window.teableAuth.saveClientConfig({
+            baseUrl: config.baseUrl,
+            spaceId: config.spaceId,
+            baseId: config.baseId,
+            accessToken: config.accessToken
+        });
+
+        // Show success
+        showAlert('success', 'Space owner configuration completed successfully!');
+
+        // Clear form
         document.getElementById('configForm').reset();
-        
-        // Reload existing configs
+
+        // Refresh list
         loadExistingConfigs();
-        
-        console.log('✅ Configuration created with ID:', configId);
-        
+
+        // Show redirect option
+        setTimeout(() => {
+            if (confirm('Configuration saved! Would you like to go to the login page now?')) {
+                window.location.href = 'login.html';
+            }
+        }, 1500);
+
     } catch (error) {
-        console.error('❌ Configuration failed:', error);
-        showConfigAlert('❌ Failed to create configuration: ' + error.message, 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalText;
+        console.error('Configuration failed:', error);
+        showAlert('danger', error.message);
     }
 }
 
-function validateFormData(data) {
-    const required = ['clientName', 'adminEmail', 'adminPassword', 'baseUrl', 'spaceId', 'baseId', 'apiToken'];
-    
-    for (const field of required) {
-        if (!data[field]) {
-            showConfigAlert(`Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} field.`, 'error');
-            return false;
-        }
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.adminEmail)) {
-        showConfigAlert('Please enter a valid email address.', 'error');
-        return false;
-    }
-    
-    // Validate URL format
+/**
+ * Set up space owner authentication with clean logic
+ */
+async function setupSpaceOwner(config) {
     try {
-        new URL(data.baseUrl);
-    } catch {
-        showConfigAlert('Please enter a valid URL for Teable Instance URL.', 'error');
-        return false;
-    }
-    
-    return true;
-}
+        console.log('🔧 Setting up space owner authentication...');
 
-async function testConnectionForSubmit(formData) {
-    const testApi = new TeableAPI({
-        baseUrl: formData.baseUrl,
-        spaceId: formData.spaceId,
-        baseId: formData.baseId,
-        accessToken: formData.apiToken
-    });
-    
-    try {
-        const baseInfo = await testApi.getBase();
-        if (!baseInfo || !baseInfo.id) {
-            throw new Error('Invalid API response - could not verify base access');
-        }
-        console.log('✅ Connection test passed');
-    } catch (error) {
-        throw new Error(`Connection test failed: ${error.message}`);
-    }
-}
-
-async function setupSpaceOwner(formData) {
-    const api = new TeableAPI({
-        baseUrl: formData.baseUrl,
-        spaceId: formData.spaceId,
-        baseId: formData.baseId,
-        accessToken: formData.apiToken
-    });
-    
-    try {
-        // First, check if Users table exists by trying to get tables
-        const tables = await api.getTables();
-        const usersTable = tables.find(table => 
-            table.name === 'Users' || table.name === 'users' || table.name === 'User'
-        );
+        // Step 1: Try to fetch space owner from Teable.io
+        let teableSpaceOwner = null;
         
-        if (!usersTable) {
-            console.log('ℹ️ No Users table found in this base - skipping user creation');
-            return null;
-        }
-        
-        console.log(`✅ Found Users table: ${usersTable.name}`);
-        
-        // Try to check if user already exists
         try {
-            const existingUsers = await api.getRecords(usersTable.id || usersTable.name);
-            const records = existingUsers.records || existingUsers;
+            console.log('🔍 Fetching space owner from Teable.io...');
             
-            if (Array.isArray(records)) {
-                const existingUser = records.find(user => 
-                    user.fields && (
-                        user.fields.Email === formData.adminEmail ||
-                        user.fields.email === formData.adminEmail
-                    )
-                );
-                
-                if (existingUser) {
-                    console.log('✅ User already exists:', existingUser.fields.Email || existingUser.fields.email);
-                    return existingUser;
+            const endpoints = [
+                `/api/space/${config.spaceId}/collaborators`,
+                `/api/space/${config.spaceId}/collaborator`,
+                `/api/space/${config.spaceId}`,
+                `/api/space`
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const result = await window.teableAPI.request(endpoint);
+
+                    // Look for owner role in different response formats
+                    if (result.collaborators) {
+                        teableSpaceOwner = result.collaborators.find(user => 
+                            user.role === 'Owner' || user.role === 'owner'
+                        );
+                    } else if (result.members) {
+                        teableSpaceOwner = result.members.find(user => 
+                            user.role === 'Owner' || user.role === 'owner'
+                        );
+                    } else if (result.owner) {
+                        teableSpaceOwner = result.owner;
+                    }
+
+                    if (teableSpaceOwner) {
+                        console.log('✅ Found space owner from Teable.io:', teableSpaceOwner);
+                        break;
+                    }
+
+                } catch (endpointError) {
+                    console.log(`❌ Endpoint ${endpoint} failed:`, endpointError.message);
                 }
             }
-        } catch (recordError) {
-            console.log('ℹ️ Could not check existing users - will try to create new user');
+        } catch (teableError) {
+            console.log('⚠️ Could not fetch space owner from Teable.io:', teableError.message);
         }
-        
-        // Try to get table structure
-        let tableInfo = null;
-        try {
-            tableInfo = await api.getTable(usersTable.id || usersTable.name);
-        } catch (tableError) {
-            console.log('ℹ️ Could not get table structure - using basic user data');
+
+        // Step 2: Validate admin email matches space owner (if found)
+        if (teableSpaceOwner && teableSpaceOwner.email) {
+            if (teableSpaceOwner.email.toLowerCase() !== config.adminEmail.toLowerCase()) {
+                throw new Error(`Admin email mismatch: Space owner in Teable.io is ${teableSpaceOwner.email}, but you provided ${config.adminEmail}. Please use the correct space owner email.`);
+            }
+            console.log('✅ Admin email matches Teable.io space owner');
+        } else {
+            console.log('⚠️ Could not verify space owner from Teable.io - proceeding with admin email');
         }
-        
-        // Create basic user data
-        const userData = {
-            Email: formData.adminEmail,
-            Role: 'Admin',
-            'Created Date': new Date().toISOString().split('T')[0],
-            Status: 'Active'
-        };
-        
-        // Add password if supported
-        if (formData.adminPassword) {
-            userData.Password = formData.adminPassword;
+
+        // Step 3: Check if space owner already exists in app_users
+        console.log('🔍 Checking local app_users table...');
+        const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
+        const existingUser = users.records?.find(u => 
+            u.fields.email?.toLowerCase() === config.adminEmail.toLowerCase()
+        );
+
+        // Step 4: Hash the admin password
+        const adminPasswordHash = await window.teableAPI.hashPassword(config.adminPassword);
+
+        if (existingUser) {
+            console.log('🔄 Updating existing user with space owner credentials...');
+            
+            // Update existing user to be space owner with admin password
+            await window.teableAPI.updateRecord(
+                window.teableAPI.systemTables.users,
+                existingUser.id,
+                {
+                    role: 'Owner', // Ensure they have Owner role (capitalized)
+                    admin_password_hash: adminPasswordHash,
+                    is_active: true,
+                    is_space_owner: true,
+                    synced_from_teable: teableSpaceOwner ? true : false,
+                    teable_user_id: teableSpaceOwner?.id || 'admin_setup'
+                }
+            );
+            console.log('✅ Updated existing user as space owner');
+        } else {
+            console.log('➕ Creating new space owner record...');
+
+            // Parse name from Teable.io data or email
+            let firstName = 'Space';
+            let lastName = 'Owner';
+
+            if (teableSpaceOwner?.name) {
+                const nameParts = teableSpaceOwner.name.split(' ');
+                firstName = nameParts[0] || 'Space';
+                lastName = nameParts.slice(1).join(' ') || 'Owner';
+            } else {
+                // Use email prefix as first name
+                firstName = config.adminEmail.split('@')[0];
+                lastName = 'Owner';
+            }
+
+            // Create new space owner record
+            const spaceOwnerData = {
+                email: config.adminEmail.toLowerCase(),
+                password_hash: await window.teableAPI.hashPassword('temp123'), // Temp password for app user auth
+                admin_password_hash: adminPasswordHash, // The actual admin password for space owner auth
+                first_name: firstName,
+                last_name: lastName,
+                role: 'Owner', // Using capitalized Owner role
+                is_active: true,
+                is_space_owner: true,
+                created_date: new Date().toISOString().split('T')[0],
+                last_login: null,
+                synced_from_teable: teableSpaceOwner ? true : false,
+                teable_user_id: teableSpaceOwner?.id || 'admin_setup'
+            };
+
+            console.log('📝 Creating space owner record:', config.adminEmail);
+            await window.teableAPI.createRecord(window.teableAPI.systemTables.users, spaceOwnerData);
+            console.log('✅ Created space owner record');
         }
-        
-        // Add owner/client information
-        userData.Owner = formData.clientName;
-        userData.Client = formData.clientName;
-        
-        console.log('🔄 Creating user with data:', userData);
-        
-        try {
-            const newUser = await api.createRecord(usersTable.id || usersTable.name, userData);
-            console.log('✅ Space owner created successfully');
-            return newUser;
-        } catch (createError) {
-            console.log('⚠️ Could not create user record - this is optional and configuration will still work');
-            console.log('User creation error:', createError.message);
-            return null;
-        }
-        
+
+        console.log('✅ Space owner authentication setup completed!');
+
+        // Log the setup activity
+        await window.teableAPI.logActivity(
+            config.adminEmail,
+            'space_owner_setup',
+            `Space owner configured for client: ${config.clientName}`,
+            'app_users'
+        );
+
     } catch (error) {
-        console.log('⚠️ User setup failed but configuration will continue:', error.message);
-        // Don't throw error - user creation is optional
-        return null;
+        console.error('❌ Space owner setup failed:', error);
+        throw new Error('Failed to set up space owner: ' + error.message);
     }
 }
 
-function saveClientConfig(formData) {
-    const config = {
-        id: 'config_' + Date.now(),
-        clientName: formData.clientName,
-        adminEmail: formData.adminEmail,
-        baseUrl: formData.baseUrl,
-        spaceId: formData.spaceId,
-        baseId: formData.baseId,
-        accessToken: formData.apiToken,
-        createdAt: new Date().toISOString()
-    };
-    
-    // Get existing configs
-    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
-    
-    // Add new config
-    configs.push(config);
-    
-    // Save to localStorage
-    localStorage.setItem('clientConfigs', JSON.stringify(configs));
-    
-    return config.id;
+async function testConnection() {
+    try {
+        const baseUrl = document.getElementById('teableUrl').value.trim();
+        const spaceId = document.getElementById('spaceId').value.trim();
+        const baseId = document.getElementById('baseId').value.trim();
+        const token = document.getElementById('apiToken').value.trim();
+
+        if (!baseUrl || !baseId || !token) {
+            throw new Error('Please fill in Base URL, Base ID, and API Token');
+        }
+
+        // Show loading
+        document.getElementById('connectionStatus').innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>Testing connection...
+            </div>
+        `;
+
+        // Initialize API for testing
+        if (window.teableAPI) {
+            window.teableAPI.init({
+                baseUrl: baseUrl.replace(/\/$/, ''),
+                spaceId: spaceId,
+                baseId: baseId,
+                accessToken: token
+            });
+
+            const result = await window.teableAPI.testConnection();
+
+            if (result.success) {
+                document.getElementById('connectionStatus').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Connection successful! Working endpoint: ${result.endpoint}
+                    </div>
+                `;
+            } else {
+                throw new Error(result.error);
+            }
+        } else {
+            throw new Error('Teable API not loaded');
+        }
+
+    } catch (error) {
+        document.getElementById('connectionStatus').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Connection failed: ${error.message}
+            </div>
+        `;
+    }
 }
 
 function loadExistingConfigs() {
-    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
+    const configs = window.teableAuth ? window.teableAuth.getClientConfigs() : [];
     const container = document.getElementById('existingConfigs');
-    
+
     if (!container) return;
-    
+
     if (configs.length === 0) {
-        container.innerHTML = '<p class="text-muted">No configurations found.</p>';
+        container.innerHTML = `
+            <div class="text-center text-muted py-3">
+                <i class="fas fa-inbox fa-2x mb-2"></i>
+                <p>No client configurations found</p>
+                <p class="small">Create your first client configuration above</p>
+            </div>
+        `;
         return;
     }
-    
-    container.innerHTML = configs.map(config => `
-        <div class="card mb-3 client-config-card" style="cursor: pointer; transition: all 0.3s ease;">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start" onclick="accessClientDashboard('${config.id}')">
-                    <div class="flex-grow-1">
-                        <h6 class="card-title mb-2">
-                            <i class="fas fa-building text-primary me-2"></i>
-                            ${config.clientName}
+
+    let html = '<div class="row">';
+    configs.forEach(config => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-building me-2"></i>${config.clientName}
                         </h6>
-                        <p class="card-text mb-2">
-                            <small class="text-muted">
-                                <i class="fas fa-envelope me-1"></i>Email: ${config.adminEmail}<br>
-                                <i class="fas fa-link me-1"></i>Base URL: ${config.baseUrl}<br>
-                                <i class="fas fa-calendar me-1"></i>Created: ${new Date(config.createdAt).toLocaleDateString()}
-                            </small>
+                        <p class="card-text small">
+                            <strong>Admin:</strong> ${config.adminEmail}<br>
+                            <strong>URL:</strong> ${config.baseUrl}<br>
+                            <strong>Base:</strong> ${config.baseId}<br>
+                            <strong>Created:</strong> ${new Date(config.created).toLocaleDateString()}
                         </p>
-                        <div class="mt-2">
-                            <span class="badge bg-primary me-1">
-                                <i class="fas fa-database me-1"></i>Base: ${config.baseId}
-                            </span>
-                            <span class="badge bg-info me-1">
-                                <i class="fas fa-cube me-1"></i>Space: ${config.spaceId}
-                            </span>
-                        </div>
-                        <div class="mt-3">
-                            <button class="btn btn-primary btn-sm me-2" onclick="event.stopPropagation(); accessClientDashboard('${config.id}')">
-                                <i class="fas fa-tachometer-alt me-1"></i>Access Dashboard
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" onclick="useConfig('${config.id}')">
+                                <i class="fas fa-sign-in-alt me-1"></i>Use Config
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm me-2" onclick="event.stopPropagation(); viewClientDetails('${config.id}')">
-                                <i class="fas fa-info-circle me-1"></i>Details
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteConfig('${config.id}')">
+                                <i class="fas fa-trash me-1"></i>Delete
                             </button>
                         </div>
-                    </div>
-                    <div class="ms-3">
-                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteConfig('${config.id}')" title="Delete Configuration">
-                            <i class="fas fa-trash"></i>
-                        </button>
                     </div>
                 </div>
             </div>
-        </div>
-    `).join('');
-    
-    // Add hover effects
-    const cards = container.querySelectorAll('.client-config-card');
-    cards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-2px)';
-            this.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
-        });
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
-            this.style.boxShadow = '';
-        });
+        `;
     });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function useConfig(configId) {
+    if (!window.teableAuth) return;
+
+    const configs = window.teableAuth.getClientConfigs();
+    const config = configs.find(c => c.id === configId);
+
+    if (config) {
+        // Save as current client config
+        window.teableAuth.saveClientConfig({
+            baseUrl: config.baseUrl,
+            spaceId: config.spaceId,
+            baseId: config.baseId,
+            accessToken: config.accessToken
+        });
+
+        showAlert('success', 'Configuration loaded successfully!');
+
+        // Redirect to login
+        setTimeout(() => {
+            window.location.href = 'login.html';
+        }, 1000);
+    }
 }
 
 function deleteConfig(configId) {
-    if (!confirm('Are you sure you want to delete this configuration?')) {
-        return;
+    if (!window.teableAuth) return;
+
+    if (confirm('Are you sure you want to delete this client configuration?')) {
+        const configs = window.teableAuth.getClientConfigs();
+        const updatedConfigs = configs.filter(c => c.id !== configId);
+        localStorage.setItem('teable_client_configs', JSON.stringify(updatedConfigs));
+        loadExistingConfigs();
+        showAlert('info', 'Configuration deleted successfully');
     }
-    
-    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
-    const updatedConfigs = configs.filter(config => config.id !== configId);
-    
-    localStorage.setItem('clientConfigs', JSON.stringify(updatedConfigs));
-    loadExistingConfigs();
-    
-    showConfigAlert('Configuration deleted successfully.', 'info');
 }
 
-function showConfigAlert(message, type) {
+function showAlert(type, message) {
     // Remove existing alerts
     const existingAlerts = document.querySelectorAll('.alert');
-    existingAlerts.forEach(alert => alert.remove());
-    
-    const alertClass = type === 'success' ? 'alert-success' : 
-                     type === 'error' ? 'alert-danger' : 'alert-info';
-    
+    existingAlerts.forEach(alert => {
+        if (alert.classList.contains('alert-dismissible')) {
+            alert.remove();
+        }
+    });
+
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
     alertDiv.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
-    // Insert before the form
+
+    // Insert at top of form
     const form = document.getElementById('configForm');
-    form.parentNode.insertBefore(alertDiv, form);
-    
-    // Auto-remove after 8 seconds
+    if (form && form.parentNode) {
+        form.parentNode.insertBefore(alertDiv, form);
+    }
+
+    // Auto-remove after 5 seconds
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
         }
-    }, 8000);
+    }, 5000);
 }
 
-// Add verification helper function
-async function verifyConfiguration() {
-    const baseUrlEl = document.getElementById('baseUrl');
-    const spaceIdEl = document.getElementById('spaceId'); 
-    const baseIdEl = document.getElementById('baseId');
-    const apiTokenEl = document.getElementById('apiToken');
-    
-    const baseUrl = baseUrlEl.value.trim();
-    const spaceId = spaceIdEl.value.trim(); 
-    const baseId = baseIdEl.value.trim();
-    const apiToken = apiTokenEl.value.trim();
-    
-    showConnectionStatus('🔍 Verifying configuration step by step...', 'info');
-    
-    // Step 1: Check URL format
-    try {
-        new URL(baseUrl);
-        console.log('✅ URL format is valid');
-    } catch {
-        showConnectionStatus('❌ Invalid URL format. Please use: https://app.teable.io', 'error');
-        return;
-    }
-    
-    // Step 2: Check ID formats
-    if (!spaceId.startsWith('spc')) {
-        showConnectionStatus('⚠️ Space ID should start with "spc". Current: ' + spaceId, 'error');
-        return;
-    }
-    
-    if (!baseId.startsWith('bse')) {
-        showConnectionStatus('⚠️ Base ID should start with "bse". Current: ' + baseId, 'error');
-        return;
-    }
-    
-    // Step 3: Check token format
-    if (apiToken.length < 10) {
-        showConnectionStatus('⚠️ API token seems too short. Please check your token.', 'error');
-        return;
-    }
-    
-    showConnectionStatus(`✅ Configuration format looks good:
-• URL: ${baseUrl}
-• Space ID: ${spaceId} ✓
-• Base ID: ${baseId} ✓
-• Token: ${apiToken.substring(0, 8)}... ✓
+// Toggle password visibility
+function togglePasswordVisibility(inputId) {
+    const passwordInput = document.getElementById(inputId);
+    const button = passwordInput.nextElementSibling;
+    const icon = button.querySelector('i');
 
-Now testing API connection...`, 'info');
-    
-    // Continue with connection test
-    setTimeout(() => testConnection(), 2000);
-}
-
-function accessClientDashboard(configId) {
-    try {
-        // Get the config details
-        const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
-        const selectedConfig = configs.find(config => config.id === configId);
-        
-        if (!selectedConfig) {
-            showConfigAlert('Configuration not found!', 'error');
-            return;
-        }
-        
-        showConfigAlert(`Opening ${selectedConfig.clientName} dashboard in new tab...`, 'info');
-        
-        // Open login page in new tab with config ID as parameter
-        const loginUrl = `login.html?config=${configId}`;
-        window.open(loginUrl, '_blank');
-        
-    } catch (error) {
-        console.error('Error accessing client dashboard:', error);
-        showConfigAlert('Failed to access client dashboard: ' + error.message, 'error');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
     }
-}
-
-function viewClientDetails(configId) {
-    const configs = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
-    const config = configs.find(c => c.id === configId);
-    
-    if (!config) {
-        showConfigAlert('Configuration not found!', 'error');
-        return;
-    }
-    
-    const detailsModal = `
-        <div class="modal fade" id="clientDetailsModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-building me-2"></i>
-                            ${config.clientName} - Configuration Details
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6><i class="fas fa-info-circle text-primary me-2"></i>Basic Information</h6>
-                                <table class="table table-borderless table-sm">
-                                    <tr><td><strong>Client Name:</strong></td><td>${config.clientName}</td></tr>
-                                    <tr><td><strong>Admin Email:</strong></td><td>${config.adminEmail}</td></tr>
-                                    <tr><td><strong>Created:</strong></td><td>${new Date(config.createdAt).toLocaleString()}</td></tr>
-                                    <tr><td><strong>Configuration ID:</strong></td><td><code>${config.id}</code></td></tr>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h6><i class="fas fa-database text-info me-2"></i>Teable Configuration</h6>
-                                <table class="table table-borderless table-sm">
-                                    <tr><td><strong>Base URL:</strong></td><td><a href="${config.baseUrl}" target="_blank">${config.baseUrl}</a></td></tr>
-                                    <tr><td><strong>Space ID:</strong></td><td><code>${config.spaceId}</code></td></tr>
-                                    <tr><td><strong>Base ID:</strong></td><td><code>${config.baseId}</code></td></tr>
-                                    <tr><td><strong>API Token:</strong></td><td><code>${config.accessToken.substring(0, 8)}...****</code></td></tr>
-                                </table>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="row">
-                            <div class="col-12">
-                                <h6><i class="fas fa-cogs text-success me-2"></i>Available Features</h6>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <ul class="list-unstyled">
-                                            <li><i class="fas fa-map text-primary me-2"></i>Interactive Map</li>
-                                            <li><i class="fas fa-table text-info me-2"></i>Data Management</li>
-                                            <li><i class="fas fa-globe text-success me-2"></i>Public Map</li>
-                                            <li><i class="fas fa-clipboard-list text-warning me-2"></i>Activity Logs</li>
-                                        </ul>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <ul class="list-unstyled">
-                                            <li><i class="fas fa-shield-alt text-danger me-2"></i>Permissions Management</li>
-                                            <li><i class="fas fa-users text-dark me-2"></i>User Management</li>
-                                            <li><i class="fas fa-cog text-secondary me-2"></i>Map Configuration</li>
-                                            <li><i class="fas fa-lock text-primary me-2"></i>Role-Based Access</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-primary" onclick="accessClientDashboard('${config.id}'); bootstrap.Modal.getInstance(document.getElementById('clientDetailsModal')).hide();">
-                            <i class="fas fa-sign-in-alt me-1"></i>Access Dashboard
-                        </button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Remove existing modal if present
-    const existingModal = document.getElementById('clientDetailsModal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-    
-    // Add modal to body
-    document.body.insertAdjacentHTML('beforeend', detailsModal);
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('clientDetailsModal'));
-    modal.show();
 }
 
 // Make functions globally available
 window.testConnection = testConnection;
-window.verifyConfiguration = verifyConfiguration;
+window.useConfig = useConfig;
 window.deleteConfig = deleteConfig;
-window.accessClientDashboard = accessClientDashboard;
-window.viewClientDetails = viewClientDetails;
+window.handleConfigSubmit = handleConfigSubmit;

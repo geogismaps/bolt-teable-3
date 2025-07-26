@@ -32,9 +32,6 @@ const baseMaps = {
     }
 };
 
-// Current base layer reference
-let currentBaseLayer = null;
-
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication
     if (!window.teableAuth.requireAuth()) return;
@@ -48,24 +45,18 @@ async function initializeMap() {
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Initialize API if needed - check if teableAPI exists first
-        if (window.teableAPI && currentUser.userType === 'space_owner') {
+        // Initialize API if needed
+        if (currentUser.userType === 'space_owner') {
             window.teableAPI.init(window.teableAuth.clientConfig);
         }
 
-        // Initialize Leaflet map with India center view and proper zoom for India
+        // Initialize Leaflet map
         map = L.map('map').setView([20.5937, 78.9629], 5);
 
-        // Add default base layer (OpenStreetMap) and store reference
-        currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+        // Add default base layer
+        L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution
         }).addTo(map);
-
-        // Set the default basemap selector value
-        const basemapSelector = document.getElementById('basemapSelector');
-        if (basemapSelector) {
-            basemapSelector.value = 'openstreetmap';
-        }
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
@@ -76,7 +67,7 @@ async function initializeMap() {
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('Map initialized successfully with India center view');
+        console.log('Map initialized successfully');
 
     } catch (error) {
         console.error('Map initialization failed:', error);
@@ -86,12 +77,6 @@ async function initializeMap() {
 
 async function loadAvailableTables() {
     try {
-        // Check if API is available
-        if (!window.teableAPI) {
-            console.warn('Teable API not available, skipping table loading');
-            return;
-        }
-
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
 
@@ -133,22 +118,13 @@ async function loadTableFields() {
         if (geometrySelector) {
             geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
         }
-        if(linkedTablesInfo) {
-            linkedTablesInfo.innerHTML = 'Select a table to see linked information';
-        }
+	if(linkedTablesInfo) {
+	    linkedTablesInfo.innerHTML = 'Select a table to see linked information';
+	}
         return;
     }
 
     try {
-        // Check if API is available
-        if (!window.teableAPI) {
-            console.warn('Teable API not available');
-            if (geometrySelector) {
-                geometrySelector.innerHTML = '<option value="">API not available</option>';
-            }
-            return;
-        }
-
         // Get sample records to detect fields
         const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
 
@@ -189,7 +165,7 @@ async function loadTableFields() {
                     showSuccess(`Auto-detected geometry field: ${detectedGeometryField}`);
                 }
             }
-            if (linkedTablesInfo) {
+	    if (linkedTablesInfo) {
                 linkedTablesInfo.innerHTML = `
                     <div class="small">
                         <strong>Available Fields:</strong> ${fields.length}<br>
@@ -205,7 +181,7 @@ async function loadTableFields() {
         if (geometrySelector) {
             geometrySelector.innerHTML = '<option value="">Error loading fields</option>';
         }
-        if (linkedTablesInfo) {
+    if (linkedTablesInfo) {
             linkedTablesInfo.innerHTML = '<span class="text-danger">Error loading table information</span>';
         }
     }
@@ -235,11 +211,6 @@ async function addLayerFromTable() {
 
         if (!tableId || !layerName) {
             throw new Error('Please select a table and enter a layer name');
-        }
-
-        // Check if API is available
-        if (!window.teableAPI) {
-            throw new Error('Teable API not available. Please check your configuration.');
         }
 
         // Get table data
@@ -305,7 +276,7 @@ async function addLayerFromTable() {
             }
 
             updateLayersList();
-            updateMapStatistics();
+	    updateMapStatistics();
         }
 
     } catch (error) {
@@ -921,7 +892,7 @@ function updateLayersList() {
     let html = '';
     mapLayers.forEach((layer, index) => {
         const visibilityIcon = layer.visible ? 'fa-eye text-success' : 'fa-eye-slash text-muted';
-        const geometryIcon = getGeometryIcon(layer.type);
+	const geometryIcon = getGeometryIcon(layer.type);
 
         html += `
             <div class="layer-item ${layer.visible ? 'active' : ''}" data-layer-id="${layer.id}">
@@ -929,7 +900,7 @@ function updateLayersList() {
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
                             <i class="fas ${visibilityIcon} me-2" onclick="toggleLayerVisibility('${layer.id}')"></i>
-                            <i class="${geometryIcon} me-2"></i>
+			    <i class="${geometryIcon} me-2"></i>
                             <strong>${layer.name}</strong>
                         </div>
                         <div class="small text-muted">
@@ -937,7 +908,8 @@ function updateLayersList() {
                         </div>
                     </div>
                     <div class="layer-controls">
-                        <button class="btn-zoom" onclick="zoomToLayer('${layer.id}')" title="Zoom to Layer">
+                        <button class="btn-zoom" onclick```python
+="zoomToLayer('${layer.id}')" title="Zoom to Layer">
                             <i class="fas fa-search-plus"></i>
                         </button>
                         <button class="btn-table" onclick="showAttributeTable('${layer.id}')" title="Attribute Table">
@@ -988,7 +960,7 @@ function toggleLayerVisibility(layerId) {
     }
 
     updateLayersList();
-    updateMapStatistics();
+	updateMapStatistics();
 }
 
 function zoomToLayer(layerId) {
@@ -1003,11 +975,686 @@ function zoomToLayer(layerId) {
 }
 
 function showAttributeTable(layerId) {
-    showInfo('Attribute table functionality would be implemented here');
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+
+    if (!layer.records || layer.records.length === 0) {
+        showError('No data available for this layer');
+        return;
+    }
+
+    // Create and show docked attribute table
+    createDockedAttributeTable(layer);
 }
 
 function showLayerProperties(layerId) {
-    showInfo('Layer properties functionality would be implemented here');
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+
+    try {
+        // Store current layer for properties modal
+        window.currentPropertiesLayer = layer;
+
+        // Populate properties modal with layer data
+        populatePropertiesModal(layer);
+
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Error opening layer properties:', error);
+        showError('Failed to open layer properties: ' + error.message);
+    }
+}
+
+function createDockedAttributeTable(layer) {
+    // Remove existing docked table if present
+    const existingTable = document.getElementById('dockedAttributeTable');
+    if (existingTable) {
+        existingTable.remove();
+    }
+
+    // Create docked attribute table HTML
+    const dockedTableHTML = `
+        <div id="dockedAttributeTable" class="docked-attribute-table">
+            <div class="docked-table-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
+                    </h6>
+                    <div class="docked-table-controls">
+                        <button class="btn btn-sm btn-outline-light" onclick="toggleDockedTableSize()" title="Toggle Size">
+                            <i class="fas fa-expand-alt" id="tableToggleIcon"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" onclick="closeDockedTable()" title="Close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="docked-table-toolbar">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
+                                <i class="fas fa-check-square me-1"></i>Select All
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
+                                <i class="fas fa-square me-1"></i>Clear Selection
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
+                                <i class="fas fa-search-plus me-1"></i>Zoom to Selection
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="exportTableData('${layer.id}')">
+                                <i class="fas fa-download me-1"></i>Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <span class="text-muted">
+                            <span id="selectedCount">0</span> of ${layer.records.length} features selected
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="docked-table-content">
+                <table class="table table-sm table-striped mb-0" id="attributeTable">
+                    <thead class="table-dark sticky-top">
+                        ${createTableHeader(layer)}
+                    </thead>
+                    <tbody>
+                        ${createTableBody(layer)}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Add docked table to map container
+    const mapContainer = document.querySelector('.map-container');
+    mapContainer.insertAdjacentHTML('beforeend', dockedTableHTML);
+
+    // Adjust map height to accommodate the docked table
+    adjustMapForDockedTable();
+}
+
+function createTableHeader(layer) {
+    if (!layer.records || layer.records.length === 0) return '';
+
+    const fields = Object.keys(layer.records[0].fields || {});
+    let headerHTML = '<tr>';
+
+    // Add selection checkbox column
+    headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
+
+    // Add field columns
+    fields.forEach(field => {
+        if (field !== layer.geometryField) {
+            headerHTML += `<th>${field}</th>`;
+        }
+    });
+
+    // Add actions column
+    headerHTML += '<th style="width: 100px;">Actions</th>';
+    headerHTML += '</tr>';
+
+    return headerHTML;
+}
+
+function createTableBody(layer) {
+    if (!layer.records || layer.records.length === 0) return '';
+
+    const fields = Object.keys(layer.records[0].fields || {});
+    let bodyHTML = '';
+
+    layer.records.forEach((record, index) => {
+        bodyHTML += `<tr data-record-id="${record.id}" data-feature-index="${index}">`;
+
+        // Add selection checkbox
+        bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
+
+        // Add field data
+        fields.forEach(field => {
+            if (field !== layer.geometryField) {
+                let value = record.fields[field];
+                if (value === null || value === undefined) {
+                    value = '';
+                } else if (typeof value === 'string' && value.length > 50) {
+                    value = value.substring(0, 50) + '...';
+                }
+                bodyHTML += `<td title="${record.fields[field] || ''}">${value}</td>`;
+            }
+        });
+
+        // Add actions
+        bodyHTML += `
+            <td>
+                <button class="btn btn-xs btn-outline-primary" onclick="zoomToFeature('${layer.id}', ${index})" title="Zoom to Feature">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="btn btn-xs btn-outline-info" onclick="showFeatureInfo('${layer.id}', ${index})" title="Show Info">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </td>
+        `;
+
+        bodyHTML += '</tr>';
+    });
+
+    return bodyHTML;
+}
+
+function populatePropertiesModal(layer) {
+    try {
+        // Information tab
+        const propLayerName = document.getElementById('propLayerName');
+        const propDataSource = document.getElementById('propDataSource');
+        const propGeometryType = document.getElementById('propGeometryType');
+        const propFeatureCount = document.getElementById('propFeatureCount');
+
+        if (propLayerName) propLayerName.value = layer.name || '';
+        if (propDataSource) propDataSource.value = layer.tableId || '';
+        if (propGeometryType) propGeometryType.value = determineGeometryType(layer);
+        if (propFeatureCount) propFeatureCount.value = layer.featureCount || 0;
+
+    // Populate field selectors
+    populateFieldSelectors(layer);
+
+    // Symbology tab
+        const symbology = layer.properties?.symbology || {};
+        const propSymbologyType = document.getElementById('propSymbologyType');
+        const propFillColor = document.getElementById('propFillColor');
+        const propBorderColor = document.getElementById('propBorderColor');
+        const propBorderWidth = document.getElementById('propBorderWidth');
+        const propFillOpacity = document.getElementById('propFillOpacity');
+        const fillOpacityValue = document.getElementById('fillOpacityValue');
+        const borderWidthValue = document.getElementById('borderWidthValue');
+
+        if (propSymbologyType) propSymbologyType.value = symbology.type || 'single';
+        if (propFillColor) propFillColor.value = symbology.fillColor || '#3498db';
+        if (propBorderColor) propBorderColor.value = symbology.borderColor || '#2c3e50';
+        if (propBorderWidth) propBorderWidth.value = symbology.borderWidth || 2;
+        if (propFillOpacity) propFillOpacity.value = symbology.fillOpacity || 0.7;
+
+        // Update opacity display
+        if (fillOpacityValue) fillOpacityValue.textContent = Math.round((symbology.fillOpacity || 0.7) * 100) + '%';
+        if (borderWidthValue) borderWidthValue.textContent = (symbology.borderWidth || 2) + 'px';
+
+    // Labels tab
+        const labels = layer.properties?.labels || {};
+        const propEnableLabels = document.getElementById('propEnableLabels');
+        const propLabelField = document.getElementById('propLabelField');
+        const propLabelSize = document.getElementById('propLabelSize');
+        const propLabelColor = document.getElementById('propLabelColor');
+        const propLabelBackground = document.getElementById('propLabelBackground');
+        const propLabelControls = document.getElementById('propLabelControls');
+
+        if (propEnableLabels) propEnableLabels.checked = labels.enabled || false;
+        if (propLabelField) propLabelField.value = labels.field || '';
+        if (propLabelSize) propLabelSize.value = labels.fontSize || 12;
+        if (propLabelColor) propLabelColor.value = labels.color || '#333333';
+        if (propLabelBackground) propLabelBackground.checked = labels.background !== false;
+
+        // Update label controls visibility
+        if (propLabelControls) propLabelControls.style.display = labels.enabled ? 'block' : 'none';
+
+    // iTool tab
+        populatePopupFieldsSelector(layer);
+        const popup = layer.properties?.popup || {};
+
+        // Basic popup settings
+        const propEnablePopups = document.getElementById('propEnablePopups');
+        const propPopupTemplate = document.getElementById('propPopupTemplate');
+        const propMaxPopupWidth = document.getElementById('propMaxPopupWidth');
+        const propMaxFieldLength = document.getElementById('propMaxFieldLength');
+        const propPopupPosition = document.getElementById('propPopupPosition');
+
+        if (propEnablePopups) propEnablePopups.checked = popup.enabled !== false;
+        if (propPopupTemplate) propPopupTemplate.value = popup.template || 'default';
+        if (propMaxPopupWidth) propMaxPopupWidth.value = popup.maxWidth || 300;
+        if (propMaxFieldLength) propMaxFieldLength.value = popup.maxFieldLength || 100;
+        if (propPopupPosition) propPopupPosition.value = popup.position || 'auto';
+
+        // Advanced settings
+        const propShowEmptyFields = document.getElementById('propShowEmptyFields');
+        const propShowFieldIcons = document.getElementById('propShowFieldIcons');
+        const propHighlightLinks = document.getElementById('propHighlightLinks');
+        const propShowTooltips = document.getElementById('propShowTooltips');
+        const propEnableSearch = document.getElementById('propEnableSearch');
+        const propShowCopyButtons = document.getElementById('propShowCopyButtons');
+        const propEnableFieldSorting = document.getElementById('propEnableFieldSorting');
+        const propCustomTemplate = document.getElementById('propCustomTemplate');
+
+        if (propShowEmptyFields) propShowEmptyFields.checked = popup.showEmptyFields || false;
+        if (propShowFieldIcons) propShowFieldIcons.checked = popup.showFieldIcons !== false;
+        if (propHighlightLinks) propHighlightLinks.checked = popup.highlightLinks !== false;
+        if (propShowTooltips) propShowTooltips.checked = popup.showTooltips || false;
+        if (propEnableSearch) propEnableSearch.checked = popup.enableSearch || false;
+        if (propShowCopyButtons) propShowCopyButtons.checked = popup.showCopyButtons || false;
+        if (propEnableFieldSorting) propEnableFieldSorting.checked = popup.enableFieldSorting || false;
+        if (propCustomTemplate) propCustomTemplate.value = popup.customTemplate || '';
+
+        // Control settings
+        const controls = popup.controls || {};
+        const propShowZoomControls = document.getElementById('propShowZoomControls');
+        const propShowCenterControl = document.getElementById('propShowCenterControl');
+        const propShowExportControl = document.getElementById('propShowExportControl');
+        const propShowEditControl = document.getElementById('propShowEditControl');
+
+        if (propShowZoomControls) propShowZoomControls.checked = controls.showZoomControls !== false;
+        if (propShowCenterControl) propShowCenterControl.checked = controls.showCenterControl !== false;
+        if (propShowExportControl) propShowExportControl.checked = controls.showExportControl || false;
+        if (propShowEditControl) propShowEditControl.checked = controls.showEditControl || false;
+
+        // Handle template change and popup toggle
+        handleTemplateChange();
+        handlePopupToggle();
+
+        // Update symbology type display
+        updateSymbologyType();
+
+    } catch (error) {
+        console.error('Error populating properties modal:', error);
+        showError('Failed to load layer properties: ' + error.message);
+    }
+}
+
+function populateFieldSelectors(layer) {
+    if (!layer.records || layer.records.length === 0) return;
+
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+
+    // Populate label field selector
+    const labelFieldSelect = document.getElementById('propLabelField');
+    if (labelFieldSelect) {
+        const currentValue = labelFieldSelect.value;
+        labelFieldSelect.innerHTML = '<option value="">Select field...</option>';
+        fields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            labelFieldSelect.appendChild(option);
+        });
+        if (currentValue) labelFieldSelect.value = currentValue;
+    }
+
+    // Populate graduated field selector
+    const graduatedFieldSelect = document.getElementById('propGraduatedField');
+    if (graduatedFieldSelect) {
+        const currentValue = graduatedFieldSelect.value;
+        graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
+        fields.forEach(field => {
+            // Try to determine if field is numeric by checking sample values
+            const isNumeric = layer.records.some(record => {
+                const value = record.fields[field];
+                return !isNaN(parseFloat(value)) && isFinite(value);
+            });
+
+            if (isNumeric) {
+                const option = document.createElement('option');
+                option.value = field;
+                option.textContent = field;
+                graduatedFieldSelect.appendChild(option);
+            }
+        });
+        if (currentValue) graduatedFieldSelect.value = currentValue;
+    }
+
+    // Populate categorized field selector
+    const categorizedFieldSelect = document.getElementById('propCategorizedField');
+    if (categorizedFieldSelect) {
+        const currentValue = categorizedFieldSelect.value;
+        categorizedFieldSelect.innerHTML = '<option value="">Select field...</option>';
+        fields.forEach(field => {
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = field;
+            categorizedFieldSelect.appendChild(option);
+        });
+        if (currentValue) categorizedFieldSelect.value = currentValue;
+    }
+}
+
+function populatePopupFieldsSelector(layer) {
+    const container = document.getElementById('propPopupFields');
+    if (!container || !layer.records || layer.records.length === 0) return;
+
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const selectedFields = layer.properties?.popup?.fields || [];
+
+    let html = '';
+    fields.forEach(field => {
+        const isSelected = selectedFields.includes(field);
+        const fieldType = getFieldType(layer.records[0].fields[field]);
+        const fieldIcon = getFieldIcon(fieldType);
+
+        html += `
+            <div class="field-checkbox d-flex align-items-center mb-2">
+                <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
+                       ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
+                <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
+                <label class="form-check-label flex-grow-1" for="popup_field_${field}">
+                    ${field}
+                </label>
+                <small class="text-muted">(${fieldType})</small>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Update available fields for custom template
+    updateAvailableFieldsHelp(fields);
+}
+
+function getFieldType(value) {
+    if (value === null || value === undefined) return 'empty';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'string') {
+        if (value.match(/^\d{4}-\d{2}-\d{2}/)) return 'date';
+        if (value.match(/^https?:\/\//)) return 'url';
+        if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return 'email';
+        if (value.length > 100) return 'longtext';
+        return 'text';
+    }
+    return 'unknown';
+}
+
+function getFieldIcon(fieldType) {
+    const icons = {
+        'text': 'fas fa-font',
+        'longtext': 'fas fa-align-left',
+        'number': 'fas fa-hashtag',
+        'boolean': 'fas fa-check-square',
+        'date': 'fas fa-calendar',
+        'url': 'fas fa-link',
+        'email': 'fas fa-envelope',
+        'empty': 'fas fa-circle',
+        'unknown': 'fas fa-question-circle'
+    };
+    return icons[fieldType] || 'fas fa-question-circle';
+}
+
+function updateAvailableFieldsHelp(fields) {
+    const container = document.getElementById('availableFieldsHelp');
+    if (!container) return;
+
+    let html = '<div class="row">';
+    fields.forEach((field, index) => {
+        if (index > 0 && index % 3 === 0) html += '</div><div class="row">';
+        html += `<div class="col-md-4"><code>{{${field}}}</code></div>`;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function determineGeometryType(layer) {
+    if (!layer.features || layer.features.length === 0) return 'Unknown';
+
+    const feature = layer.features[0];
+    if (feature.getLatLng) return 'Point';
+    if (feature.getLatLngs) return 'Polygon';
+    return 'Unknown';
+}
+
+function selectAllRows(layerId) {
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, true);
+    });
+}
+
+function clearSelection(layerId) {
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, false);
+    });
+}
+
+function toggleAllRows(masterCheckbox, layerId) {
+    const checkboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = masterCheckbox.checked;
+        const featureIndex = parseInt(checkbox.closest('tr').dataset.featureIndex);
+        toggleRowSelection(layerId, featureIndex, masterCheckbox.checked);
+    });
+}
+
+function toggleRowSelection(layerId, featureIndex, isSelected) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.features[featureIndex]) return;
+
+    const feature = layer.features[featureIndex];
+
+    if (isSelected) {
+        // Add to selection
+        if (!selectedFeatures.includes(feature)) {
+            selectedFeatures.push(feature);
+
+            // Highlight feature on map in yellow
+            if (feature.setStyle) {
+                feature.setStyle({
+                    fillColor: '#ffff00',   // Yellow highlight
+                    color: '#000000',       // Black border
+                    weight: 3,              // Thicker border
+                    fillOpacity: 0.8        // More opaque when selected
+                });
+            }
+        }
+    } else {
+        // Remove from selection
+        const index = selectedFeatures.indexOf(feature);
+        if (index !== -1) {
+            selectedFeatures.splice(index, 1);
+
+            // Reset feature style to original
+            if (feature.setStyle) {
+                const originalStyle = layer.properties?.symbology || {};
+                feature.setStyle({
+                    fillColor: originalStyle.fillColor || '#3498db',
+                    color: originalStyle.borderColor || '#2c3e50',
+                    weight: originalStyle.borderWidth || 2,
+                    fillOpacity: originalStyle.fillOpacity || 0.7
+                });
+            }
+        }
+    }
+
+    // Update selection count
+    updateSelectionCount();
+}
+
+function updateSelectionCount() {
+    const countElement = document.getElementById('selectedCount');
+    const zoomButton = document.getElementById('zoomToSelectionBtn');
+
+    if (countElement) {
+        countElement.textContent = selectedFeatures.length;
+    }
+
+    if (zoomButton) {
+        zoomButton.disabled = selectedFeatures.length === 0;
+    }
+}
+
+function zoomToSelection(layerId) {
+    if (selectedFeatures.length === 0) {
+        showWarning('No features selected');
+        return;
+    }
+
+    // Create bounds from selected features
+    let bounds = null;
+    selectedFeatures.forEach(feature => {
+        if (feature.getBounds) {
+            const featureBounds = feature.getBounds();
+            if (!bounds) {
+                bounds = featureBounds;
+            } else {
+                bounds.extend(featureBounds);
+            }
+        } else if (feature.getLatLng) {
+            const latlng = feature.getLatLng();
+            if (!bounds) {
+                bounds = L.latLngBounds([latlng, latlng]);
+            } else {
+                bounds.extend(latlng);
+            }
+        }
+    });
+
+    if (bounds) {
+        map.fitBounds(bounds.pad(0.1));
+        showSuccess(`Zoomed to ${selectedFeatures.length} selected feature(s)`);
+    }
+}
+
+function zoomToFeature(layerId, featureIndex, options = null) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.features[featureIndex]) return;
+
+    const feature = layer.features[featureIndex];
+
+    // Store reference for popup zoom controls
+    window.currentPopupFeature = feature;
+
+    const defaultOptions = {
+        padding: 0.3,
+        maxZoom: 18,
+        minZoom: 10
+    };
+
+    const zoomOptions = { ...defaultOptions, ...options };
+
+    if (feature.getBounds) {
+        // Polygon or complex geometry
+        const bounds = feature.getBounds();
+        map.fitBounds(bounds.pad(zoomOptions.padding), {
+            maxZoom: zoomOptions.maxZoom
+        });
+    } else if (feature.getLatLng) {
+        // Point geometry
+        const latlng = feature.getLatLng();
+        map.setView(latlng, Math.max(zoomOptions.minZoom, map.getZoom()));
+    }
+
+    // Open popup if feature has one
+    if (feature.getPopup && feature.getPopup()) {
+        feature.openPopup();
+    }
+
+    showSuccess('Zoomed to feature');
+}
+
+function showFeatureInfo(layerId, featureIndex) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.records[featureIndex]) return;
+
+    const record = layer.records[featureIndex];
+    const feature = layer.features[featureIndex];
+
+    // Store reference for popup controls
+    window.currentPopupFeature = feature;
+
+    // Highlight the feature in yellow
+    if (feature.setStyle) {
+        feature.setStyle({
+            fillColor: '#ffff00',   // Yellow highlight
+            color: '#000000',       // Black border
+            weight: 3,              // Thicker border
+            fillOpacity: 0.8        // More opaque when selected
+        });
+    }
+
+    // Add to selected features if not already selected
+    if (!selectedFeatures.includes(feature)) {
+        selectedFeatures.push(feature);
+        updateSelectionCount();
+
+        // Update the corresponding checkbox in attribute table if visible
+        const checkbox = document.querySelector(`tr[data-feature-index="${featureIndex}"] .row-selector`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    }
+
+    // Ensure we have the latest record data
+    feature.recordData = record.fields;
+    feature.layerId = layerId;
+    feature.featureIndex = featureIndex;
+
+    // Create popup content using current layer configuration (respects popup field selection)
+    const popupContent = createFeaturePopup(record.fields, layer);
+
+    // Show popup on map
+    if (feature.getBounds) {
+        const center = feature.getBounds().getCenter();
+        L.popup()
+            .setLatLng(center)
+            .setContent(popupContent)
+            .openOn(map);
+    } else if (feature.getLatLng) {
+        feature.bindPopup(popupContent).openPopup();
+    }
+
+    console.log(`Feature info displayed for feature ${featureIndex} in layer "${layer.name}" with ${layer.properties?.popup?.fields?.length || 0} configured popup fields`);
+}
+
+function exportTableData(layerId) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer || !layer.records) {
+        showError('No data to export');
+        return;
+    }
+
+    try {
+        // Prepare CSV data
+        const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+
+        // Create CSV header
+        let csvContent = fields.join(',') + '\n';
+
+        // Add data rows
+        layer.records.forEach(record => {
+            const row = fields.map(field => {
+                let value = record.fields[field] || '';
+                // Escape commas and quotes
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                    value = '"' + value.replace(/"/g, '""') + '"';
+                }
+                return value;
+            });
+            csvContent += row.join(',') + '\n';
+        });
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${layer.name}_data.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showSuccess('Data exported successfully');
+    } catch (error) {
+        console.error('Export error:', error);
+        showError('Failed to export data: ' + error.message);
+    }
 }
 
 function removeLayer(layerId) {
@@ -1034,22 +1681,19 @@ function removeLayer(layerId) {
 function changeBasemap() {
     const basemapType = document.getElementById('basemapSelector').value;
 
-    // Remove current base layer if it exists
-    if (currentBaseLayer) {
-        map.removeLayer(currentBaseLayer);
-    }
+    // Remove current base layer
+    map.eachLayer(layer => {
+        if (layer._url && layer._url.includes('tile')) {
+            map.removeLayer(layer);
+        }
+    });
 
     // Add new base layer
     const basemap = baseMaps[basemapType];
     if (basemap) {
-        currentBaseLayer = L.tileLayer(basemap.url, {
+        L.tileLayer(basemap.url, {
             attribution: basemap.attribution
         }).addTo(map);
-
-        showSuccess(`Switched to ${basemapType} basemap`);
-        console.log(`Basemap changed to: ${basemapType}`);
-    } else {
-        showError(`Basemap type "${basemapType}" not found`);
     }
 }
 
@@ -1169,7 +1813,162 @@ function showGeoJSONPreview(data) {
 }
 
 async function uploadGeoJSON() {
-    showInfo('GeoJSON upload functionality would be implemented here');
+    if (!geoJSONData) {
+        showError('No GeoJSON data to upload');
+        return;
+    }
+
+    const tableName = document.getElementById('geoJSONTableName').value.trim();
+    if (!tableName) {
+        showError('Please enter a table name');
+        return;
+    }
+
+    try {
+        // Show progress
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        if (uploadProgress) uploadProgress.style.display = 'block';
+        if (uploadStatus) uploadStatus.textContent = 'Creating table...';
+
+        // Create table schema from GeoJSON
+        const tableSchema = createTableSchemaFromGeoJSON(geoJSONData, tableName);
+
+        // Create table
+        const newTable = await window.teableAPI.createTable(tableSchema);
+
+        if (uploadStatus) uploadStatus.textContent = 'Uploading features...';
+
+        // Upload features
+        const records = geoJSONData.features.map(feature => {
+            const fields = {
+                geometry: JSON.stringify(feature.geometry), // Store as WKT or GeoJSON string
+                ...feature.properties
+            };
+            return fields;
+        });
+
+        // Upload in batches
+        const batchSize = 100;
+        for (let i = 0; i < records.length; i += batchSize) {
+            const batch = records.slice(i, i + batchSize);
+            for (const record of batch) {
+                await window.teableAPI.createRecord(newTable.id, record);
+            }
+
+            const progress = Math.round(((i + batch.length) / records.length) * 100);
+            const progressBar = document.querySelector('.progress-bar');
+            if (progressBar) progressBar.style.width = progress + '%';
+            if (uploadStatus) uploadStatus.textContent = `Uploading... ${progress}%`;
+        }
+
+        // Create layer from uploaded data
+        const layerConfig = {
+            id: Date.now().toString(),
+            name: tableName,
+            tableId: newTable.id,
+            geometryField: 'geometry',
+            color: '#3498db',
+            visible: true,
+            type: 'geojson'
+        };
+
+        // Convert GeoJSON to records format
+        const layerRecords = geoJSONData.features.map((feature, index) => ({
+            id: `geojson_${index}`,
+            fields: {
+                geometry: JSON.stringify(feature.geometry),
+                ...feature.properties
+            }
+        }));
+
+        await createLayerFromData(layerRecords, layerConfig);
+
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addLayerModal'));
+        modal.hide();
+
+        // Reset form
+        const geoJSONTableName = document.getElementById('geoJSONTableName');
+        const geoJSONPreview = document.getElementById('geoJSONPreview');
+        const progressBar = document.querySelector('.progress-bar');
+
+        if (geoJSONTableName) geoJSONTableName.value = '';
+        if (geoJSONPreview) geoJSONPreview.style.display = 'none';
+        if (uploadProgress) uploadProgress.style.display = 'none';
+        if (progressBar) progressBar.style.width = '0%';
+
+        geoJSONData = null;
+
+        showSuccess(`GeoJSON uploaded successfully! Created table "${tableName}" with ${records.length} features.`);
+        updateLayersList();
+	updateMapStatistics();
+
+    } catch (error) {
+        console.error('Error uploading GeoJSON:', error);
+        showError('Failed to upload GeoJSON: ' + error.message);
+
+        // Hide progress
+        const uploadProgress = document.getElementById('uploadProgress');
+        if (uploadProgress) uploadProgress.style.display = 'none';
+    }
+}
+
+function createTableSchemaFromGeoJSON(geoJSON, tableName) {
+    const fields = [
+        { name: 'geometry', type: 'longText' } // Store geometry as text
+    ];
+
+    // Analyze properties to determine field types
+    const propertyTypes = {};
+
+    if (geoJSON.features && geoJSON.features.length > 0) {
+        geoJSON.features.forEach(feature => {
+            if (feature.properties) {
+                Object.keys(feature.properties).forEach(key => {
+                    const value = feature.properties[key];
+                    if (value !== null && value !== undefined) {
+                        const type = typeof value;
+                        if (!propertyTypes[key]) {
+                            propertyTypes[key] = new Set();
+                        }
+                        propertyTypes[key].add(type);
+                    }
+                });
+            }
+        });
+    }
+
+    // Create fields based on detected types
+    Object.keys(propertyTypes).forEach(key => {
+        const types = Array.from(propertyTypes[key]);
+        let fieldType = 'singleLineText'; // default
+
+        if (types.includes('number')) {
+            fieldType = 'number';
+        } else if (types.includes('boolean')) {
+            fieldType = 'checkbox';
+        } else if (types.length === 1 && types[0] === 'string') {
+            fieldType = 'singleLineText';
+        }
+
+        fields.push({
+            name: key,
+            type: fieldType
+        });
+    });
+
+    return {
+        name: tableName,
+        description: `Table created from GeoJSON upload`,
+        fields: fields
+    };
+}
+
+// Layer sorting
+function setupLayerSorting() {
+    // Implementation would go here
 }
 
 // Utility functions
@@ -1208,226 +2007,1462 @@ function showAlert(type, message) {
     }, 5000);
 }
 
-// Export/fullscreen functionality
-function exportMap() {
-    showInfo('Map export functionality would be implemented here');
+// Properties modal functions
+function switchPropertiesTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.properties-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // Update tab content
+    document.querySelectorAll('.tab-pane').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById(tabName + '-tab').style.display = 'block';
 }
 
-function fullscreenMap() {
-    const mapContainer = document.querySelector('.app-container');
+function updateSymbologyType() {
+    const symbologyType = document.getElementById('propSymbologyType').value;
+    const singleControls = document.getElementById('propSingleSymbol');
+    const graduatedControls = document.getElementById('propGraduated');
+    const categorizedControls = document.getElementById('propCategorized');
 
-    if (!document.fullscreenElement) {
-        mapContainer.requestFullscreen().then(() => {
-            // Invalidate map size after entering fullscreen
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100);
-            showSuccess('Entered fullscreen mode');
-        }).catch(err => {
-            console.error('Error entering fullscreen:', err);
-            showError('Failed to enter fullscreen mode');
-        });
-    } else {
-        document.exitFullscreen().then(() => {
-            // Invalidate map size after exiting fullscreen
-            setTimeout(() => {
-                map.invalidateSize();
-            }, 100);
-            showSuccess('Exited fullscreen mode');
-        }).catch(err => {
-            console.error('Error exiting fullscreen:', err);
-            showError('Failed to exit fullscreen mode');
-        });
+    // Hide all controls first
+    if (singleControls) singleControls.style.display = 'none';
+    if (graduatedControls) graduatedControls.style.display = 'none';
+    if (categorizedControls) categorizedControls.style.display = 'none';
+
+    // Show relevant controls
+    switch (symbologyType) {
+        case 'single':
+            if (singleControls) singleControls.style.display = 'block';
+            break;
+        case 'graduated':
+            if (graduatedControls) graduatedControls.style.display = 'block';
+            break;
+        case 'categorized':
+            if (categorizedControls) categorizedControls.style.display = 'block';
+            break;
     }
 }
 
-// Listen for fullscreen changes
-document.addEventListener('fullscreenchange', function() {
-    // Invalidate map size when fullscreen state changes
+function updatePopupFieldSelection(fieldName, isSelected) {
+    if (!window.currentPropertiesLayer) return;
+
+    const layer = window.currentPropertiesLayer;
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = {};
+    if (!layer.properties.popup.fields) layer.properties.popup.fields = [];
+
+    if (isSelected && !layer.properties.popup.fields.includes(fieldName)) {
+        layer.properties.popup.fields.push(fieldName);
+    } else if (!isSelected) {
+        layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
+    }
+
+    // Mark as configured when any field selection is made
+    layer.properties.popup.configured = true;
+
+    // Update the actual layer reference in mapLayers array immediately
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        // Deep copy to ensure changes are reflected
+        if (!mapLayers[layerIndex].properties) mapLayers[layerIndex].properties = {};
+        if (!mapLayers[layerIndex].properties.popup) mapLayers[layerIndex].properties.popup = {};
+        mapLayers[layerIndex].properties.popup.fields = [...layer.properties.popup.fields];
+        mapLayers[layerIndex].properties.popup.configured = true;
+
+        console.log(`Updated popup fields for layer "${layer.name}": ${layer.properties.popup.fields.join(', ')}`);
+        console.log('Fields will be applied when "Apply" button is clicked.');
+    }
+}
+
+function selectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, true);
+    });
+}
+
+function deselectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, false);
+    });
+}
+
+function generateGraduatedSymbology() {
+    const field = document.getElementById('propGraduatedField').value;
+    const classes = parseInt(document.getElementById('propGraduatedClasses').value);
+    const colorRamp = document.getElementById('propColorRamp').value;
+
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for graduated symbology');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+    const values = layer.records.map(record => parseFloat(record.fields[field])).filter(v => !isNaN(v));
+
+    if (values.length === 0) {
+        showError('No numeric values found in the selected field');
+        return;
+    }
+
+    // Calculate class breaks
+    values.sort((a, b) => a - b);
+    const min = values[0];
+    const max = values[values.length - 1];
+    const interval = (max - min) / classes;
+
+    // Generate color ramp
+    const colors = generateColorRamp(colorRamp, classes);
+
+    // Create legend
+    let legendHTML = '<div class="graduated-legend">';
+    for (let i = 0; i < classes; i++) {
+        const minVal = (min + i * interval).toFixed(2);
+        const maxVal = (min + (i + 1) * interval).toFixed(2);
+        legendHTML += `
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: ${colors[i]}"></div>
+                <span>${minVal} - ${maxVal}</span>
+            </div>
+        `;
+    }
+    legendHTML += '</div>';
+
+    const legendContainer = document.getElementById('propGraduatedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    layer.properties.symbology = {
+        type: 'graduated',
+        field: field,
+        classes: classes,
+        colorRamp: colorRamp,
+        breaks: Array.from({length: classes}, (_, i) => min + (i + 1) * interval),
+        colors: colors
+    };
+
+    showSuccess('Graduated symbology generated successfully');
+}
+
+function generateCategorizedSymbology() {
+    const field = document.getElementById('propCategorizedField').value;
+
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for categorized symbology');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+    const uniqueValues = [...new Set(layer.records.map(record => record.fields[field]).filter(v => v != null))];
+
+    if (uniqueValues.length === 0) {
+        showError('No values found in the selected field');
+        return;
+    }
+
+    // Generate colors
+    const colors = generateColorPalette(uniqueValues.length);
+
+    // Create legend
+    let legendHTML = '<div class="categorized-legend">';
+    uniqueValues.forEach((value, index) => {
+        legendHTML += `
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: ${colors[index]}"></div>
+                <span>${value}</span>
+            </div>
+        `;
+    });
+    legendHTML += '</div>';
+
+    const legendContainer = document.getElementById('propCategorizedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    layer.properties.symbology = {
+        type: 'categorized',
+        field: field,
+        categories: uniqueValues.map((value, index) => ({
+            value: value,
+            color: colors[index],
+            label: String(value)
+        }))
+    };
+
+    showSuccess('Categorized symbology generated successfully');
+}
+
+function generateColorRamp(rampName, count) {
+    const ramps = {
+        blues: ['#08519c', '#3182bd', '#6baed6', '#9ecae1', '#c6dbef'],
+        greens: ['#006d2c', '#31a354', '#74c476', '#a1d99b', '#c7e9c0'],
+        reds: ['#a50f15', '#de2d26', '#fb6a4a', '#fc9272', '#fcbba1'],
+        oranges: ['#b30000', '#e34a33', '#fc8d59', '#fdbb84', '#fdd49e'],
+        purples: ['#54278f', '#756bb1', '#9e9ac8', '#bcbddc', '#dadaeb']
+    };
+
+    const baseColors = ramps[rampName] || ramps.blues;
+
+    if (count <= baseColors.length) {
+        return baseColors.slice(0, count);
+    }
+
+    // Interpolate colors if we need more than available
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        const ratio = i / (count - 1);
+        const index = ratio * (baseColors.length - 1);
+        const lower = Math.floor(index);
+        const upper = Math.ceil(index);
+
+        if (lower === upper) {
+            colors.push(baseColors[lower]);
+        } else {
+            // Simple interpolation
+            colors.push(baseColors[lower]); // For simplicity, just use the lower color
+        }
+    }
+
+    return colors;
+}
+
+function generateColorPalette(count) {
+    const colors = [];
+    const hueStep = 360 / count;
+
+    for (let i = 0; i < count; i++) {
+        const hue = (i * hueStep) % 360;
+        const saturation = 70 + (i % 3) * 10;
+        const lightness = 50 + (i % 2) * 10;
+
+        colors.push(hslToHex(hue, saturation, lightness));
+    }
+
+    return colors;
+}
+
+function hslToHex(h, s, l) {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function applyProperties() {
+    if (!window.currentPropertiesLayer) {
+        showError('No layer selected for properties update');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+
+    // Update layer name
+    layer.name = document.getElementById('propLayerName').value;
+
+    // Update symbology properties
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+
+    layer.properties.symbology.fillColor = document.getElementById('propFillColor').value;
+    layer.properties.symbology.borderColor = document.getElementById('propBorderColor').value;
+    layer.properties.symbology.borderWidth = parseInt(document.getElementById('propBorderWidth').value);
+    layer.properties.symbology.fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
+
+    // Update labels properties
+    if (!layer.properties.labels) layer.properties.labels = {};
+    layer.properties.labels.enabled = document.getElementById('propEnableLabels').checked;
+    layer.properties.labels.field = document.getElementById('propLabelField').value;
+    layer.properties.labels.fontSize = parseInt(document.getElementById('propLabelSize').value);
+    layer.properties.labels.color = document.getElementById('propLabelColor').value;
+    layer.properties.labels.background = document.getElementById('propLabelBackground').checked;
+
+    // Update popup properties with all iTool settings
+    if (!layer.properties.popup) layer.properties.popup = {};
+
+    // Apply all popup settings
+    updateLayerPopupSettings(layer);
+
+    // Collect selected popup fields from checkboxes
+    const selectedPopupFields = [];
+    const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
+    popupCheckboxes.forEach(checkbox => {
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        selectedPopupFields.push(fieldName);
+    });
+
+    // Update popup fields in layer properties and mark as configured
+    layer.properties.popup.fields = selectedPopupFields;
+    layer.properties.popup.configured = true;
+
+    console.log(`Applying popup configuration for layer "${layer.name}"`);
+    console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
+    console.log(`Total selected fields: ${selectedPopupFields.length}`);
+
+    // Update the actual layer reference in mapLayers array
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        // Deep copy the updated properties to ensure changes persist
+        mapLayers[layerIndex].properties = JSON.parse(JSON.stringify(layer.properties));
+        mapLayers[layerIndex].name = layer.name;
+
+        // Force update all existing feature popups with new field configuration
+        if (mapLayers[layerIndex].features && mapLayers[layerIndex].records) {
+            console.log(`Updating popups for ${mapLayers[layerIndex].features.length} features`);
+
+            mapLayers[layerIndex].features.forEach((feature, index) => {
+                // Get the record data for this feature
+                const recordData = mapLayers[layerIndex].records[index]?.fields;
+
+                if (recordData) {
+                    // Update the cached record data on the feature
+                    feature.recordData = recordData;
+                    feature.layerId = mapLayers[layerIndex].id;
+                    feature.featureIndex = index;
+
+                    // Create new popup content with updated field configuration
+                    const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
+
+                    // Remove existing popup if it exists
+                    if (feature.getPopup()) {
+                        feature.unbindPopup();
+                    }
+
+                    // Bind new popup with updated content
+                    feature.bindPopup(newPopupContent);
+
+                    // Update click handler to use new configuration
+                    feature.off('click');
+                    feature.on('click', function(e) {
+                        window.currentPopupFeature = this;
+                        handleFeatureClick(this, index, mapLayers[layerIndex]);
+                    });
+                }
+            });
+
+            console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
+        }
+    }
+
+    // Apply visual styling changes to map features
+    applyLayerStyling(layer);
+
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    } else {
+        // Remove labels if disabled
+        if (layer.labelGroup) {
+            map.removeLayer(layer.labelGroup);
+            layer.labelGroup = null;
+        }
+    }
+
+    // Update layers list to reflect changes
+    updateLayersList();
+
+    const fieldCount = selectedPopupFields.length;
+    const message = fieldCount === 0 ? 
+        'Layer properties applied! Popup will show no fields.' : 
+        `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
+
+    showSuccess(message);
+}
+
+function applyAndCloseProperties() {
+    applyProperties();
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function cancelProperties() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('layerPropertiesModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+function applyLayerStyling(layer) {
+    if (!layer.features || !layer.properties) return;
+
+    const symbology = layer.properties.symbology;
+
+    layer.features.forEach(feature => {
+        if (feature.setStyle) {
+            feature.setStyle({
+                fillColor: symbology.fillColor || '#3498db',
+                color: symbology.borderColor || '#2c3e50',
+                weight: symbology.borderWidth || 2,
+                fillOpacity: symbology.fillOpacity || 0.7
+            });
+        }
+    });
+
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    }
+}
+
+function applyLabelsToLayer(layer) {
+    // Remove existing labels
+    if (layer.labelGroup) {
+        map.removeLayer(layer.labelGroup);
+        layer.labelGroup = null;
+    }
+
+    const labels = layer.properties.labels;
+    if (!labels.enabled || !labels.field) return;
+
+    const labelMarkers = [];
+
+    layer.features.forEach((feature, index) => {
+        const record = layer.records[index];
+        if (!record || !record.fields[labels.field]) return;
+
+        let labelPosition;
+        if (feature.getLatLng) {
+            labelPosition = feature.getLatLng();
+        } else if (feature.getBounds) {
+            labelPosition = feature.getBounds().getCenter();
+        } else {
+            return;
+        }
+
+        const labelText = String(record.fields[labels.field]);
+        const fontSize = labels.fontSize || 12;
+        const color = labels.color || '#333333';
+        const background = labels.background !== false;
+
+        const labelMarker = L.marker(labelPosition, {
+            icon: L.divIcon({
+                className: 'feature-label',
+                html: `<div style="
+                    font-size: ${fontSize}px;
+                    color: ${color};
+                    font-weight: bold;
+                    text-align: center;
+                    white-space: nowrap;
+                    pointer-events: none;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+                    ${background ? `
+                        background: rgba(255,255,255,0.8);
+                        padding: 2px 6px;
+                        border-radius: 3px;
+                        border: 1px solid rgba(0,0,0,0.3);
+                    ` : ''}
+                ">${labelText}</div>`,
+                iconSize: [null, null],
+                iconAnchor: [0, 0]
+            }),
+            zIndexOffset: 1000
+        });
+
+        labelMarkers.push(labelMarker);
+    });
+
+    if (labelMarkers.length > 0) {
+        layer.labelGroup = L.layerGroup(labelMarkers);
+        if (layer.visible) {
+            layer.labelGroup.addTo(map);
+        }
+    }
+}
+
+// Additional iTool utility functions
+function filterPopupFields(searchTerm) {
+    const fields = document.querySelectorAll('.popup-field, tr[data-field], .card[data-field]');
+    fields.forEach(field => {
+        const fieldName = field.dataset.field || '';
+        const fieldContent = field.textContent.toLowerCase();
+        const isVisible = fieldName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         fieldContent.includes(searchTerm.toLowerCase());
+        field.style.display = isVisible ? '' : 'none';
+    });
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showSuccess('Copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showSuccess('Copied to clipboard!');
+    });
+}
+
+function previewPopup() {
+    if (!window.currentPropertiesLayer || !window.currentPropertiesLayer.records) {
+        showError('No layer selected or no data available for preview');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+    const sampleRecord = layer.records[0];
+
+    if (!sampleRecord || !sampleRecord.fields) {
+        showError('No sample data available for preview');
+        return;
+    }
+
+    // Apply current settings to layer temporarily for preview
+    updateLayerPopupSettings(layer);
+
+    // Generate preview content
+    const previewContent = createFeaturePopup(sampleRecord.fields, layer);
+
+    // Display in preview area
+    document.getElementById('popupPreview').innerHTML = previewContent;
+}
+
+function updateLayerPopupSettings(layer) {
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = {};
+
+    // Collect all settings from the form
+    layer.properties.popup.enabled = document.getElementById('propEnablePopups')?.checked !== false;
+    layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
+    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
+    layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
+    layer.properties.popup.position = document.getElementById('propPopupPosition')?.value || 'auto';
+    layer.properties.popup.showEmptyFields = document.getElementById('propShowEmptyFields')?.checked || false;
+    layer.properties.popup.showFieldIcons = document.getElementById('propShowFieldIcons')?.checked !== false;
+    layer.properties.popup.highlightLinks = document.getElementById('propHighlightLinks')?.checked !== false;
+    layer.properties.popup.showTooltips = document.getElementById('propShowTooltips')?.checked || false;
+    layer.properties.popup.enableSearch = document.getElementById('propEnableSearch')?.checked || false;
+    layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
+    layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
+    layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
+
+    // Controls
+    if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
+    layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
+    layer.properties.popup.controls.showCenterControl = document.getElementById('propShowCenterControl')?.checked !== false;
+    layer.properties.popup.controls.showExportControl = document.getElementById('propShowExportControl')?.checked || false;
+    layer.properties.popup.controls.showEditControl = document.getElementById('propShowEditControl')?.checked || false;
+}
+
+function exportCurrentFeature() {
+    if (!window.currentPopupFeature || !window.currentPopupFeature.recordData) {
+        showError('No feature data available for export');
+        return;
+    }
+
+    const data = window.currentPopupFeature.recordData;
+    const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'feature_data.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+
+    showSuccess('Feature data exported successfully!');
+}
+
+function editCurrentFeature() {
+    showInfo('Feature editing functionality would be implemented here based on permissions');
+}
+
+// Template change handler
+function handleTemplateChange() {
+    const template = document.getElementById('propPopupTemplate')?.value;
+    const customSection = document.getElementById('customTemplateSection');
+
+    if (template === 'custom' && customSection) {
+        customSection.style.display = 'block';
+    } else if (customSection) {
+        customSection.style.display = 'none';
+    }
+}
+
+// Popup enable/disable handler
+function handlePopupToggle() {
+    const enabled = document.getElementById('propEnablePopups')?.checked;
+    const configSection = document.getElementById('popupConfigSection');
+
+    if (configSection) {
+        configSection.style.display = enabled ? 'block' : 'none';
+    }
+}
+
+// Make functions globally available
+window.toggleSection = toggleSection;
+window.showAddLayerModal = showAddLayerModal;
+window.addNewLayer = addNewLayer;
+window.loadTableFields = loadTableFields;
+window.toggleLayerVisibility = toggleLayerVisibility;
+window.zoomToLayer = zoomToLayer;
+window.showAttributeTable = showAttributeTable;
+window.showLayerProperties = showLayerProperties;
+window.removeLayer = removeLayer;
+window.changeBasemap = changeBasemap;
+window.toggleDockedTableSize = toggleDockedTableSize;
+window.closeDockedTable = closeDockedTable;
+window.startMeasurement = startMeasurement;
+window.clearMeasurements = clearMeasurements;
+window.loadFilterFields = loadFilterFields;
+window.loadFilterValues = loadFilterValues;
+window.addFilterRule = addFilterRule;
+window.removeFilterRule = removeFilterRule;
+window.applyFilters = applyFilters;
+window.clearAllFilters = clearAllFilters;
+window.exportMap = exportMap;
+window.fullscreenMap = fullscreenMap;
+window.switchPropertiesTab = switchPropertiesTab;
+window.updateSymbologyType = updateSymbologyType;
+window.applyProperties = applyProperties;
+window.applyAndCloseProperties = applyAndCloseProperties;
+window.cancelProperties = cancelProperties;
+window.selectAllRows = selectAllRows;
+window.toggleRowSelection = toggleRowSelection;
+window.zoomToSelection = zoomToSelection;
+window.generateGraduatedSymbology = generateGraduatedSymbology;
+window.generateCategorizedSymbology = generateCategorizedSymbology;
+window.selectAllPopupFields = selectAllPopupFields;
+window.deselectAllPopupFields = deselectAllPopupFields;
+window.zoomToFeature = zoomToFeature;
+window.showFeatureInfo = showFeatureInfo;
+window.exportTableData = exportTableData;
+window.clearSelection = clearSelection;
+window.toggleAllRows = toggleAllRows;
+window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.filterPopupFields = filterPopupFields;
+window.copyToClipboard = copyToClipboard;
+window.previewPopup = previewPopup;
+window.exportCurrentFeature = exportCurrentFeature;
+window.editCurrentFeature = editCurrentFeature;
+window.handleTemplateChange = handleTemplateChange;
+window.handlePopupToggle = handlePopupToggle;
+
+// Docked table utility functions
+function toggleDockedTableSize() {
+    const dockedTable =document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
+
+    if (!dockedTable) return;
+
+    if (dockedTable.classList.contains('expanded')) {
+        dockedTable.classList.remove('expanded');
+        toggleIcon.className = 'fas fa-expand-alt';
+    } else {
+        dockedTable.classList.add('expanded');
+        toggleIcon.className = 'fas fa-compress-alt';
+    }
+
+    adjustMapForDockedTable();
+}
+
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        adjustMapForDockedTable();
+    }
+}
+
+function adjustMapForDockedTable() {
+    const mapElement = document.getElementById('map');
+    const dockedTable = document.getElementById('dockedAttributeTable');
+
+    if (!mapElement) return;
+
+    if (dockedTable) {
+        const isExpanded = dockedTable.classList.contains('expanded');
+        const tableHeight = isExpanded ? '60%' : '30%';
+        const mapHeight = isExpanded ? '40%' : '70%';
+
+        mapElement.style.height = mapHeight;
+        dockedTable.style.height = tableHeight;
+    } else {
+        mapElement.style.height = '100%';
+    }
+
+    // Invalidate map size to ensure proper rendering
     setTimeout(() => {
         if (map) {
             map.invalidateSize();
         }
     }, 100);
-});
-
-// Additional utility functions
-function resetMapView() {
-    map.setView([20.5937, 78.9629], 5);
-    showSuccess('Map view reset to India');
 }
 
-function zoomToAllLayers() {
-    if (mapLayers.length === 0) {
-        showWarning('No layers available to zoom to');
-        return;
-    }
-
-    let bounds = null;
-    mapLayers.forEach(layer => {
-        if (layer.visible && layer.bounds) {
-            if (!bounds) {
-                bounds = layer.bounds;
-            } else {
-                bounds.extend(layer.bounds);
-            }
-        }
-    });
-
-    if (bounds) {
-        map.fitBounds(bounds.pad(0.1));
-        showSuccess('Zoomed to all visible layers');
-    } else {
-        showWarning('No visible layers with valid bounds found');
-    }
-}
-
-function updateMapStatistics() {
-    // Update map statistics
-    console.log('Map statistics updated');
-}
-
-function handleFeatureClick(feature, index, layerConfig) {
-    // Handle feature click
-    console.log('Feature clicked:', feature, index, layerConfig);
-}
-
-function getFieldType(value) {
-    if (value === null || value === undefined) return 'empty';
-    if (typeof value === 'number') return 'number';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'string') {
-        if (value.match(/^\d{4}-\d{2}-\d{2}/)) return 'date';
-        if (value.match(/^https?:\/\//)) return 'url';
-        if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return 'email';
-        if (value.length > 100) return 'longtext';
-        return 'text';
-    }
-    return 'unknown';
-}
-
-function getFieldIcon(fieldType) {
-    const icons = {
-        'text': 'fas fa-font',
-        'longtext': 'fas fa-align-left',
-        'number': 'fas fa-hashtag',
-        'boolean': 'fas fa-check-square',
-        'date': 'fas fa-calendar',
-        'url': 'fas fa-link',
-        'email': 'fas fa-envelope',
-        'empty': 'fas fa-circle',
-        'unknown': 'fas fa-question-circle'
-    };
-    return icons[fieldType] || 'fas fa-question-circle';
-}
-
-// Global functions for popup controls
-window.zoomToCurrentPopupFeature = function(level) {
+// Global functions for popup zoom controls
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
     if (!window.currentPopupFeature) return;
 
-    const options = {};
-    if (level === 'close') {
-        options.padding = 0.1;
-        options.maxZoom = 18;
-    } else if (level === 'medium') {
-        options.padding = 0.3;
-        options.maxZoom = 15;
-    }
+    const options = {
+        close: { padding: 0.8, maxZoom: 20, minZoom: 16 },
+        medium: { padding: 0.4, maxZoom: 16, minZoom: 12 },
+        far: { padding: 0.2, maxZoom: 12, minZoom: 8 }
+    };
 
-    if (window.currentPopupFeature.getBounds) {
-        const bounds = window.currentPopupFeature.getBounds();
-        map.fitBounds(bounds.pad(options.padding || 0.2), {
-            maxZoom: options.maxZoom || 16
-        });
-    } else if (window.currentPopupFeature.getLatLng) {
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.setView(latlng, options.maxZoom || 16);
-    }
+    zoomToFeature(window.currentPopupFeature, options[zoomType] || options.close);
 };
 
 window.centerCurrentPopupFeature = function() {
     if (!window.currentPopupFeature) return;
 
-    if (window.currentPopupFeature.getBounds) {
-        const center = window.currentPopupFeature.getBounds().getCenter();
-        map.setView(center);
-    } else if (window.currentPopupFeature.getLatLng) {
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.setView(latlng);
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
+    }
+
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
     }
 };
 
-function exportCurrentFeature() {
-    if (!window.currentPopupFeature) return;
+// Additional zoom control functions
+window.resetMapView = function() {
+    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
+    showInfo('Map view reset to default');
+};
 
-    const data = {
-        recordId: window.currentPopupFeature.recordId,
-        recordData: window.currentPopupFeature.recordData,
-        layerId: window.currentPopupFeature.layerId,
-        featureIndex: window.currentPopupFeature.featureIndex
-    };
+window.zoomToAllLayers = function() {
+    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `feature_${data.recordId || 'unknown'}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (visibleLayers.length === 0) {
+        showWarning('No visible layers to zoom to');
+        return;
+    }
 
-    showSuccess('Feature exported successfully');
-}
-
-function editCurrentFeature() {
-    if (!window.currentPopupFeature) return;
-
-    showInfo('Feature editing functionality would be implemented here');
-}
-
-function copyToClipboard(text) {
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-            showSuccess('Copied to clipboard');
-        }).catch(() => {
-            showError('Failed to copy to clipboard');
+    // Collect all features from visible layers
+    const allFeatures = [];
+    visibleLayers.forEach(layer => {
+        layer.features.forEach(feature => {
+            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
+                allFeatures.push(feature);
+            }
         });
-    } else {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            showSuccess('Copied to clipboard');
-        } catch (err) {
-            showError('Failed to copy to clipboard');
-        }
-        document.body.removeChild(textArea);
+    });
+
+    if (allFeatures.length === 0) {
+        showWarning('No valid features found to zoom to');
+        return;
+    }
+
+    // Create feature group and fit bounds
+    const group = new L.featureGroup(allFeatures);
+    const bounds = group.getBounds();
+
+    // Calculate adaptive padding
+    const latSpan = bounds.getNorth() - bounds.getSouth();
+    const lngSpan = bounds.getEast() - bounds.getWest();
+    const maxSpan = Math.max(latSpan, lngSpan);
+
+    let padding = maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
+
+    map.fitBounds(bounds.pad(padding), { animate: true, duration: 1 });
+
+    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features`);
+};
+
+// Event listeners for property controls
+document.addEventListener('DOMContentLoaded', function() {
+    // Opacity slider
+    const opacitySlider = document.getElementById('propFillOpacity');
+    if (opacitySlider) {
+        opacitySlider.addEventListener('input', function() {
+            const fillOpacityValue = document.getElementById('fillOpacityValue');
+            if (fillOpacityValue) {
+                fillOpacityValue.textContent = Math.round(this.value * 100) + '%';
+            }
+        });
+    }
+
+    // Border width slider
+    const borderSlider = document.getElementById('propBorderWidth');
+    if (borderSlider) {
+        borderSlider.addEventListener('input', function() {
+            const borderWidthValue = document.getElementById('borderWidthValue');
+            if (borderWidthValue) {
+                borderWidthValue.textContent = this.value + 'px';
+            }
+        });
+    }
+
+    // Labels checkbox
+    const labelsCheckbox = document.getElementById('propEnableLabels');
+    if (labelsCheckbox) {
+        labelsCheckbox.addEventListener('change', function() {
+            const propLabelControls = document.getElementById('propLabelControls');
+            if (propLabelControls) {
+                propLabelControls.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+    }
+
+    // iTool event listeners
+    const popupEnableCheckbox = document.getElementById('propEnablePopups');
+    if (popupEnableCheckbox) {
+        popupEnableCheckbox.addEventListener('change', handlePopupToggle);
+    }
+
+    const popupTemplateSelect = document.getElementById('propPopupTemplate');
+    if (popupTemplateSelect) {
+        popupTemplateSelect.addEventListener('change', handleTemplateChange);
+    }
+
+     // Tab switching for layer source
+    const tabButtons = document.querySelectorAll('#layerSourceTabs .nav-link');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-bs-target');
+
+            // Update button visibility based on active tab
+            const addLayerBtn = document.getElementById('addLayerBtn');
+            const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+
+            if (targetTab === '#geojson-pane') {
+                if (addLayerBtn) addLayerBtn.style.display = 'none';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'inline-block';
+            } else {
+                if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
+            }
+        });
+    });
+});
+
+// Measurement tools
+function startMeasurement(type) {
+    clearMeasurements();
+    currentMeasurement = type;
+    measurementPoints = [];
+
+    if (type === 'distance') {
+        map.on('click', onDistanceMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        showInfo('Click on the map to start measuring distance');
+    } else if (type === 'area') {
+        map.on('click', onAreaMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        showInfo('Click on the map to start measuring area');
     }
 }
 
-function filterPopupFields(searchTerm) {
-    const fields = document.querySelectorAll('.popup-field');
-    fields.forEach(field => {
-        const fieldName = field.dataset.field;
-        const fieldValue = field.textContent;
+function onDistanceMeasureClick(e) {
+    measurementPoints.push(e.latlng);
 
-        if (fieldName.toLowerCase().includes(searchTerm.toLowerCase()) ||            fieldValue.toLowerCase().includes(searchTerm.toLowerCase())) {
-            field.style.display = '';
-        } else {
-            field.style.display = 'none';
-        }
-    });
+    // Add marker
+    const marker = L.circleMarker(e.latlng, {
+        radius: 4,
+        fillColor: '#e74c3c',
+        color: '#c0392b',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    if (measurementPoints.length > 1) {
+        // Draw line
+        const line = L.polyline(measurementPoints, {
+            color: '#e74c3c',
+            weight: 3
+        }).addTo(measurementGroup);
+
+        // Calculate distance
+        const distance = calculateDistance(measurementPoints);
+
+        // Add distance label
+        const midpoint = L.latLng(
+            (measurementPoints[measurementPoints.length - 2].lat + e.latlng.lat) / 2,
+            (measurementPoints[measurementPoints.length - 2].lng + e.latlng.lng) / 2
+        );
+
+        L.marker(midpoint, {
+            icon: L.divIcon({
+                className: 'distance-label',
+                html: `<div class="measurement-result">${distance}</div>`,
+                iconSize: [60, 20],
+                iconAnchor: [30, 10]
+            })
+        }).addTo(measurementGroup);
+    }
 }
 
-// Logout function
-function logout() {
-    if (window.teableAuth && window.teableAuth.logout) {
-        window.teableAuth.logout();
+function onAreaMeasureClick(e) {
+    measurementPoints.push(e.latlng);
+
+    // Add marker
+    L.circleMarker(e.latlng, {
+        radius: 4,
+        fillColor: '#27ae60',
+        color: '#229954',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    if (measurementPoints.length > 2) {
+        // Draw polygon
+        const polygon = L.polygon(measurementPoints, {
+            color: '#27ae60',
+            weight: 3,
+            fillOpacity: 0.2
+        }).addTo(measurementGroup);
+
+        // Calculate area
+        const area = calculateArea(measurementPoints);
+
+        // Add area label at centroid
+        const centroid = polygon.getBounds().getCenter();
+        L.marker(centroid, {
+            icon: L.divIcon({
+                className: 'area-label',
+                html: `<div class="measurement-result">${area}</div>`,
+                iconSize: [80, 20],
+                iconAnchor: [40, 10]
+            })
+        }).addTo(measurementGroup);
+    }
+}
+
+function calculateDistance(points) {
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+        totalDistance += points[i - 1].distanceTo(points[i]);
+    }
+
+    if (totalDistance < 1000) {
+        return Math.round(totalDistance) + ' m';
     } else {
-        window.location.href = 'login.html';
+        return (totalDistance / 1000).toFixed(2) + ' km';
+    }
+}
+
+function calculateArea(points) {
+    if (points.length < 3) return '0 m²';
+
+    // Simple area calculation using shoelace formula
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+        const j = (i + 1) % points.length;
+        area += points[i].lat * points[j].lng;
+        area -= points[j].lat * points[i].lng;
+    }
+    area = Math.abs(area) / 2;
+
+    // Convert to approximate square meters (rough calculation)
+    area = area * 111320 * 111320 * Math.cos(points[0].lat * Math.PI / 180);
+
+    if (area < 10000) {
+        return Math.round(area) + ' m²';
+    } else {
+        return (area / 10000).toFixed(2) + ' ha';
+    }
+}
+
+function clearMeasurements() {
+    measurementGroup.clearLayers();
+    measurementPoints = [];
+    currentMeasurement = null;
+
+    // Reset cursor
+    map.getContainer().style.cursor = '';
+
+    // Remove event listeners
+    map.off('click', onDistanceMeasureClick);
+    map.off('click', onAreaMeasureClick);
+}
+
+// Filter functionality
+function loadFilterFields() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldSelect = document.getElementById('filterField');
+
+    if (fieldSelect) {
+        fieldSelect.innerHTML = '<option value="">Select field...</option>';
+
+        if (!layerId) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records || layer.records.length === 0) return;
+
+        const fields = Object.keys(layer.records[0].fields || {});
+        fields.forEach(field => {
+            if (field !== layer.geometryField) {
+                const option = document.createElement('option');
+                option.value = field;
+                option.textContent = field;
+                fieldSelect.appendChild(option);
+            }
+        });
+    }
+}
+
+function loadFilterValues() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldName = document.getElementById('filterField').value;
+    const valueSelect = document.getElementById('filterValue');
+
+    if (valueSelect) {
+        valueSelect.innerHTML = '<option value="">Select value...</option>';
+
+        if (!layerId || !fieldName) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records) return;
+
+        // Get unique values for the field
+        const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
+        uniqueValues.forEach(value => {
+            if (value !== null && value !== undefined) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                valueSelect.appendChild(option);
+            }
+        });
+    }
+}
+
+function addFilterRule() {
+    const layerId = document.getElementById('filterLayer').value;
+    const field = document.getElementById('filterField').value;
+    const operator = document.getElementById('filterOperator').value;
+    const value = document.getElementById('filterValue').value;
+
+    if (!layerId || !field || !operator || !value) {
+        showWarning('Please fill in all filter fields');
+        return;
+    }
+
+    const filter = {
+        id: Date.now().toString(),
+        layerId: layerId,
+        field: field,
+        operator: operator,
+        value: value
+    };
+
+    currentFilters.push(filter);
+    updateFilterRulesDisplay();
+
+    // Clear form
+    const filterLayer = document.getElementById('filterLayer');
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+
+    if (filterLayer) filterLayer.value = '';
+    if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
+    if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
+}
+
+function updateFilterRulesDisplay() {
+    const container = document.getElementById('filterRules');
+
+    if (!container) return;
+
+    if (currentFilters.length === 0) {
+        container.innerHTML = '<p class="text-muted">No filters applied</p>';
+        return;
+    }
+
+    let html = '';
+    currentFilters.forEach(filter => {
+        const layer = mapLayers.find(l => l.id === filter.layerId);
+        const layerName = layer ? layer.name : 'Unknown Layer';
+
+        html += `
+            <div class="filter-rule">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${layerName}</strong> → ${filter.field} ${filter.operator} "${filter.value}"
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFilterRule('${filter.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function removeFilterRule(filterId) {
+    const index = currentFilters.findIndex(f => f.id === filterId);
+    if (index !== -1) {
+        currentFilters.splice(index, 1);
+        updateFilterRulesDisplay();
+        applyFilters(); // Re-apply remaining filters
+    }
+}
+
+function applyFilters() {
+    if (currentFilters.length === 0) {
+        // Show all features
+        mapLayers.forEach(layer => {
+            if (layer.visible && layer.leafletLayer) {
+                layer.features.forEach(feature => {
+                    if (!layer.leafletLayer.hasLayer(feature)) {
+                        layer.leafletLayer.addLayer(feature);
+                    }
+                });
+            }
+        });
+        showSuccess('All filters cleared - showing all features');
+        return;
+    }
+
+    let filteredCount = 0;
+    let totalCount = 0;
+
+    mapLayers.forEach(layer => {
+        if (!layer.visible) return;
+
+        const layerFilters = currentFilters.filter(f => f.layerId === layer.id);
+
+        layer.features.forEach(feature => {
+            totalCount++;
+            let showFeature = true;
+
+            // Apply all filters for this layer
+            layerFilters.forEach(filter => {
+                const fieldValue = feature.recordData[filter.field];
+
+                switch (filter.operator) {
+                    case 'equals':
+                        if (String(fieldValue) !== String(filter.value)) showFeature = false;
+                        break;
+                    case 'contains':
+                        if (!String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'starts_with':
+                        if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                }
+            });
+
+            // Show/hide feature based on filter result
+            if (showFeature) {
+                if (!layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.addLayer(feature);
+                }
+                filteredCount++;
+            } else {
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+            }
+        });
+    });
+
+    showSuccess(`Filters applied: showing ${filteredCount} of ${totalCount} features`);
+}
+
+function clearAllFilters() {
+    currentFilters = [];
+    updateFilterRulesDisplay();
+    applyFilters(); // This will show all features
+}
+
+// Populate layer selector in filters
+function updateLayerSelectors() {
+    const filterLayerSelect = document.getElementById('filterLayer');
+
+    if (filterLayerSelect) {
+        filterLayerSelect.innerHTML = '<option value="">Select layer...</option>';
+        mapLayers.forEach(layer => {
+            const option = document.createElement('option');
+            option.value = layer.id;
+            option.textContent = layer.name;
+            filterLayerSelect.appendChild(option);
+        });
+    }
+}
+
+function updateMapStatistics() {
+    const totalLayers = mapLayers.length;
+    const visibleLayers = mapLayers.filter(l => l.visible).length;
+    const totalFeatures = mapLayers.reduce((sum, layer) => sum + layer.featureCount, 0);
+    const visibleFeatures = mapLayers.filter(l => l.visible).reduce((sum, layer) => {
+        if (layer.leafletLayer) {
+            return sum + layer.leafletLayer.getLayers().length;
+        }
+        return sum;
+    }, 0);
+
+    const totalLayersElement = document.getElementById('totalLayers');
+    const totalFeaturesElement = document.getElementById('totalFeatures');
+    const visibleFeaturesElement = document.getElementById('visibleFeatures');
+    const filteredFeaturesElement = document.getElementById('filteredFeatures');
+
+    if (totalLayersElement) totalLayersElement.textContent = totalLayers;
+    if (totalFeaturesElement) totalFeaturesElement.textContent = totalFeatures;
+    if (visibleFeaturesElement) visibleFeaturesElement.textContent = visibleFeatures;
+    if (filteredFeaturesElement) filteredFeaturesElement.textContent = totalFeatures - visibleFeatures;
+
+    // Update layer selectors
+    updateLayerSelectors();
+}
+
+// Export functionality
+function exportMap() {
+    showInfo('Map export functionality would be implemented here');
+}
+
+function fullscreenMap() {
+    const mapContainer = document.getElementById('map');
+
+    if (!mapContainer) {
+        showError('Map container not found');
+        return;
+    }
+
+    try {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (mapContainer.requestFullscreen) {
+                mapContainer.requestFullscreen();
+            } else if (mapContainer.webkitRequestFullscreen) {
+                mapContainer.webkitRequestFullscreen();
+            } else if (mapContainer.msRequestFullscreen) {
+                mapContainer.msRequestFullscreen();
+            } else if (mapContainer.mozRequestFullScreen) {
+                mapContainer.mozRequestFullScreen();
+            } else {
+                showError('Fullscreen not supported by this browser');
+                return;
+            }
+
+            // Add fullscreen class for styling
+            mapContainer.classList.add('fullscreen-map');
+
+            // Show success message
+            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
+
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+
+        // Listen for fullscreen changes to update map size and remove class
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+
+    } catch (error) {
+        console.error('Fullscreen error:', error);
+        showError('Failed to toggle fullscreen: ' + error.message);
+    }
+}
+
+function handleFullscreenChange() {
+    const mapContainer = document.getElementById('map');
+
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.msFullscreenElement && 
+        !document.mozFullScreenElement) {
+
+        // Exited fullscreen
+        if (mapContainer) {
+            mapContainer.classList.remove('fullscreen-map');
+        }
+
+        showInfo('Exited fullscreen mode');
+    }
+
+    // Invalidate map size to ensure proper rendering
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
+}
+
+function handleFeatureClick(feature, featureIndex, layerConfig) {
+    // Check if the feature is already selected
+    const isSelected = selectedFeatures.includes(feature);
+
+    // Toggle selection state
+    toggleRowSelection(layerConfig.id, featureIndex, !isSelected);
+
+    // Highlight if selected, reset style if deselected
+    if (!isSelected) {
+        // Highlight in yellow
+        if (feature.setStyle) {
+            feature.setStyle({
+                fillColor: '#ffff00',   // Yellow highlight color
+                color: '#000000',       // Black border
+                weight: 3,              // Thicker border
+                fillOpacity: 0.8        // More opaque when selected
+            });
+        }
+
+        // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
+        const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
+
+        // Ensure we have the record data for this feature
+        let recordData = feature.recordData;
+        if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
+            recordData = currentLayer.records[featureIndex].fields;
+            feature.recordData = recordData; // Cache for future use
+        }
+
+        if (recordData) {
+            // Create popup content using the current layer configuration (which includes updated popup fields)
+            const popupContent = createFeaturePopup(recordData, currentLayer);
+
+            // Update the popup with the new content that respects field selection
+            if (feature.getPopup()) {
+                feature.getPopup().setContent(popupContent);
+                feature.openPopup();
+            } else {
+                feature.bindPopup(popupContent).openPopup();
+            }
+
+            console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
+        }
+    } else {
+        // Reset to original style
+        if (feature.setStyle) {
+            const originalStyle = layerConfig.properties?.symbology || {};
+            feature.setStyle({
+                fillColor: originalStyle.fillColor || '#3498db',
+                color: originalStyle.borderColor || '#2c3e50',
+                weight: originalStyle.borderWidth || 2,
+                fillOpacity: originalStyle.fillOpacity || 0.7
+            });
+        }
+    }
+}
+
+// Field Permissions Check
+function hasFieldPermission(fieldName, permissionType) {
+    // Mock permission check - replace with actual logic using currentUser and field_permissions
+    // This function should query or reference the field_permissions table to determine
+    // if the current user has the specified permission for the given field.
+
+    // For demonstration purposes, let's assume all fields are viewable for now
+    return true;
+}
+
+async function loadFieldsForStyling(selectId) {
+    const layerId = document.getElementById('styleLayerSelector').value;
+    const fieldSelect = document.getElementById(selectId);
+
+    if (!layerId || !fieldSelect) return;
+
+    try {
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer) return;
+
+        // Get table fields
+        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1 });
+        if (!recordsData.records || recordsData.records.length === 0) return;
+
+        const allFieldNames = Object.keys(recordsData.records[0].fields || {});
+        // Filter fields by user permissions - only show viewable fields for styling
+        const fieldNames = allFieldNames.filter(fieldName => 
+            fieldName !== layer.geometryField && hasFieldPermission(fieldName, 'view')
+        );
+
+        fieldSelect.innerHTML = '<option value="">Select field...</option>';
+
+        if (fieldNames.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No fields available with current permissions';
+            option.disabled = true;
+            fieldSelect.appendChild(option);
+            return;
+        }
+
+        fieldNames.forEach(fieldName => {
+            const option = document.createElement('option');
+            option.value = fieldName;
+            option.textContent = fieldName;
+            fieldSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Error loading fields for styling:', error);
+    }
+}
+
+async function loadFieldsForLabelling() {
+    const layerId = document.getElementById('labelLayerSelector').value;
+    const fieldSelect = document.getElementById('labelField');
+
+    if (!layerId || !fieldSelect) return;
+
+    try {
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer) return;
+
+        // Get table fields
+        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1 });
+        if (!recordsData.records || recordsData.records.length === 0) return;
+
+        const allFieldNames = Object.keys(recordsData.records[0].fields || {});
+        // Filter fields by user permissions - only show viewable fields for labelling
+        const fieldNames = allFieldNames.filter(fieldName => 
+            fieldName !== layer.geometryField && hasFieldPermission(fieldName, 'view')
+        );
+
+        fieldSelect.innerHTML = '<option value="">Select field for labels...</option>';
+
+        if (fieldNames.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No fields available with current permissions';
+            option.disabled = true;
+            fieldSelect.appendChild(option);
+            return;
+        }
+
+        fieldNames.forEach(fieldName => {
+            const option = document.createElement('option');
+            option.value = fieldName;
+            option.textContent = fieldName;
+            fieldSelect.appendChild(option);
+        });
+
+        // Restore previous selection if user still has permission to view it
+        if (layer.properties?.labels?.field && fieldNames.includes(layer.properties.labels.field)) {
+            fieldSelect.value = layer.properties.labels.field;
+        }
+
+    } catch (error) {
+        console.error('Error loading fields for labelling:', error);
     }
 }

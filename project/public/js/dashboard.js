@@ -3,110 +3,56 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication first
+    // Check authentication
     if (!window.teableAuth.requireAuth()) return;
-
-    // For dashboard, allow all authenticated users but show different content based on role
+    
     initializeDashboard();
 });
 
 async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
-        const clientConfig = window.teableAuth.clientConfig;
         
-        // Update user display with client information
-        document.getElementById('userDisplay').textContent = 
-            `${session.firstName} ${session.lastName} (${session.role})`;
-            
-        // Show client information
-        if (clientConfig) {
-            const clientInfo = document.getElementById('clientInfo');
-            if (clientInfo) {
-                clientInfo.innerHTML = `
-                    <div class="alert alert-primary">
-                        <strong><i class="fas fa-building me-2"></i>${clientConfig.clientName}</strong><br>
-                        <small>Base: ${clientConfig.baseId} | Space: ${clientConfig.spaceId}</small>
-                    </div>
-                `;
-            }
-            
-            // Initialize API with client config
-            window.teableAPI.init(clientConfig);
+        // Display user info
+        displayUserInfo(session);
+        
+        // Show admin features if user is admin or creator
+        if (session.isAdmin || session.role === 'creator') {
+            document.getElementById('quickActions').style.display = 'block';
+            document.getElementById('mapConfigCard').style.display = 'block';
+            document.getElementById('logsCard').style.display = 'block';
+        } else {
+            // Hide admin-only cards for non-admin users
+            const adminCards = document.querySelectorAll('#mapConfigCard, #logsCard');
+            adminCards.forEach(card => {
+                card.style.display = 'none';
+            });
         }
 
-        // Show/hide admin features based on role
-        updateUIForUserRole(session);
+        // Initialize API
+        if (session.userType === 'space_owner') {
+            // API should already be initialized from login
+            window.teableAPI.init(window.teableAuth.clientConfig);
+        }
 
         // Load dashboard data
         await loadDashboardStats();
-        await loadRecentActivity();
-        await loadSystemHealth();
-
-        console.log(`✅ Dashboard initialized for client: ${clientConfig?.clientName || 'Unknown'}`);
-
+        
     } catch (error) {
         console.error('Dashboard initialization failed:', error);
-        showError('Failed to initialize dashboard: ' + error.message);
+        showError('Failed to load dashboard: ' + error.message);
     }
 }
 
-function updateUIForUserRole(session) {
-    const isAdmin = window.teableAuth.isAdmin();
-    const clientConfig = window.teableAuth.clientConfig;
-
-    console.log('Updating UI for:', {
-        role: session.role,
-        isAdmin: isAdmin,
-        isConfigAdmin: session.isConfigAdmin,
-        client: clientConfig?.clientName
-    });
-
-    // Hide super admin sections (config management) - only for super admin
-    const superAdminSections = document.querySelectorAll('.super-admin-only');
-    superAdminSections.forEach(section => {
-        section.style.display = session.isConfigAdmin ? 'block' : 'none';
-    });
-
-    // Show ALL client tabs for authenticated users - this is the main functionality
-    const clientTabs = document.querySelectorAll('.client-tab');
-    clientTabs.forEach(tab => {
-        tab.style.display = 'block';
-        console.log('Showing client tab:', tab.querySelector('h5')?.textContent || 'Unknown');
-    });
-
-    // Apply role-based restrictions within features
-    updateClientFeatures(session);
-
-    // Update page title and branding to show client name
-    if (clientConfig) {
-        document.title = `${clientConfig.clientName} - Dashboard`;
-        
-        // Update any client name placeholders
-        const clientNameElements = document.querySelectorAll('.client-name-placeholder');
-        clientNameElements.forEach(el => {
-            el.textContent = clientConfig.clientName;
-        });
-
-        // Update header with client information
-        const headerTitle = document.querySelector('h1');
-        if (headerTitle && headerTitle.textContent.includes('Dashboard')) {
-            headerTitle.innerHTML = `<i class="fas fa-building me-2"></i>${clientConfig.clientName} Dashboard`;
-        }
-    }
-
-    console.log('✅ UI updated - All client features should be accessible based on role');
-}
-
-function updateClientFeatures(session) {
-    // Show/hide features based on role within the client base
-    const isClientAdmin = session.role === 'owner' || session.role === 'admin';
+function displayUserInfo(session) {
+    const displayName = `${session.firstName} ${session.lastName} (${session.role})`;
+    document.getElementById('userDisplay').textContent = displayName;
     
-    // User management only for client admins
-    const userMgmtSections = document.querySelectorAll('.client-admin-only');
-    userMgmtSections.forEach(section => {
-        section.style.display = isClientAdmin ? 'block' : 'none';
-    });
+    // Update hero section user info
+    const heroDisplay = document.getElementById('userDisplayHero');
+    if (heroDisplay) {
+        heroDisplay.textContent = `${session.firstName} ${session.lastName}`;
+    }
 }
 
 async function loadDashboardStats() {
@@ -120,7 +66,7 @@ async function loadDashboardStats() {
             !t.name.startsWith('system_') &&
             t.name !== 'data_change_logs'
         );
-
+        
         document.getElementById('statTables').textContent = userTables.length;
 
         // Load users count
@@ -132,7 +78,7 @@ async function loadDashboardStats() {
         // Count total records (sample from first few tables)
         let totalRecords = 0;
         const tablesToSample = userTables.slice(0, 3); // Sample first 3 tables
-
+        
         for (const table of tablesToSample) {
             try {
                 const records = await window.teableAPI.getRecords(table.id, { limit: 1000 });
@@ -141,7 +87,7 @@ async function loadDashboardStats() {
                 console.log('Failed to count records for table:', table.name);
             }
         }
-
+        
         document.getElementById('statRecords').textContent = totalRecords;
 
         // Activity count
@@ -166,49 +112,11 @@ async function loadDashboardStats() {
     }
 }
 
-async function loadRecentActivity() {
-    try {
-        if (!window.teableAPI.systemTables.activity) {
-            console.log('Activity table not available');
-            return;
-        }
-
-        const activityData = await window.teableAPI.getRecords(window.teableAPI.systemTables.activity, { 
-            limit: 10,
-            sort: [{ field: 'timestamp', order: 'desc' }]
-        });
-        
-        const activities = activityData.records || [];
-        console.log('Recent activities loaded:', activities.length);
-        
-    } catch (error) {
-        console.error('Error loading recent activity:', error);
-    }
-}
-
-async function loadSystemHealth() {
-    try {
-        const session = window.teableAuth.getCurrentSession();
-        const clientConfig = window.teableAuth.clientConfig;
-        
-        // Basic health check - verify API connectivity
-        const tables = await window.teableAPI.getTables();
-        const isHealthy = tables && (tables.length > 0 || Array.isArray(tables));
-        
-        console.log('System health check:', isHealthy ? 'Healthy' : 'Issues detected');
-        console.log('Client:', clientConfig?.clientName || 'Unknown');
-        console.log('Base ID:', clientConfig?.baseId || 'Unknown');
-        
-    } catch (error) {
-        console.error('System health check failed:', error);
-    }
-}
-
 function showProfile() {
     const session = window.teableAuth.getCurrentSession();
-
+    
     alert(`Profile Information:
-
+    
 Name: ${session.firstName} ${session.lastName}
 Email: ${session.email}
 Role: ${session.role}
@@ -225,9 +133,9 @@ function showError(message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-
+    
     document.body.insertBefore(alertDiv, document.body.firstChild);
-
+    
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
