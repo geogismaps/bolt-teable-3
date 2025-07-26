@@ -36,6 +36,15 @@ const baseMaps = {
 let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Wait for all dependencies to load
+    if (typeof window.teableAuth === 'undefined') {
+        console.log('Waiting for teableAuth to load...');
+        setTimeout(() => {
+            initializeMap();
+        }, 500);
+        return;
+    }
+
     // Check authentication
     if (!window.teableAuth.requireAuth()) return;
 
@@ -114,6 +123,9 @@ async function loadAvailableTables() {
                 option.textContent = table.name;
                 tableSelector.appendChild(option);
             });
+
+            // Auto-trigger field loading when table is selected
+            tableSelector.addEventListener('change', loadTableFields);
         }
 
         console.log(`Loaded ${userTables.length} available tables`);
@@ -149,27 +161,62 @@ async function loadTableFields() {
             return;
         }
 
+        // Show loading indicator
+        if (geometrySelector) {
+            geometrySelector.innerHTML = '<option value="">Loading fields...</option>';
+        }
+        if (linkedTablesInfo) {
+            linkedTablesInfo.innerHTML = 'Loading table information...';
+        }
+
         // Get sample records to detect fields
-        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
+        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 10 });
 
         if (recordsData.records && recordsData.records.length > 0) {
             const fields = Object.keys(recordsData.records[0].fields || {});
 
-            // Auto-detect geometry field
+            // Enhanced geometry field detection
             let detectedGeometryField = null;
-            const geometryFieldCandidates = fields.filter(field => {
+            let confidence = 0;
+            
+            const geometryFieldCandidates = fields.map(field => {
                 const fieldLower = field.toLowerCase();
-                return fieldLower.includes('geom') || 
-                       fieldLower.includes('wkt') || 
-                       fieldLower.includes('shape') ||
-                       fieldLower.includes('polygon') ||
-                       fieldLower.includes('point') ||
-                       fieldLower.includes('coordinates') ||
-                       fieldLower.includes('geometry');
-            });
+                let score = 0;
+                
+                // Primary geometry field indicators
+                if (fieldLower === 'geometry' || fieldLower === 'geom') score += 10;
+                if (fieldLower === 'wkt' || fieldLower === 'shape') score += 9;
+                if (fieldLower.includes('polygon') || fieldLower.includes('point')) score += 8;
+                if (fieldLower.includes('coordinates') || fieldLower.includes('location')) score += 7;
+                
+                // Secondary indicators
+                if (fieldLower.includes('geom')) score += 5;
+                if (fieldLower.includes('wkt')) score += 5;
+                if (fieldLower.includes('shape')) score += 4;
+                
+                return { field, score };
+            }).filter(item => item.score > 0)
+              .sort((a, b) => b.score - a.score);
 
             if (geometryFieldCandidates.length > 0) {
-                detectedGeometryField = geometryFieldCandidates[0];
+                detectedGeometryField = geometryFieldCandidates[0].field;
+                confidence = geometryFieldCandidates[0].score;
+            }
+
+            // Verify the detected field contains valid geometry data
+            if (detectedGeometryField) {
+                const sampleGeometry = recordsData.records[0].fields[detectedGeometryField];
+                if (sampleGeometry && typeof sampleGeometry === 'string') {
+                    const upperGeometry = sampleGeometry.toUpperCase().trim();
+                    if (!upperGeometry.startsWith('POINT') && 
+                        !upperGeometry.startsWith('POLYGON') && 
+                        !upperGeometry.startsWith('MULTIPOLYGON') &&
+                        !upperGeometry.startsWith('LINESTRING') &&
+                        !upperGeometry.startsWith('MULTIPOINT')) {
+                        console.warn('Detected geometry field may not contain valid WKT data');
+                        confidence = Math.max(1, confidence - 3);
+                    }
+                }
             }
 
             // Populate geometry field selector
@@ -186,17 +233,29 @@ async function loadTableFields() {
                 });
 
                 if (detectedGeometryField) {
-                    showSuccess(`Auto-detected geometry field: ${detectedGeometryField}`);
+                    const confidenceText = confidence >= 8 ? 'High' : confidence >= 5 ? 'Medium' : 'Low';
+                    showSuccess(`Auto-detected geometry field: ${detectedGeometryField} (${confidenceText} confidence)`);
                 }
             }
+            
             if (linkedTablesInfo) {
+                const hasGeometry = detectedGeometryField ? 'Yes' : 'No';
                 linkedTablesInfo.innerHTML = `
                     <div class="small">
+                        <strong>Records Found:</strong> ${recordsData.records.length}<br>
                         <strong>Available Fields:</strong> ${fields.length}<br>
                         <strong>Geometry Field:</strong> ${detectedGeometryField || 'Not detected'}<br>
-                        <strong>Sample Fields:</strong> ${fields.slice(0, 3).join(', ')}${fields.length > 3 ? '...' : ''}
+                        <strong>Has Geometry:</strong> <span class="${hasGeometry === 'Yes' ? 'text-success' : 'text-warning'}">${hasGeometry}</span><br>
+                        <strong>Sample Fields:</strong> ${fields.slice(0, 5).join(', ')}${fields.length > 5 ? '...' : ''}
                     </div>
                 `;
+            }
+        } else {
+            if (geometrySelector) {
+                geometrySelector.innerHTML = '<option value="">No data found</option>';
+            }
+            if (linkedTablesInfo) {
+                linkedTablesInfo.innerHTML = '<span class="text-warning">No records found in this table</span>';
             }
         }
 
@@ -208,6 +267,7 @@ async function loadTableFields() {
         if (linkedTablesInfo) {
             linkedTablesInfo.innerHTML = '<span class="text-danger">Error loading table information</span>';
         }
+        showError('Failed to load table fields: ' + error.message);
     }
 }
 
