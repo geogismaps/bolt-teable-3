@@ -91,6 +91,14 @@ async function handleLogin(event) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Signing in...';
 
+        // Validate dependencies
+        if (!window.teableAPI) {
+            throw new Error('Teable API not available. Please refresh the page.');
+        }
+        if (!window.teableAuth) {
+            throw new Error('Authentication module not available. Please refresh the page.');
+        }
+
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
 
@@ -104,18 +112,33 @@ async function handleLogin(event) {
             throw new Error('Please select a client configuration first');
         }
 
+        // Validate email format
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email)) {
+            throw new Error('Please enter a valid email address');
+        }
+
         console.log('🔐 Attempting login with:', { email, configId: selectedConfigId });
 
         // Show loading modal
-        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-        loadingModal.show();
+        const loadingModalElement = document.getElementById('loadingModal');
+        if (loadingModalElement) {
+            const loadingModal = new bootstrap.Modal(loadingModalElement);
+            loadingModal.show();
+        }
 
+        // Attempt authentication
         const authResult = await window.teableAuth.login({ email, password });
 
         // Hide loading modal
-        loadingModal.hide();
+        if (loadingModalElement) {
+            const loadingModal = bootstrap.Modal.getInstance(loadingModalElement);
+            if (loadingModal) {
+                loadingModal.hide();
+            }
+        }
 
-        if (authResult.success) {
+        if (authResult && authResult.success) {
             console.log('✅ Login successful:', authResult.session);
             showAlert('Login successful! Loading your dashboard...', 'success');
 
@@ -124,7 +147,8 @@ async function handleLogin(event) {
                 window.location.replace('dashboard.html');
             }, 1000);
         } else {
-            throw new Error(authResult.message || 'Login failed');
+            const errorMessage = (authResult && authResult.message) || 'Login failed - Invalid credentials';
+            throw new Error(errorMessage);
         }
 
     } catch (error) {
@@ -132,12 +156,21 @@ async function handleLogin(event) {
         
         // Hide loading modal if it's showing
         const loadingModalElement = document.getElementById('loadingModal');
-        const loadingModal = bootstrap.Modal.getInstance(loadingModalElement);
-        if (loadingModal) {
-            loadingModal.hide();
+        if (loadingModalElement) {
+            const loadingModal = bootstrap.Modal.getInstance(loadingModalElement);
+            if (loadingModal) {
+                loadingModal.hide();
+            }
         }
         
-        showAlert('Login failed: ' + error.message, 'error');
+        let errorMessage = error.message;
+        if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+            errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+            errorMessage = 'Access denied. Please check your credentials and permissions.';
+        }
+        
+        showAlert('Login failed: ' + errorMessage, 'error');
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;

@@ -139,7 +139,68 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/teable-api.js"></script>
     <script src="js/auth.js"></script>
-    <script src="js/login.js"></script>
+    <script>
+        // Wait for all scripts to load before initializing login
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if required modules are loaded
+            if (!window.teableAPI) {
+                console.error('Teable API not loaded');
+                showAlert('System error: Teable API not available. Please refresh the page.', 'error');
+                return;
+            }
+            if (!window.teableAuth) {
+                console.error('Teable Auth not loaded');
+                showAlert('System error: Authentication module not available. Please refresh the page.', 'error');
+                return;
+            }
+            
+            // Load the login script after dependencies are ready
+            const script = document.createElement('script');
+            script.src = 'js/login.js';
+            script.onload = function() {
+                console.log('✅ Login module loaded successfully');
+            };
+            script.onerror = function() {
+                console.error('❌ Failed to load login module');
+                showAlert('Failed to load login module. Please refresh the page.', 'error');
+            };
+            document.head.appendChild(script);
+        });
+
+        function showAlert(message, type) {
+            // Remove existing alerts
+            const existingAlerts = document.querySelectorAll('.alert:not(.alert-info)');
+            existingAlerts.forEach(alert => alert.remove());
+
+            const alertClass = type === 'success' ? 'alert-success' : 
+                             type === 'info' ? 'alert-info' : 'alert-danger';
+            const iconClass = type === 'success' ? 'check-circle' : 
+                             type === 'info' ? 'info-circle' : 'exclamation-triangle';
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                <i class="fas fa-${iconClass} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            // Insert at the top of the main container
+            const container = document.querySelector('.glass-card');
+            if (container) {
+                container.insertBefore(alertDiv, container.firstChild);
+            }
+
+            // Auto-remove success alerts
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 3000);
+            }
+        }
+    </script>
 
     <script>
         function togglePasswordVisibility(fieldId) {
