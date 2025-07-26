@@ -1243,8 +1243,14 @@ function changeBasemap() {
     try {
         console.log('Changing basemap to:', basemapType);
 
+        // Check if map is initialized
+        if (!map) {
+            console.warn('Map not initialized yet, skipping basemap change');
+            return;
+        }
+
         // Remove current base layer if it exists
-        if (currentBaseLayer) {
+        if (currentBaseLayer && map.hasLayer && map.hasLayer(currentBaseLayer)) {
             map.removeLayer(currentBaseLayer);
         }
 
@@ -1271,30 +1277,49 @@ function changeBasemap() {
             console.error(`Basemap type "${basemapType}" not found`);
             showError(`Basemap type "${basemapType}" not found`);
             
-            // Fallback to OpenStreetMap
-            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                attribution: baseMaps.openstreetmap.attribution,
-                maxZoom: 19
-            }).addTo(map);
-            
-            document.getElementById('basemapSelector').value = 'openstreetmap';
+            // Fallback to OpenStreetMap if map exists
+            if (map && baseMaps.openstreetmap) {
+                currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                    attribution: baseMaps.openstreetmap.attribution,
+                    maxZoom: 19
+                }).addTo(map);
+                
+                const basemapSelector = document.getElementById('basemapSelector');
+                if (basemapSelector) {
+                    basemapSelector.value = 'openstreetmap';
+                }
+            }
         }
     } catch (error) {
         console.error('Error changing basemap:', error);
         showError('Failed to change basemap: ' + error.message);
         
-        // Fallback to OpenStreetMap
+        // Fallback to OpenStreetMap with proper null checks
         try {
-            if (currentBaseLayer) {
+            if (!map) {
+                console.warn('Map not available for fallback basemap');
+                return;
+            }
+
+            if (currentBaseLayer && map.hasLayer && map.hasLayer(currentBaseLayer)) {
                 map.removeLayer(currentBaseLayer);
             }
-            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                attribution: baseMaps.openstreetmap.attribution,
-                maxZoom: 19
-            }).addTo(map);
-            document.getElementById('basemapSelector').value = 'openstreetmap';
+
+            if (baseMaps.openstreetmap) {
+                currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                    attribution: baseMaps.openstreetmap.attribution,
+                    maxZoom: 19
+                }).addTo(map);
+                
+                const basemapSelector = document.getElementById('basemapSelector');
+                if (basemapSelector) {
+                    basemapSelector.value = 'openstreetmap';
+                }
+                console.log('✅ Fallback to OpenStreetMap successful');
+            }
         } catch (fallbackError) {
             console.error('Fallback basemap failed:', fallbackError);
+            showError('Critical error: Unable to load any basemap');
         }
     }
 }
