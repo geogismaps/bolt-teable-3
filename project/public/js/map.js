@@ -1261,7 +1261,15 @@ function changeBasemap() {
                 attribution: basemap.attribution,
                 maxZoom: 19,
                 errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-            }).addTo(map);
+            });
+
+            // Ensure map exists before adding layer
+            if (map && map.addLayer) {
+                currentBaseLayer.addTo(map);
+            } else {
+                console.error('Map object invalid, cannot add basemap layer');
+                return;
+            }
 
             // Update success message with proper basemap names
             const basemapNames = {
@@ -1282,7 +1290,11 @@ function changeBasemap() {
                 currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
                     attribution: baseMaps.openstreetmap.attribution,
                     maxZoom: 19
-                }).addTo(map);
+                });
+                
+                if (map.addLayer) {
+                    currentBaseLayer.addTo(map);
+                }
                 
                 const basemapSelector = document.getElementById('basemapSelector');
                 if (basemapSelector) {
@@ -1296,7 +1308,7 @@ function changeBasemap() {
         
         // Fallback to OpenStreetMap with proper null checks
         try {
-            if (!map) {
+            if (!map || !map.addLayer) {
                 console.warn('Map not available for fallback basemap');
                 return;
             }
@@ -1309,7 +1321,9 @@ function changeBasemap() {
                 currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
                     attribution: baseMaps.openstreetmap.attribution,
                     maxZoom: 19
-                }).addTo(map);
+                });
+                
+                currentBaseLayer.addTo(map);
                 
                 const basemapSelector = document.getElementById('basemapSelector');
                 if (basemapSelector) {
