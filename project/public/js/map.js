@@ -85,7 +85,9 @@ function initializeBasicMap() {
 
         // Add default base layer (OpenStreetMap) and store reference
         currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-            attribution: baseMaps.openstreetmap.attribution
+            attribution: baseMaps.openstreetmap.attribution,
+            maxZoom: 19,
+            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
         }).addTo(map);
 
         // Set the default basemap selector value
@@ -180,7 +182,9 @@ async function initializeMap() {
         setTimeout(() => {
             // Add default base layer (OpenStreetMap) and store reference
             currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                attribution: baseMaps.openstreetmap.attribution
+                attribution: baseMaps.openstreetmap.attribution,
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
             });
 
             // Ensure map exists before adding layer
@@ -1247,19 +1251,74 @@ function changeBasemap() {
 
     // Remove current base layer if it exists
     if (currentBaseLayer) {
-        map.removeLayer(currentBaseLayer);
+        try {
+            map.removeLayer(currentBaseLayer);
+        } catch (error) {
+            console.warn('Error removing current base layer:', error);
+        }
     }
 
     // Add new base layer
     const basemap = baseMaps[basemapType];
-    if (basemap) {
-        currentBaseLayer = L.tileLayer(basemap.url, {
-            attribution: basemap.attribution
-        }).addTo(map);
+    if (basemap && map) {
+        try {
+            currentBaseLayer = L.tileLayer(basemap.url, {
+                attribution: basemap.attribution,
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+            });
 
-        showSuccess(`Switched to ${basemapType} basemap`);
-        console.log(`Basemap changed to: ${basemapType}`);
+            // Ensure map exists before adding layer
+            if (map && map.addLayer) {
+                currentBaseLayer.addTo(map);
+            } else {
+                console.error('Map object invalid, cannot add basemap layer');
+                return;
+            }
+
+            // Update success message with proper basemap names
+            const basemapNames = {
+                'openstreetmap': 'OpenStreetMap',
+                'satellite': 'Satellite Imagery',
+                'terrain': 'Terrain Map', 
+                'dark': 'Dark Mode'
+            };
+
+            showSuccess(`Switched to ${basemapNames[basemapType] || basemapType} basemap`);
+            console.log(`Basemap changed to: ${basemapType}`);
+
+        } catch (error) {
+            console.error('Error adding new basemap:', error);
+            
+            // Fallback to OpenStreetMap with proper null checks
+            try {
+                if (!map || !map.addLayer) {
+                    console.warn('Map not available for fallback basemap');
+                    return;
+                }
+
+                console.log('Falling back to OpenStreetMap...');
+                currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                    attribution: baseMaps.openstreetmap.attribution,
+                    maxZoom: 19
+                });
+                
+                currentBaseLayer.addTo(map);
+                
+                const basemapSelector = document.getElementById('basemapSelector');
+                if (basemapSelector) {
+                    basemapSelector.value = 'openstreetmap';
+                }
+                
+                showWarning('Basemap loading failed, switched to OpenStreetMap');
+
+            } catch (fallbackError) {
+                console.error('Fallback basemap failed:', fallbackError);
+                showError('Failed to load any basemap. Please refresh the page.');
+            }
+        }
     } else {
+        console.error(`Basemap type "${basemapType}" not found or map not initialized`);
         showError(`Basemap type "${basemapType}" not found`);
     }
 }
