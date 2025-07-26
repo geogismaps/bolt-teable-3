@@ -37,27 +37,32 @@ let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for all dependencies to load
-    if (typeof window.teableAuth === 'undefined' || typeof window.teableAPI === 'undefined') {
-        console.log('Waiting for dependencies to load...');
+    if (typeof window.teableAuth === 'undefined') {
+        console.log('Waiting for auth to load...');
         setTimeout(() => {
             document.dispatchEvent(new Event('DOMContentLoaded'));
         }, 500);
         return;
     }
 
-    // Check authentication
-    if (!window.teableAuth.requireAuth()) return;
-
-    // Additional check for client configuration
-    const clientConfig = window.teableAuth.clientConfig;
-    if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken) {
-        console.warn('⚠️ No client configuration found. Initializing basic map...');
-        initializeBasicMap();
-        return;
-    }
-
+    // Initialize basic map first, then try to enhance with data if possible
     console.log('🚀 Starting map initialization...');
-    initializeMap();
+    initializeBasicMap();
+    
+    // Try to load additional features if auth and config are available
+    setTimeout(() => {
+        try {
+            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
+                const clientConfig = window.teableAuth.clientConfig;
+                if (clientConfig && clientConfig.baseUrl && clientConfig.accessToken && window.teableAPI) {
+                    console.log('Enhancing map with data features...');
+                    enhanceMapWithData();
+                }
+            }
+        } catch (error) {
+            console.log('Enhanced features not available:', error.message);
+        }
+    }, 1000);
 });
 
 function initializeBasicMap() {
@@ -67,7 +72,12 @@ function initializeBasicMap() {
         // Set user display to show basic info
         const userDisplay = document.getElementById('userDisplay');
         if (userDisplay) {
-            userDisplay.textContent = 'Guest User (Basic Mode)';
+            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
+                const session = window.teableAuth.getCurrentSession();
+                userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role})`;
+            } else {
+                userDisplay.textContent = 'Guest User (Basic Mode)';
+            }
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
@@ -90,14 +100,37 @@ function initializeBasicMap() {
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        // Show info about basic mode
-        showInfo('Map initialized in basic mode. Please configure your Teable connection to load table data.');
+        // Show success message
+        showSuccess('Map initialized successfully! You can switch basemaps and upload GeoJSON files.');
 
         console.log('✅ Basic map initialized successfully');
 
     } catch (error) {
         console.error('❌ Basic map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
+    }
+}
+
+async function enhanceMapWithData() {
+    try {
+        console.log('🔧 Enhancing map with data features...');
+        
+        const clientConfig = window.teableAuth.clientConfig;
+        
+        // Initialize API with client config
+        if (window.teableAPI && typeof window.teableAPI.init === 'function') {
+            window.teableAPI.init(clientConfig);
+            console.log('✅ Teable API initialized');
+            
+            // Load available tables
+            await loadAvailableTables();
+            
+            showInfo('Enhanced features loaded! You can now add layers from Teable tables.');
+        }
+        
+    } catch (error) {
+        console.warn('Could not enhance map with data features:', error.message);
+        showWarning('Map is running in basic mode. Some features may not be available.');
     }
 }
 
