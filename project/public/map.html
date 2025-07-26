@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -436,50 +437,13 @@
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Load API and Auth first with error handling -->
-    <script>
-        // Load Teable API
-        try {
-            const teableScript = document.createElement('script');
-            teableScript.src = 'js/teable-api.js';
-            teableScript.onerror = function() {
-                console.warn('Teable API script failed to load - running in basic mode');
-            };
-            document.head.appendChild(teableScript);
-        } catch (error) {
-            console.warn('Error loading Teable API:', error);
-        }
-
-        // Load Auth script
-        try {
-            const authScript = document.createElement('script');
-            authScript.src = 'js/auth.js';
-            authScript.onerror = function() {
-                console.warn('Auth script failed to load - running in basic mode');
-            };
-            document.head.appendChild(authScript);
-        } catch (error) {
-            console.warn('Error loading Auth script:', error);
-        }
-
-        // Load map script after a short delay
-        setTimeout(function() {
-            try {
-                const mapScript = document.createElement('script');
-                mapScript.src = 'js/map.js';
-                mapScript.onerror = function() {
-                    console.error('Map script failed to load');
-                    document.body.innerHTML += '<div class="alert alert-danger m-3">Map failed to load. Please refresh the page.</div>';
-                };
-                document.head.appendChild(mapScript);
-            } catch (error) {
-                console.error('Error loading map script:', error);
-            }
-        }, 200);
-    </script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map.js"></script>
 </body>
 </html>

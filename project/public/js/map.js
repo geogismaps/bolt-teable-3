@@ -36,49 +36,21 @@ const baseMaps = {
 let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Starting map initialization...');
-    
-    // Initialize basic map immediately - don't wait for auth
-    initializeBasicMap();
+    // Check authentication
+    if (!window.teableAuth.requireAuth()) return;
 
-    // Try to load additional features if auth and config are available
-    setTimeout(() => {
-        try {
-            if (window.teableAuth && typeof window.teableAuth.isLoggedIn === 'function' && window.teableAuth.isLoggedIn()) {
-                const clientConfig = window.teableAuth.clientConfig;
-                if (clientConfig && clientConfig.baseUrl && clientConfig.accessToken && window.teableAPI) {
-                    console.log('Enhancing map with data features...');
-                    enhanceMapWithData();
-                }
-            }
-        } catch (error) {
-            console.log('Enhanced features not available:', error.message);
-        }
-    }, 1000);
+    initializeMap();
 });
 
-function initializeBasicMap() {
+async function initializeMap() {
     try {
-        console.log('🗺️ Initializing map in basic mode...');
+        currentUser = window.teableAuth.getCurrentSession();
+        document.getElementById('userDisplay').textContent = 
+            `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Set user display to show basic info
-        const userDisplay = document.getElementById('userDisplay');
-        if (userDisplay) {
-            try {
-                if (window.teableAuth && typeof window.teableAuth.isLoggedIn === 'function' && window.teableAuth.isLoggedIn()) {
-                    const session = window.teableAuth.getCurrentSession();
-                    if (session && session.firstName && session.lastName) {
-                        userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role || 'User'})`;
-                    } else {
-                        userDisplay.textContent = 'Authenticated User';
-                    }
-                } else {
-                    userDisplay.textContent = 'Guest User (Basic Mode)';
-                }
-            } catch (error) {
-                console.log('Error setting user display:', error);
-                userDisplay.textContent = 'Guest User (Basic Mode)';
-            }
+        // Initialize API if needed - check if teableAPI exists first
+        if (window.teableAPI && currentUser.userType === 'space_owner') {
+            window.teableAPI.init(window.teableAuth.clientConfig);
         }
 
         // Initialize Leaflet map with India center view and proper zoom for India
@@ -86,9 +58,7 @@ function initializeBasicMap() {
 
         // Add default base layer (OpenStreetMap) and store reference
         currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-            attribution: baseMaps.openstreetmap.attribution,
-            maxZoom: 19,
-            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+            attribution: baseMaps.openstreetmap.attribution
         }).addTo(map);
 
         // Set the default basemap selector value
@@ -100,170 +70,30 @@ function initializeBasicMap() {
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
 
-        // Setup drag and drop for GeoJSON
-        setupGeoJSONDragDrop();
-
-        // Show success message
-        showSuccess('Map initialized successfully! You can switch basemaps and upload GeoJSON files.');
-
-        console.log('✅ Basic map initialized successfully');
-
-    } catch (error) {
-        console.error('❌ Basic map initialization failed:', error);
-        showError('Failed to initialize map: ' + error.message);
-    }
-}
-
-async function enhanceMapWithData() {
-    try {
-        console.log('🔧 Enhancing map with data features...');
-
-        const clientConfig = window.teableAuth.clientConfig;
-
-        // Initialize API with client config
-        if (window.teableAPI && typeof window.teableAPI.init === 'function') {
-            window.teableAPI.init(clientConfig);
-            console.log('✅ Teable API initialized');
-
-            // Load available tables
-            await loadAvailableTables();
-
-            showInfo('Enhanced features loaded! You can now add layers from Teable tables.');
-        }
-
-    } catch (error) {
-        console.warn('Could not enhance map with data features:', error.message);
-        showWarning('Map is running in basic mode. Some features may not be available.');
-    }
-}
-
-async function initializeMap() {
-    try {
-        currentUser = window.teableAuth.getCurrentSession();
-        if (!currentUser) {
-            throw new Error('No user session found');
-        }
-
-        document.getElementById('userDisplay').textContent = 
-            `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
-
-        // Get client configuration
-        const clientConfig = window.teableAuth.clientConfig;
-        if (!clientConfig) {
-            throw new Error('No client configuration found');
-        }
-
-        console.log('Initializing map with config:', {
-            clientName: clientConfig.clientName,
-            baseId: clientConfig.baseId,
-            hasToken: !!clientConfig.accessToken
-        });
-
-        // Initialize API with client config - do this for all users
-        if (window.teableAPI && clientConfig && typeof window.teableAPI.init === 'function') {
-            try {
-                window.teableAPI.init(clientConfig);
-                console.log('✅ Teable API initialized');
-            } catch (initError) {
-                console.error('Failed to initialize Teable API:', initError);
-                console.warn('Falling back to basic map mode...');
-                initializeBasicMap();
-                return;
-            }
-        } else {
-            console.warn('Teable API not available or client configuration missing - initializing basic map');
-            initializeBasicMap();
-            return;
-        }
-
-        // Initialize Leaflet map with India center view and proper zoom for India
-        map = L.map('map').setView([20.5937, 78.9629], 5);
-
-        // Wait for map to be ready before adding layers
-        setTimeout(() => {
-            // Add default base layer (OpenStreetMap) and store reference
-            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                attribution: baseMaps.openstreetmap.attribution,
-                maxZoom: 19,
-                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-            });
-
-            // Ensure map exists before adding layer
-            if (map && typeof map.addLayer === 'function') {
-                currentBaseLayer.addTo(map);
-            } else {
-                console.error('Map object invalid, cannot add basemap layer');
-                return;
-            }
-        }, 100);
-
-        // Set the default basemap selector value
-        const basemapSelector = document.getElementById('basemapSelector');
-        if (basemapSelector) {
-            basemapSelector.value = 'openstreetmap';
-        }
-
-        // Initialize measurement group
-        measurementGroup = L.layerGroup().addTo(map);
-
-        // Load available tables after API is properly initialized
+        // Load available tables
         await loadAvailableTables();
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('✅ Map initialized successfully with India center view');
+        console.log('Map initialized successfully with India center view');
 
     } catch (error) {
-        console.error('❌ Map initialization failed:', error);
+        console.error('Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
 }
 
 async function loadAvailableTables() {
     try {
-        // Check if API is available and properly configured
+        // Check if API is available
         if (!window.teableAPI) {
             console.warn('Teable API not available, skipping table loading');
-            const tableSelector = document.getElementById('newLayerTable');
-            if (tableSelector) {
-                tableSelector.innerHTML = '<option value="">Teable API not available</option>';
-            }
             return;
         }
-
-        // Check if client config is available
-        let clientConfig = null;
-        try {
-            clientConfig = window.teableAuth?.clientConfig;
-        } catch (error) {
-            console.warn('Error accessing client config:', error);
-        }
-        
-        if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken || !clientConfig.baseId) {
-            console.warn('Client configuration not complete, skipping table loading');
-            const tableSelector = document.getElementById('newLayerTable');
-            if (tableSelector) {
-                tableSelector.innerHTML = '<option value="">Please configure Teable connection first</option>';
-            }
-            // Don't show error for missing config in basic mode
-            console.log('Running in basic mode without Teable configuration');
-            return;
-        }
-
-        // Ensure API is initialized with proper config
-        window.teableAPI.init(clientConfig);
-
-        console.log('Loading tables with config:', {
-            baseUrl: clientConfig.baseUrl,
-            baseId: clientConfig.baseId,
-            hasToken: !!clientConfig.accessToken
-        });
 
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
-
-        console.log('Raw tables response:', tables);
 
         // Filter out system tables
         const userTables = tables.filter(t => 
@@ -284,22 +114,13 @@ async function loadAvailableTables() {
                 option.textContent = table.name;
                 tableSelector.appendChild(option);
             });
-
-            // Auto-trigger field loading when table is selected
-            tableSelector.addEventListener('change', loadTableFields);
         }
 
-        console.log(`✅ Loaded ${userTables.length} available tables`);
+        console.log(`Loaded ${userTables.length} available tables`);
 
     } catch (error) {
-        console.error('❌ Error loading tables:', error);
+        console.error('Error loading tables:', error);
         showError('Failed to load tables: ' + error.message);
-
-        // Show error in selector
-        const tableSelector = document.getElementById('newLayerTable');
-        if (tableSelector) {
-            tableSelector.innerHTML = '<option value="">Error loading tables</option>';
-        }
     }
 }
 
@@ -328,62 +149,27 @@ async function loadTableFields() {
             return;
         }
 
-        // Show loading indicator
-        if (geometrySelector) {
-            geometrySelector.innerHTML = '<option value="">Loading fields...</option>';
-        }
-        if (linkedTablesInfo) {
-            linkedTablesInfo.innerHTML = 'Loading table information...';
-        }
-
         // Get sample records to detect fields
-        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 10 });
+        const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
 
         if (recordsData.records && recordsData.records.length > 0) {
             const fields = Object.keys(recordsData.records[0].fields || {});
 
-            // Enhanced geometry field detection
+            // Auto-detect geometry field
             let detectedGeometryField = null;
-            let confidence = 0;
-
-            const geometryFieldCandidates = fields.map(field => {
+            const geometryFieldCandidates = fields.filter(field => {
                 const fieldLower = field.toLowerCase();
-                let score = 0;
-
-                // Primary geometry field indicators
-                if (fieldLower === 'geometry' || fieldLower === 'geom') score += 10;
-                if (fieldLower === 'wkt' || fieldLower === 'shape') score += 9;
-                if (fieldLower.includes('polygon') || fieldLower.includes('point')) score += 8;
-                if (fieldLower.includes('coordinates') || fieldLower.includes('location')) score += 7;
-
-                // Secondary indicators
-                if (fieldLower.includes('geom')) score += 5;
-                if (fieldLower.includes('wkt')) score += 5;
-                if (fieldLower.includes('shape')) score += 4;
-
-                return { field, score };
-            }).filter(item => item.score > 0)
-              .sort((a, b) => b.score - a.score);
+                return fieldLower.includes('geom') || 
+                       fieldLower.includes('wkt') || 
+                       fieldLower.includes('shape') ||
+                       fieldLower.includes('polygon') ||
+                       fieldLower.includes('point') ||
+                       fieldLower.includes('coordinates') ||
+                       fieldLower.includes('geometry');
+            });
 
             if (geometryFieldCandidates.length > 0) {
-                detectedGeometryField = geometryFieldCandidates[0].field;
-                confidence = geometryFieldCandidates[0].score;
-            }
-
-            // Verify the detected field contains valid geometry data
-            if (detectedGeometryField) {
-                const sampleGeometry = recordsData.records[0].fields[detectedGeometryField];
-                if (sampleGeometry && typeof sampleGeometry === 'string') {
-                    const upperGeometry = sampleGeometry.toUpperCase().trim();
-                    if (!upperGeometry.startsWith('POINT') && 
-                        !upperGeometry.startsWith('POLYGON') && 
-                        !upperGeometry.startsWith('MULTIPOLYGON') &&
-                        !upperGeometry.startsWith('LINESTRING') &&
-                        !upperGeometry.startsWith('MULTIPOINT')) {
-                        console.warn('Detected geometry field may not contain valid WKT data');
-                        confidence = Math.max(1, confidence - 3);
-                    }
-                }
+                detectedGeometryField = geometryFieldCandidates[0];
             }
 
             // Populate geometry field selector
@@ -400,29 +186,17 @@ async function loadTableFields() {
                 });
 
                 if (detectedGeometryField) {
-                    const confidenceText = confidence >= 8 ? 'High' : confidence >= 5 ? 'Medium' : 'Low';
-                    showSuccess(`Auto-detected geometry field: ${detectedGeometryField} (${confidenceText} confidence)`);
+                    showSuccess(`Auto-detected geometry field: ${detectedGeometryField}`);
                 }
             }
-
             if (linkedTablesInfo) {
-                const hasGeometry = detectedGeometryField ? 'Yes' : 'No';
                 linkedTablesInfo.innerHTML = `
                     <div class="small">
-                        <strong>Records Found:</strong> ${recordsData.records.length}<br>
                         <strong>Available Fields:</strong> ${fields.length}<br>
                         <strong>Geometry Field:</strong> ${detectedGeometryField || 'Not detected'}<br>
-                        <strong>Has Geometry:</strong> <span class="${hasGeometry === 'Yes' ? 'text-success' : 'text-warning'}">${hasGeometry}</span><br>
-                        <strong>Sample Fields:</strong> ${fields.slice(0, 5).join(', ')}${fields.length > 5 ? '...' : ''}
+                        <strong>Sample Fields:</strong> ${fields.slice(0, 3).join(', ')}${fields.length > 3 ? '...' : ''}
                     </div>
                 `;
-            }
-        } else {
-            if (geometrySelector) {
-                geometrySelector.innerHTML = '<option value="">No data found</option>';
-            }
-            if (linkedTablesInfo) {
-                linkedTablesInfo.innerHTML = '<span class="text-warning">No records found in this table</span>';
             }
         }
 
@@ -434,7 +208,6 @@ async function loadTableFields() {
         if (linkedTablesInfo) {
             linkedTablesInfo.innerHTML = '<span class="text-danger">Error loading table information</span>';
         }
-        showError('Failed to load table fields: ' + error.message);
     }
 }
 
@@ -1259,85 +1032,24 @@ function removeLayer(layerId) {
 
 // Basemap functionality
 function changeBasemap() {
-    const basemapSelector = document.getElementById('basemapSelector');
-    if (!basemapSelector) {
-        console.error('Basemap selector not found');
-        return;
-    }
-    
-    const basemapType = basemapSelector.value;
-    console.log(`Changing basemap to: ${basemapType}`);
-
-    // Ensure map is initialized
-    if (!map) {
-        console.error('Map not initialized');
-        showError('Map not initialized');
-        return;
-    }
+    const basemapType = document.getElementById('basemapSelector').value;
 
     // Remove current base layer if it exists
     if (currentBaseLayer) {
-        try {
-            map.removeLayer(currentBaseLayer);
-            console.log('Removed existing basemap layer');
-        } catch (error) {
-            console.warn('Error removing current base layer:', error);
-        }
+        map.removeLayer(currentBaseLayer);
     }
 
-    // Get basemap configuration
-    if (!baseMaps[basemapType]) {
-        console.error(`Basemap configuration not found for: ${basemapType}`);
-        showError(`Basemap type "${basemapType}" not found`);
-        return;
-    }
-
+    // Add new base layer
     const basemap = baseMaps[basemapType];
-    
-    try {
-        // Create new tile layer
+    if (basemap) {
         currentBaseLayer = L.tileLayer(basemap.url, {
-            attribution: basemap.attribution,
-            maxZoom: 19,
-            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-        });
+            attribution: basemap.attribution
+        }).addTo(map);
 
-        // Add to map
-        currentBaseLayer.addTo(map);
-
-        // Update success message with proper basemap names
-        const basemapNames = {
-            'openstreetmap': 'OpenStreetMap',
-            'satellite': 'Satellite Imagery',
-            'terrain': 'Terrain Map', 
-            'dark': 'Dark Mode'
-        };
-
-        showSuccess(`Switched to ${basemapNames[basemapType] || basemapType} basemap`);
-        console.log(`✅ Basemap changed to: ${basemapType}`);
-
-    } catch (error) {
-        console.error('Error adding new basemap:', error);
-        
-        // Fallback to OpenStreetMap
-        try {
-            console.log('Attempting fallback to OpenStreetMap...');
-            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                attribution: baseMaps.openstreetmap.attribution,
-                maxZoom: 19,
-                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-            });
-            
-            currentBaseLayer.addTo(map);
-            basemapSelector.value = 'openstreetmap';
-            
-            showWarning('Basemap loading failed, switched to OpenStreetMap');
-            console.log('✅ Fallback to OpenStreetMap successful');
-
-        } catch (fallbackError) {
-            console.error('Fallback basemap also failed:', fallbackError);
-            showError('Failed to load any basemap. Please refresh the page.');
-        }
+        showSuccess(`Switched to ${basemapType} basemap`);
+        console.log(`Basemap changed to: ${basemapType}`);
+    } else {
+        showError(`Basemap type "${basemapType}" not found`);
     }
 }
 
