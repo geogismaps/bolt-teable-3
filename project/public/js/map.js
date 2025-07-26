@@ -36,23 +36,15 @@ const baseMaps = {
 let currentBaseLayer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait for all dependencies to load
-    if (typeof window.teableAuth === 'undefined') {
-        console.log('Waiting for auth to load...');
-        setTimeout(() => {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-        }, 500);
-        return;
-    }
-
-    // Initialize basic map first, then try to enhance with data if possible
     console.log('🚀 Starting map initialization...');
+    
+    // Initialize basic map immediately - don't wait for auth
     initializeBasicMap();
 
     // Try to load additional features if auth and config are available
     setTimeout(() => {
         try {
-            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
+            if (window.teableAuth && typeof window.teableAuth.isLoggedIn === 'function' && window.teableAuth.isLoggedIn()) {
                 const clientConfig = window.teableAuth.clientConfig;
                 if (clientConfig && clientConfig.baseUrl && clientConfig.accessToken && window.teableAPI) {
                     console.log('Enhancing map with data features...');
@@ -72,10 +64,19 @@ function initializeBasicMap() {
         // Set user display to show basic info
         const userDisplay = document.getElementById('userDisplay');
         if (userDisplay) {
-            if (window.teableAuth && window.teableAuth.isLoggedIn()) {
-                const session = window.teableAuth.getCurrentSession();
-                userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role})`;
-            } else {
+            try {
+                if (window.teableAuth && typeof window.teableAuth.isLoggedIn === 'function' && window.teableAuth.isLoggedIn()) {
+                    const session = window.teableAuth.getCurrentSession();
+                    if (session && session.firstName && session.lastName) {
+                        userDisplay.textContent = `${session.firstName} ${session.lastName} (${session.role || 'User'})`;
+                    } else {
+                        userDisplay.textContent = 'Authenticated User';
+                    }
+                } else {
+                    userDisplay.textContent = 'Guest User (Basic Mode)';
+                }
+            } catch (error) {
+                console.log('Error setting user display:', error);
                 userDisplay.textContent = 'Guest User (Basic Mode)';
             }
         }
@@ -224,18 +225,29 @@ async function loadAvailableTables() {
         // Check if API is available and properly configured
         if (!window.teableAPI) {
             console.warn('Teable API not available, skipping table loading');
+            const tableSelector = document.getElementById('newLayerTable');
+            if (tableSelector) {
+                tableSelector.innerHTML = '<option value="">Teable API not available</option>';
+            }
             return;
         }
 
         // Check if client config is available
-        const clientConfig = window.teableAuth?.clientConfig;
+        let clientConfig = null;
+        try {
+            clientConfig = window.teableAuth?.clientConfig;
+        } catch (error) {
+            console.warn('Error accessing client config:', error);
+        }
+        
         if (!clientConfig || !clientConfig.baseUrl || !clientConfig.accessToken || !clientConfig.baseId) {
             console.warn('Client configuration not complete, skipping table loading');
             const tableSelector = document.getElementById('newLayerTable');
             if (tableSelector) {
                 tableSelector.innerHTML = '<option value="">Please configure Teable connection first</option>';
             }
-            showError('Please set up your Teable configuration first by visiting the Configuration page.');
+            // Don't show error for missing config in basic mode
+            console.log('Running in basic mode without Teable configuration');
             return;
         }
 
@@ -1247,79 +1259,85 @@ function removeLayer(layerId) {
 
 // Basemap functionality
 function changeBasemap() {
-    const basemapType = document.getElementById('basemapSelector').value;
+    const basemapSelector = document.getElementById('basemapSelector');
+    if (!basemapSelector) {
+        console.error('Basemap selector not found');
+        return;
+    }
+    
+    const basemapType = basemapSelector.value;
+    console.log(`Changing basemap to: ${basemapType}`);
+
+    // Ensure map is initialized
+    if (!map) {
+        console.error('Map not initialized');
+        showError('Map not initialized');
+        return;
+    }
 
     // Remove current base layer if it exists
     if (currentBaseLayer) {
         try {
             map.removeLayer(currentBaseLayer);
+            console.log('Removed existing basemap layer');
         } catch (error) {
             console.warn('Error removing current base layer:', error);
         }
     }
 
-    // Add new base layer
+    // Get basemap configuration
+    if (!baseMaps[basemapType]) {
+        console.error(`Basemap configuration not found for: ${basemapType}`);
+        showError(`Basemap type "${basemapType}" not found`);
+        return;
+    }
+
     const basemap = baseMaps[basemapType];
-    if (basemap && map) {
+    
+    try {
+        // Create new tile layer
+        currentBaseLayer = L.tileLayer(basemap.url, {
+            attribution: basemap.attribution,
+            maxZoom: 19,
+            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+        });
+
+        // Add to map
+        currentBaseLayer.addTo(map);
+
+        // Update success message with proper basemap names
+        const basemapNames = {
+            'openstreetmap': 'OpenStreetMap',
+            'satellite': 'Satellite Imagery',
+            'terrain': 'Terrain Map', 
+            'dark': 'Dark Mode'
+        };
+
+        showSuccess(`Switched to ${basemapNames[basemapType] || basemapType} basemap`);
+        console.log(`✅ Basemap changed to: ${basemapType}`);
+
+    } catch (error) {
+        console.error('Error adding new basemap:', error);
+        
+        // Fallback to OpenStreetMap
         try {
-            currentBaseLayer = L.tileLayer(basemap.url, {
-                attribution: basemap.attribution,
+            console.log('Attempting fallback to OpenStreetMap...');
+            currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+                attribution: baseMaps.openstreetmap.attribution,
                 maxZoom: 19,
                 errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
             });
-
-            // Ensure map exists before adding layer
-            if (map && map.addLayer) {
-                currentBaseLayer.addTo(map);
-            } else {
-                console.error('Map object invalid, cannot add basemap layer');
-                return;
-            }
-
-            // Update success message with proper basemap names
-            const basemapNames = {
-                'openstreetmap': 'OpenStreetMap',
-                'satellite': 'Satellite Imagery',
-                'terrain': 'Terrain Map', 
-                'dark': 'Dark Mode'
-            };
-
-            showSuccess(`Switched to ${basemapNames[basemapType] || basemapType} basemap`);
-            console.log(`Basemap changed to: ${basemapType}`);
-
-        } catch (error) {
-            console.error('Error adding new basemap:', error);
             
-            // Fallback to OpenStreetMap with proper null checks
-            try {
-                if (!map || !map.addLayer) {
-                    console.warn('Map not available for fallback basemap');
-                    return;
-                }
+            currentBaseLayer.addTo(map);
+            basemapSelector.value = 'openstreetmap';
+            
+            showWarning('Basemap loading failed, switched to OpenStreetMap');
+            console.log('✅ Fallback to OpenStreetMap successful');
 
-                console.log('Falling back to OpenStreetMap...');
-                currentBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
-                    attribution: baseMaps.openstreetmap.attribution,
-                    maxZoom: 19
-                });
-                
-                currentBaseLayer.addTo(map);
-                
-                const basemapSelector = document.getElementById('basemapSelector');
-                if (basemapSelector) {
-                    basemapSelector.value = 'openstreetmap';
-                }
-                
-                showWarning('Basemap loading failed, switched to OpenStreetMap');
-
-            } catch (fallbackError) {
-                console.error('Fallback basemap failed:', fallbackError);
-                showError('Failed to load any basemap. Please refresh the page.');
-            }
+        } catch (fallbackError) {
+            console.error('Fallback basemap also failed:', fallbackError);
+            showError('Failed to load any basemap. Please refresh the page.');
         }
-    } else {
-        console.error(`Basemap type "${basemapType}" not found or map not initialized`);
-        showError(`Basemap type "${basemapType}" not found`);
     }
 }
 
