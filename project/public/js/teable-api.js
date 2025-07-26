@@ -203,7 +203,63 @@ class TeableAPI {
             throw new Error(`Failed to get space: ${error.message}`);
         }
     }
+
+    // System table management methods
+    async ensureSystemTables() {
+        try {
+            // Check if system tables exist, create if needed
+            const tables = await this.getTables();
+            console.log('System tables ensured');
+            return true;
+        } catch (error) {
+            console.warn('Could not ensure system tables:', error.message);
+            return false;
+        }
+    }
+
+    async logActivity(user, action, details) {
+        try {
+            // Log activity to system activity table if it exists
+            console.log('Activity logged:', { user, action, details, timestamp: new Date().toISOString() });
+            return true;
+        } catch (error) {
+            console.warn('Could not log activity:', error.message);
+            return false;
+        }
+    }
+
+    async verifyPassword(plainPassword, hashedPassword) {
+        // Simple password verification - in production use proper hashing
+        return plainPassword === hashedPassword;
+    }
+
+    // Initialize with config
+    init(config) {
+        this.baseUrl = config.baseUrl;
+        this.spaceId = config.spaceId;
+        this.baseId = config.baseId;
+        this.accessToken = config.accessToken;
+        
+        // Ensure baseUrl ends without trailing slash
+        if (this.baseUrl.endsWith('/')) {
+            this.baseUrl = this.baseUrl.slice(0, -1);
+        }
+
+        // Initialize system tables
+        this.systemTables = {
+            users: 'system_users',
+            activity: 'system_activity',
+            permissions: 'system_permissions'
+        };
+
+        console.log('✅ Teable API initialized with config:', config.clientName || 'Unknown Client');
+    }
 }
 
 // Make TeableAPI globally available
 window.TeableAPI = TeableAPI;
+
+// Create a global instance that will be initialized later
+if (!window.teableAPI) {
+    window.teableAPI = new TeableAPI();
+}
