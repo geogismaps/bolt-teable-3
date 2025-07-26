@@ -1,3 +1,4 @@
+
 /**
  * Login Page Functionality
  */
@@ -105,7 +106,14 @@ async function handleLogin(event) {
 
         console.log('🔐 Attempting login with:', { email, configId: selectedConfigId });
 
+        // Show loading modal
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        loadingModal.show();
+
         const authResult = await window.teableAuth.login({ email, password });
+
+        // Hide loading modal
+        loadingModal.hide();
 
         if (authResult.success) {
             console.log('✅ Login successful:', authResult.session);
@@ -121,6 +129,14 @@ async function handleLogin(event) {
 
     } catch (error) {
         console.error('❌ Login error:', error);
+        
+        // Hide loading modal if it's showing
+        const loadingModalElement = document.getElementById('loadingModal');
+        const loadingModal = bootstrap.Modal.getInstance(loadingModalElement);
+        if (loadingModal) {
+            loadingModal.hide();
+        }
+        
         showAlert('Login failed: ' + error.message, 'error');
     } finally {
         submitBtn.disabled = false;
@@ -130,21 +146,28 @@ async function handleLogin(event) {
 
 function showAlert(message, type) {
     // Remove existing alerts
-    const existingAlerts = document.querySelectorAll('.alert');
+    const existingAlerts = document.querySelectorAll('.alert:not(.alert-info)');
     existingAlerts.forEach(alert => alert.remove());
 
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alertClass = type === 'success' ? 'alert-success' : 
+                     type === 'info' ? 'alert-info' : 'alert-danger';
+    const iconClass = type === 'success' ? 'check-circle' : 
+                     type === 'info' ? 'info-circle' : 'exclamation-triangle';
+    
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
     alertDiv.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        <i class="fas fa-${iconClass} me-2"></i>
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
 
-    // Insert at the top of the form
-    const container = document.querySelector('.card-body');
-    container.insertBefore(alertDiv, container.firstChild);
+    // Insert at the top of the login section or config selection
+    const targetContainer = document.getElementById('loginSection').style.display !== 'none' 
+        ? document.getElementById('loginSection')
+        : document.querySelector('.glass-card');
+    
+    targetContainer.insertBefore(alertDiv, targetContainer.firstChild);
 
     // Auto-remove success alerts
     if (type === 'success') {

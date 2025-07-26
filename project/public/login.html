@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,27 +44,9 @@
                                 </div>
                             </div>
 
-                            <!-- Login Form -->
-                            <form id="loginForm">
-                                <div class="mb-3">
-                                    <label for="email" class="form-label fw-semibold">
-                                        <i class="fas fa-envelope me-2"></i>Email Address
-                                    </label>
-                                    <input type="email" class="form-control" id="email" required>
-                                </div>
-                                
-                                <div class="mb-4">
-                                    <label for="password" class="form-label fw-semibold">
-                                        <i class="fas fa-lock me-2"></i>Password
-                                    </label>
-                                    <input type="password" class="form-control" id="password" required>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-primary w-100 py-2">
-                                    <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                                </button>
-                            </form>
-                        </div>
+                            <!-- User Type Selection -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">User Type</label>
                                 <div class="btn-group w-100" role="group" aria-label="User type">
                                     <input type="radio" class="btn-check" name="userType" id="spaceOwner" value="space_owner" checked>
                                     <label class="btn btn-outline-primary" for="spaceOwner">
@@ -84,40 +67,43 @@
                                 </div>
                             </div>
 
-                            <!-- Login Credentials -->
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">
-                                    <i class="fas fa-envelope me-2"></i>Email
-                                </label>
-                                <input type="email" class="form-control" id="loginEmail" required>
-                            </div>
+                            <!-- Login Form -->
+                            <form id="loginForm">
+                                <!-- Login Credentials -->
+                                <div class="mb-3">
+                                    <label for="email" class="form-label fw-semibold">
+                                        <i class="fas fa-envelope me-2"></i>Email
+                                    </label>
+                                    <input type="email" class="form-control" id="email" required>
+                                </div>
 
-                            <div class="mb-4">
-                                <label class="form-label fw-semibold">
-                                    <i class="fas fa-lock me-2"></i>Password
-                                </label>
-                                <div class="input-group">
-                                    <input type="password" class="form-control" id="loginPassword" required>
-                                    <button class="btn btn-outline-secondary" type="button" 
-                                            onclick="togglePasswordVisibility('loginPassword')">
-                                        <i class="fas fa-eye"></i>
+                                <div class="mb-4">
+                                    <label for="password" class="form-label fw-semibold">
+                                        <i class="fas fa-lock me-2"></i>Password
+                                    </label>
+                                    <div class="input-group">
+                                        <input type="password" class="form-control" id="password" required>
+                                        <button class="btn btn-outline-secondary" type="button" 
+                                                onclick="togglePasswordVisibility('password')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Login Button -->
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                                    <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                                </button>
+
+                                <!-- Quick Demo Login -->
+                                <div class="text-center">
+                                    <small class="text-muted">Demo Login:</small><br>
+                                    <button type="button" class="btn btn-link btn-sm" onclick="fillDemoCredentials()">
+                                        Use Demo Credentials
                                     </button>
                                 </div>
-                            </div>
-
-                            <!-- Login Button -->
-                            <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
-                                <i class="fas fa-sign-in-alt me-2"></i>Login
-                            </button>
-
-                            <!-- Quick Demo Login -->
-                            <div class="text-center">
-                                <small class="text-muted">Demo Login:</small><br>
-                                <button type="button" class="btn btn-link btn-sm" onclick="fillDemoCredentials()">
-                                    Use Demo Credentials
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
 
                         <!-- Super Admin Access -->
                         <div class="text-center mt-4">
@@ -130,15 +116,6 @@
                                 <i class="fas fa-arrow-left me-1"></i>Back to Login
                             </button>
                         </div>
-
-                        <script>
-                        function goBackToLogin() {
-                            document.getElementById('configSelection').style.display = 'block';
-                            document.getElementById('loginSection').style.display = 'none';
-                            document.getElementById('clientConfigSelector').value = '';
-                            localStorage.removeItem('selectedClientConfig');
-                        }
-                        </script>
                     </div>
                 </div>
             </div>
@@ -163,5 +140,51 @@
     <script src="js/teable-api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/login.js"></script>
+
+    <script>
+        function togglePasswordVisibility(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = field.nextElementSibling.querySelector('i');
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                field.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+
+        function fillDemoCredentials() {
+            document.getElementById('email').value = 'demo@example.com';
+            document.getElementById('password').value = 'demo123';
+        }
+
+        function goBackToLogin() {
+            document.getElementById('configSelection').style.display = 'block';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('clientConfigSelector').value = '';
+            localStorage.removeItem('selectedClientConfig');
+        }
+
+        // Handle user type change
+        document.addEventListener('DOMContentLoaded', function() {
+            const userTypeRadios = document.querySelectorAll('input[name="userType"]');
+            userTypeRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const spaceOwnerHelp = document.getElementById('spaceOwnerHelp');
+                    const appUserHelp = document.getElementById('appUserHelp');
+                    
+                    if (this.value === 'space_owner') {
+                        spaceOwnerHelp.style.display = 'block';
+                        appUserHelp.style.display = 'none';
+                    } else {
+                        spaceOwnerHelp.style.display = 'none';
+                        appUserHelp.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
