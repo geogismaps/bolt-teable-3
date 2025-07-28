@@ -83,26 +83,26 @@ class TeableAuth {
     }
 
     /**
-     * Authenticate Space Owner using clean logic
+     * Authenticate Space Owner using working logic
      */
     async authenticateSpaceOwner(email, password) {
         try {
-            console.log('🔐 Starting space owner authentication...');
+            console.log('Starting space owner authentication for:', email);
 
             // Step 1: Ensure system tables exist
             await window.teableAPI.ensureSystemTables();
 
             // Step 2: Get user from local app_users table
-            console.log('🔍 Checking local app_users table...');
+            console.log('Checking local app_users table...');
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records && users.records.find(u => 
+            const localUser = users.records.find(u => 
                 u.fields.email === email.toLowerCase() && 
                 (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
-                u.fields.admin_password_hash // Must have admin password set
+                u.fields.admin_password_hash
             );
 
             if (!localUser) {
-                throw new Error('Space owner not found. Please ensure the admin email was configured correctly during client setup.');
+                throw new Error('Space owner not found or admin password not set');
             }
 
             if (!localUser.fields.is_active) {
@@ -110,11 +110,9 @@ class TeableAuth {
             }
 
             // Step 3: Verify admin password
-            if (!localUser.fields.admin_password_hash) {
-                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
-            }
-
             const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            console.log('Comparing passwords...');
+            
             if (localUser.fields.admin_password_hash !== adminPasswordHash) {
                 throw new Error('Invalid admin password for space owner');
             }
@@ -130,7 +128,7 @@ class TeableAuth {
                 console.log('Failed to update last login:', updateError.message);
             }
 
-            console.log('✅ Space owner authentication successful');
+            console.log('Space owner authentication successful');
 
             return {
                 userType: 'space_owner',
@@ -159,7 +157,7 @@ class TeableAuth {
 
             // Get user from app_users table
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const user = users.records && users.records.find(u => u.fields.email === email);
+            const user = users.records.find(u => u.fields.email === email);
 
             if (!user) {
                 throw new Error('User not found');
