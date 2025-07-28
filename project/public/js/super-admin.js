@@ -715,6 +715,9 @@ async function createClient() {
 
         // Set as current client config for immediate use
         localStorage.setItem('currentClientConfig', JSON.stringify(clientConfig));
+        
+        // Also set as the main client config for backward compatibility
+        localStorage.setItem('teable_client_config', JSON.stringify(clientConfig));
 
         // Update clients list
         const existingClients = JSON.parse(localStorage.getItem('clientConfigs') || '[]');
