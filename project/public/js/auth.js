@@ -1,3 +1,4 @@
+
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -82,26 +83,26 @@ class TeableAuth {
     }
 
     /**
-     * Authenticate Space Owner using clean logic
+     * Authenticate Space Owner using working logic
      */
     async authenticateSpaceOwner(email, password) {
         try {
-            console.log('🔐 Starting space owner authentication...');
+            console.log('Starting space owner authentication for:', email);
 
             // Step 1: Ensure system tables exist
             await window.teableAPI.ensureSystemTables();
 
             // Step 2: Get user from local app_users table
-            console.log('🔍 Checking local app_users table...');
+            console.log('Checking local app_users table...');
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records?.find(u => 
+            const localUser = users.records.find(u => 
                 u.fields.email === email.toLowerCase() && 
                 (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
-                u.fields.admin_password_hash // Must have admin password set
+                u.fields.admin_password_hash
             );
 
             if (!localUser) {
-                throw new Error('Space owner not found. Please ensure the admin email was configured correctly during client setup.');
+                throw new Error('Space owner not found or admin password not set');
             }
 
             if (!localUser.fields.is_active) {
@@ -109,17 +110,15 @@ class TeableAuth {
             }
 
             // Step 3: Verify admin password
-            if (!localUser.fields.admin_password_hash) {
-                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
-            }
-
             const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            console.log('Comparing passwords...');
+            
             if (localUser.fields.admin_password_hash !== adminPasswordHash) {
                 throw new Error('Invalid admin password for space owner');
             }
 
             // Step 4: Fetch current space owner from Teable.io for verification
-            console.log('🔍 Verifying against live Teable.io space data...');
+            console.log('Verifying against live Teable.io space data...');
             let teableSpaceOwner = null;
 
             try {
@@ -159,13 +158,13 @@ class TeableAuth {
                     if (teableSpaceOwner.email.toLowerCase() !== email.toLowerCase()) {
                         throw new Error(`Authentication failed: You are not the current space owner. Current owner: ${teableSpaceOwner.email}`);
                     }
-                    console.log('✅ Email verified against live Teable.io space data');
+                    console.log('Email verified against live Teable.io space data');
                 } else {
-                    console.log('⚠️ Could not verify against Teable.io - proceeding with local authentication');
+                    console.log('Could not verify against Teable.io - proceeding with local authentication');
                 }
 
             } catch (teableError) {
-                console.log('⚠️ Could not verify against Teable.io:', teableError.message);
+                console.log('Could not verify against Teable.io:', teableError.message);
                 // Continue with local authentication
             }
 
@@ -180,7 +179,7 @@ class TeableAuth {
                 console.log('Failed to update last login:', updateError.message);
             }
 
-            console.log('✅ Space owner authentication successful');
+            console.log('Space owner authentication successful');
 
             return {
                 userType: 'space_owner',
@@ -210,7 +209,7 @@ class TeableAuth {
 
             // Get user from app_users table
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const user = users.records?.find(u => u.fields.email === email);
+            const user = users.records.find(u => u.fields.email === email);
 
             if (!user) {
                 throw new Error('User not found');
@@ -242,7 +241,7 @@ class TeableAuth {
                 email: user.fields.email,
                 firstName: user.fields.first_name,
                 lastName: user.fields.last_name,
-                role: user.fields.role || 'Viewer', // Using Teable.io role
+                role: user.fields.role || 'Viewer',
                 userId: user.id,
                 loginTime: new Date().toISOString(),
                 isAdmin: ['Owner', 'Admin'].includes(user.fields.role)
@@ -285,7 +284,7 @@ class TeableAuth {
      * Check if user is admin (owner or admin role)
      */
     isAdmin() {
-        return this.currentSession?.isAdmin || ['Owner', 'Admin'].includes(this.currentSession?.role);
+        return this.currentSession && (this.currentSession.isAdmin || ['Owner', 'Admin'].includes(this.currentSession.role));
     }
 
     /**
@@ -449,7 +448,7 @@ window.teableAuth.init();
 // Utility functions for UI
 window.togglePasswordVisibility = function(inputId) {
     const input = document.getElementById(inputId);
-    const icon = input.nextElementSibling?.querySelector('i');
+    const icon = input.nextElementSibling && input.nextElementSibling.querySelector('i');
     
     if (input.type === 'password') {
         input.type = 'text';
