@@ -1,4 +1,3 @@
-
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -62,13 +61,13 @@ class TeableAuth {
 
             this.currentSession = session;
             this.saveSession();
-
+            
             // Log activity
             try {
                 await window.teableAPI.logActivity(
                     session.email, 
                     'user_login', 
-                    'User logged in as ' + session.userType
+                    `User logged in as ${session.userType}`
                 );
             } catch (logError) {
                 console.log('Failed to log activity:', logError.message);
@@ -83,26 +82,26 @@ class TeableAuth {
     }
 
     /**
-     * Authenticate Space Owner using working logic
+     * Authenticate Space Owner using clean logic
      */
     async authenticateSpaceOwner(email, password) {
         try {
-            console.log('Starting space owner authentication for:', email);
+            console.log('🔐 Starting space owner authentication...');
 
             // Step 1: Ensure system tables exist
             await window.teableAPI.ensureSystemTables();
 
             // Step 2: Get user from local app_users table
-            console.log('Checking local app_users table...');
+            console.log('🔍 Checking local app_users table...');
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records.find(u => 
+            const localUser = users.records?.find(u => 
                 u.fields.email === email.toLowerCase() && 
                 (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
-                u.fields.admin_password_hash
+                u.fields.admin_password_hash // Must have admin password set
             );
 
             if (!localUser) {
-                throw new Error('Space owner not found or admin password not set');
+                throw new Error('Space owner not found. Please ensure the admin email was configured correctly during client setup.');
             }
 
             if (!localUser.fields.is_active) {
@@ -110,14 +109,67 @@ class TeableAuth {
             }
 
             // Step 3: Verify admin password
+            if (!localUser.fields.admin_password_hash) {
+                throw new Error('Admin password not set for this space owner. Please reconfigure the client.');
+            }
+
             const adminPasswordHash = await window.teableAPI.hashPassword(password);
-            console.log('Comparing passwords...');
-            
             if (localUser.fields.admin_password_hash !== adminPasswordHash) {
                 throw new Error('Invalid admin password for space owner');
             }
 
-            // Step 4: Update last login
+            // Step 4: Fetch current space owner from Teable.io for verification
+            console.log('🔍 Verifying against live Teable.io space data...');
+            let teableSpaceOwner = null;
+
+            try {
+                const endpoints = [
+                    `/api/space/${this.clientConfig.spaceId}/collaborators`,
+                    `/api/space/${this.clientConfig.spaceId}/collaborator`,
+                    `/api/space/${this.clientConfig.spaceId}`,
+                    `/api/space`
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const result = await window.teableAPI.request(endpoint);
+
+                        // Look for owner role
+                        if (result.collaborators) {
+                            teableSpaceOwner = result.collaborators.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
+                            );
+                        } else if (result.members) {
+                            teableSpaceOwner = result.members.find(user => 
+                                user.role === 'Owner' || user.role === 'owner'
+                            );
+                        } else if (result.owner) {
+                            teableSpaceOwner = result.owner;
+                        }
+
+                        if (teableSpaceOwner) break;
+
+                    } catch (endpointError) {
+                        console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
+                    }
+                }
+
+                // Verify email matches current space owner
+                if (teableSpaceOwner && teableSpaceOwner.email) {
+                    if (teableSpaceOwner.email.toLowerCase() !== email.toLowerCase()) {
+                        throw new Error(`Authentication failed: You are not the current space owner. Current owner: ${teableSpaceOwner.email}`);
+                    }
+                    console.log('✅ Email verified against live Teable.io space data');
+                } else {
+                    console.log('⚠️ Could not verify against Teable.io - proceeding with local authentication');
+                }
+
+            } catch (teableError) {
+                console.log('⚠️ Could not verify against Teable.io:', teableError.message);
+                // Continue with local authentication
+            }
+
+            // Step 5: Update last login
             try {
                 await window.teableAPI.updateRecord(
                     window.teableAPI.systemTables.users,
@@ -128,7 +180,7 @@ class TeableAuth {
                 console.log('Failed to update last login:', updateError.message);
             }
 
-            console.log('Space owner authentication successful');
+            console.log('✅ Space owner authentication successful');
 
             return {
                 userType: 'space_owner',
@@ -139,7 +191,8 @@ class TeableAuth {
                 userId: localUser.id,
                 accessToken: this.clientConfig.accessToken,
                 loginTime: new Date().toISOString(),
-                isAdmin: true
+                isAdmin: true,
+                teableSpaceOwner: teableSpaceOwner || { email: email, verified: false }
             };
 
         } catch (error) {
@@ -157,7 +210,7 @@ class TeableAuth {
 
             // Get user from app_users table
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const user = users.records.find(u => u.fields.email === email);
+            const user = users.records?.find(u => u.fields.email === email);
 
             if (!user) {
                 throw new Error('User not found');
@@ -189,7 +242,7 @@ class TeableAuth {
                 email: user.fields.email,
                 firstName: user.fields.first_name,
                 lastName: user.fields.last_name,
-                role: user.fields.role || 'Viewer',
+                role: user.fields.role || 'Viewer', // Using Teable.io role
                 userId: user.id,
                 loginTime: new Date().toISOString(),
                 isAdmin: ['Owner', 'Admin'].includes(user.fields.role)
@@ -232,7 +285,7 @@ class TeableAuth {
      * Check if user is admin (owner or admin role)
      */
     isAdmin() {
-        return this.currentSession && (this.currentSession.isAdmin || ['Owner', 'Admin'].includes(this.currentSession.role));
+        return this.currentSession?.isAdmin || ['Owner', 'Admin'].includes(this.currentSession?.role);
     }
 
     /**
@@ -249,7 +302,7 @@ class TeableAuth {
      */
     hasRoleOrHigher(requiredRole) {
         if (!this.currentSession) return false;
-
+        
         const roleHierarchy = {
             'Viewer': 1,
             'Commenter': 2,
@@ -257,10 +310,10 @@ class TeableAuth {
             'Admin': 4,
             'Owner': 5
         };
-
+        
         const userLevel = roleHierarchy[this.currentSession.role] || 0;
         const requiredLevel = roleHierarchy[requiredRole] || 0;
-
+        
         return userLevel >= requiredLevel;
     }
 
@@ -281,12 +334,12 @@ class TeableAuth {
             const sessionData = localStorage.getItem('teable_session');
             if (sessionData) {
                 this.currentSession = JSON.parse(sessionData);
-
+                
                 // Check if session is expired (24 hours)
                 const loginTime = new Date(this.currentSession.loginTime);
                 const now = new Date();
                 const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-
+                
                 if (hoursDiff > 24) {
                     console.log('Session expired, logging out');
                     this.logout();
@@ -317,38 +370,12 @@ class TeableAuth {
      */
     loadClientConfig() {
         try {
-            // First try to load current client config (set by super-admin)
-            let configString = localStorage.getItem('currentClientConfig');
-
-            // Fallback to legacy clientConfig
-            if (!configString) {
-                configString = localStorage.getItem('teable_client_config');
+            const configData = localStorage.getItem('teable_client_config');
+            if (configData) {
+                this.clientConfig = JSON.parse(configData);
             }
-
-            if (configString) {
-                this.clientConfig = JSON.parse(configString);
-
-                // Ensure required properties exist
-                if (!this.clientConfig.baseUrl && this.clientConfig.teableUrl) {
-                    this.clientConfig.baseUrl = this.clientConfig.teableUrl;
-                }
-                if (!this.clientConfig.accessToken && this.clientConfig.apiToken) {
-                    this.clientConfig.accessToken = this.clientConfig.apiToken;
-                }
-
-                console.log('Client configuration loaded:', {
-                    baseUrl: this.clientConfig.baseUrl,
-                    spaceId: this.clientConfig.spaceId,
-                    baseId: this.clientConfig.baseId,
-                    hasAccessToken: !!this.clientConfig.accessToken
-                });
-
-                return this.clientConfig;
-            }
-            return null;
         } catch (error) {
-            console.error('Error loading client config:', error);
-            return null;
+            console.error('Failed to load client config:', error);
         }
     }
 
@@ -392,12 +419,12 @@ class TeableAuth {
             window.location.href = 'login.html';
             return false;
         }
-
+        
         // Ensure API is configured for authenticated users
-        if (this.clientConfig && (!window.teableAPI.config || !window.teableAPI.config.baseUrl)) {
+        if (this.clientConfig && !window.teableAPI.config.baseUrl) {
             window.teableAPI.init(this.clientConfig);
         }
-
+        
         return true;
     }
 
@@ -422,8 +449,8 @@ window.teableAuth.init();
 // Utility functions for UI
 window.togglePasswordVisibility = function(inputId) {
     const input = document.getElementById(inputId);
-    const icon = input.nextElementSibling && input.nextElementSibling.querySelector('i');
-
+    const icon = input.nextElementSibling?.querySelector('i');
+    
     if (input.type === 'password') {
         input.type = 'text';
         if (icon) icon.className = 'fas fa-eye-slash';

@@ -11,7 +11,6 @@ let measurementPoints = [];
 let selectedFeatures = [];
 let currentUser = null;
 let geoJSONData = null;
-let currentTablePermissions = {};
 
 // Base map configurations
 const baseMaps = {
@@ -46,17 +45,10 @@ async function initializeMap() {
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Ensure API is initialized with proper client configuration
-        const clientConfig = window.teableAuth.clientConfig || 
-                           JSON.parse(localStorage.getItem('currentClientConfig') || '{}') ||
-                           JSON.parse(localStorage.getItem('teable_client_config') || '{}');
-
-        if (!clientConfig.baseUrl || !clientConfig.accessToken) {
-            throw new Error('No valid client configuration found. Please configure the system first in super-admin.html');
+        // Initialize API if needed
+        if (currentUser.userType === 'space_owner') {
+            window.teableAPI.init(window.teableAuth.clientConfig);
         }
-
-        console.log('🔧 Initializing Teable API for map...');
-        window.teableAPI.init(clientConfig);
 
         // Initialize Leaflet map
         map = L.map('map').setView([20.5937, 78.9629], 5);
@@ -81,75 +73,6 @@ async function initializeMap() {
         console.error('Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
-}
-
-async function loadUserPermissions(tableId) {
-    try {
-        // Admins have full access
-        if (currentUser.isAdmin) {
-            return {}; // Empty object means full access for admins
-        }
-
-        if (!window.teableAPI.systemTables.permissions) {
-            // No permissions system, use role-based defaults
-            return {};
-        }
-
-        const permissionsData = await window.teableAPI.getRecords(window.teableAPI.systemTables.permissions);
-        const permissions = {};
-
-        permissionsData.records?.forEach(record => {
-            const fields = record.fields;
-            if (fields.user_email === currentUser.email && fields.table_id === tableId) {
-                permissions[fields.field_name] = fields.permission_type;
-            }
-        });
-
-        return permissions;
-
-    } catch (error) {
-        console.error('Error loading user permissions:', error);
-        return {}; // Default to role-based permissions on error
-    }
-}
-
-function getDefaultPermission(userRole) {
-    const rolePermissions = {
-        'creator': 'edit',
-        'Owner': 'edit',
-        'editor': 'edit',
-        'Admin': 'edit',
-        'Editor': 'edit',
-        'commenter': 'view',
-        'Commenter': 'view',
-        'viewer': 'view',
-        'Viewer': 'view'
-    };
-    return rolePermissions[userRole] || 'view';
-}
-
-function hasFieldPermission(fieldName, tableId, requiredPermission = 'view') {
-    // Admins have full access
-    if (currentUser.isAdmin || currentUser.role === 'Owner' || currentUser.role === 'Admin') {
-        return true;
-    }
-
-    const permissions = currentTablePermissions[tableId] || {};
-    const fieldPermission = permissions[fieldName] || getDefaultPermission(currentUser.role);
-
-    if (fieldPermission === 'hidden') {
-        return false;
-    }
-
-    if (requiredPermission === 'edit') {
-        return fieldPermission === 'edit';
-    }
-
-    return fieldPermission === 'view' || fieldPermission === 'edit';
-}
-
-function filterFieldsByPermissions(fields, tableId, requiredPermission = 'view') {
-    return fields.filter(field => hasFieldPermission(field, tableId, requiredPermission));
 }
 
 async function loadAvailableTables() {
@@ -202,21 +125,15 @@ async function loadTableFields() {
     }
 
     try {
-        // Load permissions for this table
-        currentTablePermissions[tableId] = await loadUserPermissions(tableId);
-
         // Get sample records to detect fields
         const recordsData = await window.teableAPI.getRecords(tableId, { limit: 5 });
 
         if (recordsData.records && recordsData.records.length > 0) {
-            const allFields = Object.keys(recordsData.records[0].fields || {});
+            const fields = Object.keys(recordsData.records[0].fields || {});
 
-            // Filter fields by permissions - only show fields user can view
-            const viewableFields = filterFieldsByPermissions(allFields, tableId, 'view');
-
-            // Auto-detect geometry field from viewable fields
+            // Auto-detect geometry field
             let detectedGeometryField = null;
-            const geometryFieldCandidates = viewableFields.filter(field => {
+            const geometryFieldCandidates = fields.filter(field => {
                 const fieldLower = field.toLowerCase();
                 return fieldLower.includes('geom') || 
                        fieldLower.includes('wkt') || 
@@ -231,10 +148,10 @@ async function loadTableFields() {
                 detectedGeometryField = geometryFieldCandidates[0];
             }
 
-            // Populate geometry field selector with viewable fields only
+            // Populate geometry field selector
             if (geometrySelector) {
                 geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
-                viewableFields.forEach(field => {
+                fields.forEach(field => {
                     const option = document.createElement('option');
                     option.value = field;
                     option.textContent = field;
@@ -249,13 +166,11 @@ async function loadTableFields() {
                 }
             }
 	    if (linkedTablesInfo) {
-                const hiddenCount = allFields.length - viewableFields.length;
                 linkedTablesInfo.innerHTML = `
                     <div class="small">
-                        <strong>Viewable Fields:</strong> ${viewableFields.length}${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ''}<br>
+                        <strong>Available Fields:</strong> ${fields.length}<br>
                         <strong>Geometry Field:</strong> ${detectedGeometryField || 'Not detected'}<br>
-                        <strong>Sample Fields:</strong> ${viewableFields.slice(0, 3).join(', ')}${viewableFields.length > 3 ? '...' : ''}
-                        ${hiddenCount > 0 ? `<br><small class="text-muted">Some fields are hidden due to permissions</small>` : ''}
+                        <strong>Sample Fields:</strong> ${fields.slice(0, 3).join(', ')}${fields.length > 3 ? '...' : ''}
                     </div>
                 `;
             }
@@ -525,11 +440,11 @@ function createFeaturePopup(fields, layerConfig) {
     const enableSearch = popupSettings.enableSearch || false;
 
     let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
-
+    
     // Popup header
     content += `<div class="popup-header d-flex justify-content-between align-items-center mb-2">`;
     content += `<h6 class="popup-title mb-0">${layerConfig.name}</h6>`;
-
+    
     // Add search if enabled
     if (enableSearch) {
         content += `<input type="text" class="form-control form-control-sm" placeholder="Search..." 
@@ -537,42 +452,37 @@ function createFeaturePopup(fields, layerConfig) {
     }
     content += `</div>`;
 
-    // Get all fields excluding geometry field
+    // Get fields to display - only show selected fields if configured
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
-
-    // Filter fields by permissions first - only include viewable fields
-    const viewableFields = filterFieldsByPermissions(allFields, layerConfig.tableId, 'view');
-
-    // Get configured popup fields
     const selectedFields = layerConfig.properties?.popup?.fields;
     const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
-
+    
     let fieldsToShow = [];
-
+    
     // Check if popup fields have been specifically configured
     if (selectedFields && Array.isArray(selectedFields)) {
-        // Only show the specifically selected fields that are also viewable
+        // Only show the specifically selected fields, even if the array is empty
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
-            viewableFields.includes(field) &&
+            allFields.includes(field) &&
             fields.hasOwnProperty(field)
         );
-        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} selected and viewable fields:`, fieldsToShow);
+        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} selected fields:`, fieldsToShow);
     } else {
-        // If popup fields haven't been configured yet, show all viewable fields
-        fieldsToShow = viewableFields;
-        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} viewable fields`);
+        // If popup fields haven't been configured yet, show all fields
+        fieldsToShow = allFields;
+        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} fields`);
     }
 
     // Apply template
     if (template === 'custom' && popupSettings.customTemplate) {
-        content += renderCustomTemplate(popupSettings.customTemplate, fields, fieldsToShow, layerConfig.tableId);
+        content += renderCustomTemplate(popupSettings.customTemplate, fields, fieldsToShow);
     } else if (template === 'table') {
-        content += renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig.tableId);
+        content += renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
     } else if (template === 'card') {
-        content += renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig.tableId);
+        content += renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
     } else {
-        content += renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig.tableId);
+        content += renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
     }
 
     // Add controls if enabled
@@ -586,129 +496,111 @@ function createFeaturePopup(fields, layerConfig) {
     return content;
 }
 
-function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, tableId) {
+function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
     let content = '<div class="popup-fields">';
-
+    
     fieldsToShow.forEach(key => {
         let value = fields[key];
-
+        
         // Skip empty fields if not showing them
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-
+        
         // Format value
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
-
-        // Add permission indicator
-        const hasEditPermission = hasFieldPermission(key, tableId, 'edit');
-        const permissionIndicator = hasEditPermission ? 
-            '<span class="permission-indicator permission-edit" title="Editable field"></span>' : 
-            '<span class="permission-indicator permission-view" title="View only"></span>';
-
+        
         content += `<div class="popup-field d-flex align-items-start mb-2" data-field="${key}">`;
-        content += `<div class="field-label flex-shrink-0 me-2"><strong>${permissionIndicator}${fieldIcon}${key}:</strong></div>`;
+        content += `<div class="field-label flex-shrink-0 me-2"><strong>${fieldIcon}${key}:</strong></div>`;
         content += `<div class="field-value flex-grow-1">${formattedValue}</div>`;
-
+        
         if (showCopyButtons) {
             content += `<button class="btn btn-xs btn-outline-secondary ms-1" onclick="copyToClipboard('${value}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div>`;
     });
-
+    
     if (fieldsToShow.length === 0) {
-        content += `<div class="text-muted text-center py-2"><em>No viewable fields available</em></div>`;
+        content += `<div class="text-muted text-center py-2"><em>No fields selected for display</em></div>`;
     }
-
+    
     content += '</div>';
     return content;
 }
 
-function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, tableId) {
+function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
     let content = '<div class="popup-table-wrapper" style="max-height: 300px; overflow-y: auto;">';
     content += '<table class="table table-sm table-bordered mb-0">';
-
+    
     fieldsToShow.forEach(key => {
         let value = fields[key];
-
+        
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-
+        
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
-
-        // Add permission indicator
-        const hasEditPermission = hasFieldPermission(key, tableId, 'edit');
-        const permissionIndicator = hasEditPermission ? 
-            '<span class="permission-indicator permission-edit" title="Editable field"></span>' : 
-            '<span class="permission-indicator permission-view" title="View only"></span>';
-
+        
         content += `<tr data-field="${key}">`;
-        content += `<td class="fw-bold" style="width: 40%;">${permissionIndicator}${fieldIcon}${key}</td>`;
+        content += `<td class="fw-bold" style="width: 40%;">${fieldIcon}${key}</td>`;
         content += `<td>${formattedValue}`;
-
+        
         if (showCopyButtons) {
             content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</td></tr>`;
     });
-
+    
     content += '</table></div>';
     return content;
 }
 
-function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, tableId) {
+function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
     let content = '<div class="popup-cards">';
-
+    
     fieldsToShow.forEach(key => {
         let value = fields[key];
-
+        
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-
+        
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
-
-        // Add permission indicator
-        const hasEditPermission = hasFieldPermission(key, tableId, 'edit');
-        const permissionIndicator = hasEditPermission ? 
-            '<span class="permission-indicator permission-edit" title="Editable field"></span>' : 
-            '<span class="permission-indicator permission-view" title="View only"></span>';
-
+        
         content += `<div class="card mb-2" data-field="${key}">`;
         content += `<div class="card-body p-2">`;
-        content += `<h6 class="card-title mb-1">${permissionIndicator}${fieldIcon}${key}</h6>`;
+        content += `<h6 class="card-title mb-1">${fieldIcon}${key}</h6>`;
         content += `<div class="card-text">${formattedValue}`;
-
+        
         if (showCopyButtons) {
             content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div></div></div>`;
     });
-
+    
     content += '</div>';
     return content;
 }
 
-function renderCustomTemplate(template, fields, fieldsToShow, tableId) {
+function renderCustomTemplate(template, fields, fieldsToShow) {
     let content = template;
-
+    
     // Replace field placeholders
     fieldsToShow.forEach(field => {
         const placeholder = `{{${field}}}`;
         const value = formatFieldValue(fields[field], true, 200);
         content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
     });
-
+    
     return content;
 }
 
@@ -716,18 +608,18 @@ function formatFieldValue(value, highlightLinks, maxLength) {
     if (value === null || value === undefined) {
         return '<em class="text-muted">No data</em>';
     }
-
+    
     if (value === '') {
         return '<em class="text-muted">Empty</em>';
     }
-
+    
     let formattedValue = String(value);
-
+    
     // Truncate if too long
     if (maxLength && formattedValue.length > maxLength) {
         formattedValue = formattedValue.substring(0, maxLength) + '...';
     }
-
+    
     // Highlight links
     if (highlightLinks && typeof value === 'string') {
         if (value.match(/^https?:\/\//)) {
@@ -736,14 +628,14 @@ function formatFieldValue(value, highlightLinks, maxLength) {
             formattedValue = `<a href="mailto:${value}" class="text-primary">${formattedValue}</a>`;
         }
     }
-
+    
     return formattedValue;
 }
 
 function createPopupControls(controls) {
     let content = '<div class="popup-controls mt-3 pt-2 border-top">';
     content += '<div class="d-flex gap-1 flex-wrap">';
-
+    
     if (controls.showZoomControls !== false) {
         content += `
             <button class="btn btn-xs btn-outline-primary" onclick="window.zoomToCurrentPopupFeature('close')" title="Zoom Close">
@@ -754,7 +646,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-
+    
     if (controls.showCenterControl !== false) {
         content += `
             <button class="btn btn-xs btn-outline-info" onclick="window.centerCurrentPopupFeature()" title="Center">
@@ -762,7 +654,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-
+    
     if (controls.showExportControl) {
         content += `
             <button class="btn btn-xs btn-outline-success" onclick="exportCurrentFeature()" title="Export Feature">
@@ -770,7 +662,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-
+    
     if (controls.showEditControl) {
         content += `
             <button class="btn btn-xs btn-outline-warning" onclick="editCurrentFeature()" title="Edit Feature">
@@ -778,7 +670,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-
+    
     content += '</div></div>';
     return content;
 }
@@ -1002,14 +894,6 @@ function updateLayersList() {
         const visibilityIcon = layer.visible ? 'fa-eye text-success' : 'fa-eye-slash text-muted';
 	const geometryIcon = getGeometryIcon(layer.type);
 
-        // Check permission status for this layer
-        const allFields = layer.records && layer.records.length > 0 ? Object.keys(layer.records[0].fields || {}) : [];
-        const viewableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
-        const hiddenFieldsCount = allFields.length - viewableFields.length;
-        const permissionStatus = hiddenFieldsCount > 0 ? 
-            `<small class="text-warning">⚠️ ${hiddenFieldsCount} fields hidden</small>` : 
-            '<small class="text-success">✓ Full access</small>';
-
         html += `
             <div class="layer-item ${layer.visible ? 'active' : ''}" data-layer-id="${layer.id}">
                 <div class="d-flex justify-content-between align-items-start">
@@ -1021,7 +905,6 @@ function updateLayersList() {
                         </div>
                         <div class="small text-muted">
                             ${layer.featureCount} features • ${layer.type}
-                            <br>${permissionStatus}
                         </div>
                     </div>
                     <div class="layer-controls">
@@ -1203,25 +1086,16 @@ function createDockedAttributeTable(layer) {
 function createTableHeader(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
-    const allFields = Object.keys(layer.records[0].fields || {});
-
-    // Filter fields by permissions - only show viewable fields
-    const viewableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
-
+    const fields = Object.keys(layer.records[0].fields || {});
     let headerHTML = '<tr>';
 
     // Add selection checkbox column
     headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
 
-    // Add field columns with permission indicators
-    viewableFields.forEach(field => {
+    // Add field columns
+    fields.forEach(field => {
         if (field !== layer.geometryField) {
-            const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-            const permissionIcon = hasEditPermission ? 
-                '<i class="fas fa-edit text-primary me-1" title="Editable field"></i>' : 
-                '<i class="fas fa-eye text-secondary me-1" title="View only field"></i>';
-
-            headerHTML += `<th>${permissionIcon}${field}</th>`;
+            headerHTML += `<th>${field}</th>`;
         }
     });
 
@@ -1235,11 +1109,7 @@ function createTableHeader(layer) {
 function createTableBody(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
-    const allFields = Object.keys(layer.records[0].fields || {});
-
-    // Filter fields by permissions - only show viewable fields
-    const viewableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
-
+    const fields = Object.keys(layer.records[0].fields || {});
     let bodyHTML = '';
 
     layer.records.forEach((record, index) => {
@@ -1248,8 +1118,8 @@ function createTableBody(layer) {
         // Add selection checkbox
         bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
 
-        // Add field data for viewable fields only
-        viewableFields.forEach(field => {
+        // Add field data
+        fields.forEach(field => {
             if (field !== layer.geometryField) {
                 let value = record.fields[field];
                 if (value === null || value === undefined) {
@@ -1286,7 +1156,7 @@ function populatePropertiesModal(layer) {
         const propDataSource = document.getElementById('propDataSource');
         const propGeometryType = document.getElementById('propGeometryType');
         const propFeatureCount = document.getElementById('propFeatureCount');
-
+        
         if (propLayerName) propLayerName.value = layer.name || '';
         if (propDataSource) propDataSource.value = layer.tableId || '';
         if (propGeometryType) propGeometryType.value = determineGeometryType(layer);
@@ -1304,7 +1174,7 @@ function populatePropertiesModal(layer) {
         const propFillOpacity = document.getElementById('propFillOpacity');
         const fillOpacityValue = document.getElementById('fillOpacityValue');
         const borderWidthValue = document.getElementById('borderWidthValue');
-
+        
         if (propSymbologyType) propSymbologyType.value = symbology.type || 'single';
         if (propFillColor) propFillColor.value = symbology.fillColor || '#3498db';
         if (propBorderColor) propBorderColor.value = symbology.borderColor || '#2c3e50';
@@ -1323,7 +1193,7 @@ function populatePropertiesModal(layer) {
         const propLabelColor = document.getElementById('propLabelColor');
         const propLabelBackground = document.getElementById('propLabelBackground');
         const propLabelControls = document.getElementById('propLabelControls');
-
+        
         if (propEnableLabels) propEnableLabels.checked = labels.enabled || false;
         if (propLabelField) propLabelField.value = labels.field || '';
         if (propLabelSize) propLabelSize.value = labels.fontSize || 12;
@@ -1336,20 +1206,20 @@ function populatePropertiesModal(layer) {
     // iTool tab
         populatePopupFieldsSelector(layer);
         const popup = layer.properties?.popup || {};
-
+        
         // Basic popup settings
         const propEnablePopups = document.getElementById('propEnablePopups');
         const propPopupTemplate = document.getElementById('propPopupTemplate');
         const propMaxPopupWidth = document.getElementById('propMaxPopupWidth');
         const propMaxFieldLength = document.getElementById('propMaxFieldLength');
         const propPopupPosition = document.getElementById('propPopupPosition');
-
+        
         if (propEnablePopups) propEnablePopups.checked = popup.enabled !== false;
         if (propPopupTemplate) propPopupTemplate.value = popup.template || 'default';
         if (propMaxPopupWidth) propMaxPopupWidth.value = popup.maxWidth || 300;
         if (propMaxFieldLength) propMaxFieldLength.value = popup.maxFieldLength || 100;
         if (propPopupPosition) propPopupPosition.value = popup.position || 'auto';
-
+        
         // Advanced settings
         const propShowEmptyFields = document.getElementById('propShowEmptyFields');
         const propShowFieldIcons = document.getElementById('propShowFieldIcons');
@@ -1359,7 +1229,7 @@ function populatePropertiesModal(layer) {
         const propShowCopyButtons = document.getElementById('propShowCopyButtons');
         const propEnableFieldSorting = document.getElementById('propEnableFieldSorting');
         const propCustomTemplate = document.getElementById('propCustomTemplate');
-
+        
         if (propShowEmptyFields) propShowEmptyFields.checked = popup.showEmptyFields || false;
         if (propShowFieldIcons) propShowFieldIcons.checked = popup.showFieldIcons !== false;
         if (propHighlightLinks) propHighlightLinks.checked = popup.highlightLinks !== false;
@@ -1368,26 +1238,26 @@ function populatePropertiesModal(layer) {
         if (propShowCopyButtons) propShowCopyButtons.checked = popup.showCopyButtons || false;
         if (propEnableFieldSorting) propEnableFieldSorting.checked = popup.enableFieldSorting || false;
         if (propCustomTemplate) propCustomTemplate.value = popup.customTemplate || '';
-
+        
         // Control settings
         const controls = popup.controls || {};
         const propShowZoomControls = document.getElementById('propShowZoomControls');
         const propShowCenterControl = document.getElementById('propShowCenterControl');
         const propShowExportControl = document.getElementById('propShowExportControl');
         const propShowEditControl = document.getElementById('propShowEditControl');
-
+        
         if (propShowZoomControls) propShowZoomControls.checked = controls.showZoomControls !== false;
         if (propShowCenterControl) propShowCenterControl.checked = controls.showCenterControl !== false;
         if (propShowExportControl) propShowExportControl.checked = controls.showExportControl || false;
         if (propShowEditControl) propShowEditControl.checked = controls.showEditControl || false;
-
+        
         // Handle template change and popup toggle
         handleTemplateChange();
         handlePopupToggle();
 
         // Update symbology type display
         updateSymbologyType();
-
+        
     } catch (error) {
         console.error('Error populating properties modal:', error);
         showError('Failed to load layer properties: ' + error.message);
@@ -1397,23 +1267,17 @@ function populatePropertiesModal(layer) {
 function populateFieldSelectors(layer) {
     if (!layer.records || layer.records.length === 0) return;
 
-    const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-
-    // Filter fields by permissions - only show viewable fields
-    const viewableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
 
     // Populate label field selector
     const labelFieldSelect = document.getElementById('propLabelField');
     if (labelFieldSelect) {
         const currentValue = labelFieldSelect.value;
         labelFieldSelect.innerHTML = '<option value="">Select field...</option>';
-        viewableFields.forEach(field => {
-            const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-            const permissionIcon = hasEditPermission ? '✏️' : '👁️';
-
+        fields.forEach(field => {
             const option = document.createElement('option');
             option.value = field;
-            option.textContent = `${permissionIcon} ${field}`;
+            option.textContent = field;
             labelFieldSelect.appendChild(option);
         });
         if (currentValue) labelFieldSelect.value = currentValue;
@@ -1424,7 +1288,7 @@ function populateFieldSelectors(layer) {
     if (graduatedFieldSelect) {
         const currentValue = graduatedFieldSelect.value;
         graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
-        viewableFields.forEach(field => {
+        fields.forEach(field => {
             // Try to determine if field is numeric by checking sample values
             const isNumeric = layer.records.some(record => {
                 const value = record.fields[field];
@@ -1432,12 +1296,9 @@ function populateFieldSelectors(layer) {
             });
 
             if (isNumeric) {
-                const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-                const permissionIcon = hasEditPermission ? '✏️' : '👁️';
-
                 const option = document.createElement('option');
                 option.value = field;
-                option.textContent = `${permissionIcon} ${field}`;
+                option.textContent = field;
                 graduatedFieldSelect.appendChild(option);
             }
         });
@@ -1449,13 +1310,10 @@ function populateFieldSelectors(layer) {
     if (categorizedFieldSelect) {
         const currentValue = categorizedFieldSelect.value;
         categorizedFieldSelect.innerHTML = '<option value="">Select field...</option>';
-        viewableFields.forEach(field => {
-            const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-            const permissionIcon = hasEditPermission ? '✏️' : '👁️';
-
+        fields.forEach(field => {
             const option = document.createElement('option');
             option.value = field;
-            option.textContent = `${permissionIcon} ${field}`;
+            option.textContent = field;
             categorizedFieldSelect.appendChild(option);
         });
         if (currentValue) categorizedFieldSelect.value = currentValue;
@@ -1466,42 +1324,32 @@ function populatePopupFieldsSelector(layer) {
     const container = document.getElementById('propPopupFields');
     if (!container || !layer.records || layer.records.length === 0) return;
 
-    const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-
-    // Filter fields by permissions - only show viewable fields
-    const viewableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
+    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
     const selectedFields = layer.properties?.popup?.fields || [];
 
     let html = '';
-    if (viewableFields.length === 0) {
-        html = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>No viewable fields available for popup display</div>';
-    } else {
-        viewableFields.forEach(field => {
-            const isSelected = selectedFields.includes(field);
-            const fieldType = getFieldType(layer.records[0].fields[field]);
-            const fieldIcon = getFieldIcon(fieldType);
-            const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-            const permissionIcon = hasEditPermission ? '✏️' : '👁️';
-            const permissionText = hasEditPermission ? 'editable' : 'view-only';
-
-            html += `
-                <div class="field-checkbox d-flex align-items-center mb-2">
-                    <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
-                           ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
-                    <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
-                    <label class="form-check-label flex-grow-1" for="popup_field_${field}">
-                        ${permissionIcon} ${field}
-                    </label>
-                    <small class="text-muted">(${fieldType}, ${permissionText})</small>
-                </div>
-            `;
-        });
-    }
+    fields.forEach(field => {
+        const isSelected = selectedFields.includes(field);
+        const fieldType = getFieldType(layer.records[0].fields[field]);
+        const fieldIcon = getFieldIcon(fieldType);
+        
+        html += `
+            <div class="field-checkbox d-flex align-items-center mb-2">
+                <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
+                       ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
+                <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
+                <label class="form-check-label flex-grow-1" for="popup_field_${field}">
+                    ${field}
+                </label>
+                <small class="text-muted">(${fieldType})</small>
+            </div>
+        `;
+    });
 
     container.innerHTML = html;
-
+    
     // Update available fields for custom template
-    updateAvailableFieldsHelp(viewableFields);
+    updateAvailableFieldsHelp(fields);
 }
 
 function getFieldType(value) {
@@ -1536,14 +1384,14 @@ function getFieldIcon(fieldType) {
 function updateAvailableFieldsHelp(fields) {
     const container = document.getElementById('availableFieldsHelp');
     if (!container) return;
-
+    
     let html = '<div class="row">';
     fields.forEach((field, index) => {
         if (index > 0 && index % 3 === 0) html += '</div><div class="row">';
         html += `<div class="col-md-4"><code>{{${field}}}</code></div>`;
     });
     html += '</div>';
-
+    
     container.innerHTML = html;
 }
 
@@ -1733,7 +1581,7 @@ function showFeatureInfo(layerId, featureIndex) {
     if (!selectedFeatures.includes(feature)) {
         selectedFeatures.push(feature);
         updateSelectionCount();
-
+        
         // Update the corresponding checkbox in attribute table if visible
         const checkbox = document.querySelector(`tr[data-feature-index="${featureIndex}"] .row-selector`);
         if (checkbox) {
@@ -1759,7 +1607,7 @@ function showFeatureInfo(layerId, featureIndex) {
     } else if (feature.getLatLng) {
         feature.bindPopup(popupContent).openPopup();
     }
-
+    
     console.log(`Feature info displayed for feature ${featureIndex} in layer "${layer.name}" with ${layer.properties?.popup?.fields?.length || 0} configured popup fields`);
 }
 
@@ -1771,22 +1619,15 @@ function exportTableData(layerId) {
     }
 
     try {
-        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-
-        // Filter fields by permissions - only export viewable fields
-        const exportableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
-
-        if (exportableFields.length === 0) {
-            showError('No viewable fields available for export');
-            return;
-        }
+        // Prepare CSV data
+        const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
 
         // Create CSV header
-        let csvContent = exportableFields.join(',') + '\n';
+        let csvContent = fields.join(',') + '\n';
 
         // Add data rows
         layer.records.forEach(record => {
-            const row = exportableFields.map(field => {
+            const row = fields.map(field => {
                 let value = record.fields[field] || '';
                 // Escape commas and quotes
                 if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
@@ -1808,11 +1649,7 @@ function exportTableData(layerId) {
         link.click();
         document.body.removeChild(link);
 
-        const hiddenCount = allFields.length - exportableFields.length;
-        const message = hiddenCount > 0 ? 
-            `Data exported successfully (${exportableFields.length} viewable fields, ${hiddenCount} hidden)` : 
-            'Data exported successfully';
-        showSuccess(message);
+        showSuccess('Data exported successfully');
     } catch (error) {
         console.error('Export error:', error);
         showError('Failed to export data: ' + error.message);
@@ -2459,10 +2296,10 @@ function applyProperties() {
 
     // Update popup properties with all iTool settings
     if (!layer.properties.popup) layer.properties.popup = {};
-
+    
     // Apply all popup settings
     updateLayerPopupSettings(layer);
-
+    
     // Collect selected popup fields from checkboxes
     const selectedPopupFields = [];
     const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
@@ -2470,11 +2307,11 @@ function applyProperties() {
         const fieldName = checkbox.id.replace('popup_field_', '');
         selectedPopupFields.push(fieldName);
     });
-
+    
     // Update popup fields in layer properties and mark as configured
     layer.properties.popup.fields = selectedPopupFields;
     layer.properties.popup.configured = true;
-
+    
     console.log(`Applying popup configuration for layer "${layer.name}"`);
     console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
     console.log(`Total selected fields: ${selectedPopupFields.length}`);
@@ -2489,28 +2326,28 @@ function applyProperties() {
         // Force update all existing feature popups with new field configuration
         if (mapLayers[layerIndex].features && mapLayers[layerIndex].records) {
             console.log(`Updating popups for ${mapLayers[layerIndex].features.length} features`);
-
+            
             mapLayers[layerIndex].features.forEach((feature, index) => {
                 // Get the record data for this feature
                 const recordData = mapLayers[layerIndex].records[index]?.fields;
-
+                
                 if (recordData) {
                     // Update the cached record data on the feature
                     feature.recordData = recordData;
                     feature.layerId = mapLayers[layerIndex].id;
                     feature.featureIndex = index;
-
+                    
                     // Create new popup content with updated field configuration
                     const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
-
+                    
                     // Remove existing popup if it exists
                     if (feature.getPopup()) {
                         feature.unbindPopup();
                     }
-
+                    
                     // Bind new popup with updated content
                     feature.bindPopup(newPopupContent);
-
+                    
                     // Update click handler to use new configuration
                     feature.off('click');
                     feature.on('click', function(e) {
@@ -2519,7 +2356,7 @@ function applyProperties() {
                     });
                 }
             });
-
+            
             console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
         }
     }
@@ -2545,7 +2382,7 @@ function applyProperties() {
     const message = fieldCount === 0 ? 
         'Layer properties applied! Popup will show no fields.' : 
         `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
-
+    
     showSuccess(message);
 }
 
@@ -2615,7 +2452,7 @@ function applyLabelsToLayer(layer) {
         const fontSize = labels.fontSize || 12;
         const color = labels.color || '#333333';
         const background = labels.background !== false;
-
+        
         const labelMarker = L.marker(labelPosition, {
             icon: L.divIcon({
                 className: 'feature-label',
@@ -2683,21 +2520,21 @@ function previewPopup() {
         showError('No layer selected or no data available for preview');
         return;
     }
-
+    
     const layer = window.currentPropertiesLayer;
     const sampleRecord = layer.records[0];
-
+    
     if (!sampleRecord || !sampleRecord.fields) {
         showError('No sample data available for preview');
         return;
     }
-
+    
     // Apply current settings to layer temporarily for preview
     updateLayerPopupSettings(layer);
-
+    
     // Generate preview content
     const previewContent = createFeaturePopup(sampleRecord.fields, layer);
-
+    
     // Display in preview area
     document.getElementById('popupPreview').innerHTML = previewContent;
 }
@@ -2705,7 +2542,7 @@ function previewPopup() {
 function updateLayerPopupSettings(layer) {
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.popup) layer.properties.popup = {};
-
+    
     // Collect all settings from the form
     layer.properties.popup.enabled = document.getElementById('propEnablePopups')?.checked !== false;
     layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
@@ -2720,7 +2557,7 @@ function updateLayerPopupSettings(layer) {
     layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
     layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
     layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
-
+    
     // Controls
     if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
     layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
@@ -2734,26 +2571,10 @@ function exportCurrentFeature() {
         showError('No feature data available for export');
         return;
     }
-
+    
     const data = window.currentPopupFeature.recordData;
-    const layerId = window.currentPopupFeature.layerId;
-
-    if (!layerId) {
-        showError('Layer information not available for permission check');
-        return;
-    }
-
-    // Filter data by permissions - only export viewable fields
-    const allFields = Object.keys(data);
-    const exportableFields = filterFieldsByPermissions(allFields, layerId, 'view');
-
-    if (exportableFields.length === 0) {
-        showError('No viewable fields available for export');
-        return;
-    }
-
-    const csvContent = exportableFields.map(key => `${key},"${data[key] || ''}"`).join('\n');
-
+    const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
+    
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -2761,12 +2582,8 @@ function exportCurrentFeature() {
     link.download = 'feature_data.csv';
     link.click();
     URL.revokeObjectURL(url);
-
-    const hiddenCount = allFields.length - exportableFields.length;
-    const message = hiddenCount > 0 ? 
-        `Feature data exported successfully (${exportableFields.length} viewable fields, ${hiddenCount} hidden)` : 
-        'Feature data exported successfully!';
-    showSuccess(message);
+    
+    showSuccess('Feature data exported successfully!');
 }
 
 function editCurrentFeature() {
@@ -2777,7 +2594,7 @@ function editCurrentFeature() {
 function handleTemplateChange() {
     const template = document.getElementById('propPopupTemplate')?.value;
     const customSection = document.getElementById('customTemplateSection');
-
+    
     if (template === 'custom' && customSection) {
         customSection.style.display = 'block';
     } else if (customSection) {
@@ -2789,7 +2606,7 @@ function handleTemplateChange() {
 function handlePopupToggle() {
     const enabled = document.getElementById('propEnablePopups')?.checked;
     const configSection = document.getElementById('popupConfigSection');
-
+    
     if (configSection) {
         configSection.style.display = enabled ? 'block' : 'none';
     }
@@ -3188,30 +3005,15 @@ function loadFilterFields() {
         const layer = mapLayers.find(l => l.id === layerId);
         if (!layer || !layer.records || layer.records.length === 0) return;
 
-        const allFields = Object.keys(layer.records[0].fields || {});
-
-        // Filter fields by permissions - only show viewable fields for filtering
-        const filterableFields = filterFieldsByPermissions(allFields, layer.tableId, 'view');
-
-        filterableFields.forEach(field => {
+        const fields = Object.keys(layer.records[0].fields || {});
+        fields.forEach(field => {
             if (field !== layer.geometryField) {
-                const hasEditPermission = hasFieldPermission(field, layer.tableId, 'edit');
-                const permissionIcon = hasEditPermission ? '✏️' : '👁️';
-
                 const option = document.createElement('option');
                 option.value = field;
-                option.textContent = `${permissionIcon} ${field}`;
+                option.textContent = field;
                 fieldSelect.appendChild(option);
             }
         });
-
-        if (filterableFields.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'No viewable fields available';
-            option.disabled = true;
-            fieldSelect.appendChild(option);
-        }
     }
 }
 
@@ -3429,7 +3231,7 @@ function exportMap() {
 
 function fullscreenMap() {
     const mapContainer = document.getElementById('map');
-
+    
     if (!mapContainer) {
         showError('Map container not found');
         return;
@@ -3450,13 +3252,13 @@ function fullscreenMap() {
                 showError('Fullscreen not supported by this browser');
                 return;
             }
-
+            
             // Add fullscreen class for styling
             mapContainer.classList.add('fullscreen-map');
-
+            
             // Show success message
             showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
-
+            
         } else {
             // Exit fullscreen
             if (document.exitFullscreen) {
@@ -3469,13 +3271,13 @@ function fullscreenMap() {
                 document.mozCancelFullScreen();
             }
         }
-
+        
         // Listen for fullscreen changes to update map size and remove class
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.addEventListener('msfullscreenchange', handleFullscreenChange);
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-
+        
     } catch (error) {
         console.error('Fullscreen error:', error);
         showError('Failed to toggle fullscreen: ' + error.message);
@@ -3484,20 +3286,20 @@ function fullscreenMap() {
 
 function handleFullscreenChange() {
     const mapContainer = document.getElementById('map');
-
+    
     if (!document.fullscreenElement && 
         !document.webkitFullscreenElement && 
         !document.msFullscreenElement && 
         !document.mozFullScreenElement) {
-
+        
         // Exited fullscreen
         if (mapContainer) {
             mapContainer.classList.remove('fullscreen-map');
         }
-
+        
         showInfo('Exited fullscreen mode');
     }
-
+    
     // Invalidate map size to ensure proper rendering
     setTimeout(() => {
         if (map) {
@@ -3524,21 +3326,21 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
                 fillOpacity: 0.8        // More opaque when selected
             });
         }
-
+        
         // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
         const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
-
+        
         // Ensure we have the record data for this feature
         let recordData = feature.recordData;
         if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
             recordData = currentLayer.records[featureIndex].fields;
             feature.recordData = recordData; // Cache for future use
         }
-
+        
         if (recordData) {
             // Create popup content using the current layer configuration (which includes updated popup fields)
             const popupContent = createFeaturePopup(recordData, currentLayer);
-
+            
             // Update the popup with the new content that respects field selection
             if (feature.getPopup()) {
                 feature.getPopup().setContent(popupContent);
@@ -3546,7 +3348,7 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
             } else {
                 feature.bindPopup(popupContent).openPopup();
             }
-
+            
             console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
         }
     } else {

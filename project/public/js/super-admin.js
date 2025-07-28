@@ -1,12 +1,14 @@
+
 /**
  * Super Admin Portal - Client Configuration and Management
  */
+
 let currentClientConfig = null;
 let allConfigs = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeSuperAdmin();
-
+    
     // Setup form handler
     const configForm = document.getElementById('clientConfigForm');
     if (configForm) {
@@ -18,7 +20,9 @@ async function initializeSuperAdmin() {
     try {
         loadExistingConfigs();
         updateStats();
+        
         console.log('Super Admin portal initialized');
+        
     } catch (error) {
         console.error('Super Admin initialization failed:', error);
         showAlert('danger', 'Failed to initialize Super Admin portal: ' + error.message);
@@ -30,6 +34,7 @@ function loadExistingConfigs() {
         const configs = getStoredConfigs();
         allConfigs = configs;
         displayExistingConfigs(configs);
+        
     } catch (error) {
         console.error('Failed to load existing configs:', error);
     }
@@ -47,7 +52,7 @@ function getStoredConfigs() {
 
 function displayExistingConfigs(configs) {
     const container = document.getElementById('existingConfigs');
-
+    
     if (configs.length === 0) {
         container.innerHTML = `
             <div class="text-center text-muted py-3">
@@ -62,7 +67,7 @@ function displayExistingConfigs(configs) {
     configs.forEach((config, index) => {
         const statusClass = config.status === 'active' ? 'success' : 'warning';
         const statusIcon = config.status === 'active' ? 'check-circle' : 'exclamation-triangle';
-
+        
         html += `
             <div class="config-card mb-3 p-3 border rounded">
                 <div class="d-flex justify-content-between align-items-start">
@@ -112,9 +117,11 @@ function displayExistingConfigs(configs) {
 function updateStats() {
     try {
         const configs = getStoredConfigs();
+        
         document.getElementById('totalClients').textContent = configs.length;
         document.getElementById('totalUsers').textContent = configs.reduce((sum, config) => sum + (config.userCount || 0), 0);
         document.getElementById('totalSpaces').textContent = configs.filter(c => c.spaceId).length;
+        
     } catch (error) {
         console.error('Failed to update stats:', error);
     }
@@ -150,29 +157,14 @@ async function handleClientCreation(event) {
 
         // Show loading
         showLoadingState(true);
+
         console.log('Creating client configuration...');
 
-        // Ensure baseUrl is properly formatted
-        if (!config.baseUrl.startsWith('http://') && !config.baseUrl.startsWith('https://')) {
-            config.baseUrl = 'https://' + config.baseUrl;
-        }
+        // Test connection first
+        await testConnectionInternal(config);
 
-        // Initialize API with new config first
-        console.log('Initializing API with config:', {
-            baseUrl: config.baseUrl,
-            baseId: config.baseId,
-            spaceId: config.spaceId,
-            hasToken: !!config.accessToken
-        });
-
+        // Initialize API with new config
         window.teableAPI.init(config);
-
-        // Test connection
-        console.log('Testing API connection...');
-        const testResult = await window.teableAPI.testConnection();
-        if (!testResult.success) {
-            throw new Error(`Connection test failed: ${testResult.error}`);
-        }
 
         // Create system tables
         console.log('Creating system tables...');
@@ -181,28 +173,28 @@ async function handleClientCreation(event) {
         // Create Owner user in app_users table
         console.log('Creating Owner user...');
         const ownerPasswordHash = await window.teableAPI.hashPassword(config.ownerPassword);
-
+        
         // Extract name from email if no separate name provided
         const emailParts = config.ownerEmail.split('@')[0];
         const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
-
+        
         const ownerUserData = {
             email: config.ownerEmail,
             password_hash: ownerPasswordHash,
             first_name: firstName,
             last_name: 'Owner',
-            role: 'Owner',
+            role: 'Owner', // Using Teable.io nomenclature with proper case
             is_active: true,
             created_date: new Date().toISOString().split('T')[0],
             last_login: null,
             synced_from_teable: false,
             teable_user_id: null,
-            admin_password_hash: ownerPasswordHash
+            admin_password_hash: ownerPasswordHash // Owner can use same password for admin functions
         };
 
         await window.teableAPI.createRecord(window.teableAPI.systemTables.users, ownerUserData);
 
-        // Save configuration with multiple storage keys for compatibility
+        // Save configuration
         const fullConfig = {
             ...config,
             id: Date.now().toString(),
@@ -211,19 +203,12 @@ async function handleClientCreation(event) {
             userCount: 1
         };
 
-        // Store in multiple places for compatibility
-        localStorage.setItem('currentClientConfig', JSON.stringify(fullConfig));
-        localStorage.setItem('teable_client_config', JSON.stringify(fullConfig));
-
-        // Update the configs array
         const configs = getStoredConfigs();
         configs.push(fullConfig);
         localStorage.setItem('teable_client_configs', JSON.stringify(configs));
 
-        // Ensure auth system picks up the new config
-        if (window.teableAuth) {
-            window.teableAuth.clientConfig = fullConfig;
-        }
+        // Set as active configuration
+        localStorage.setItem('teable_client_config', JSON.stringify(fullConfig));
 
         // Log initial activity
         try {
@@ -270,43 +255,14 @@ async function testConnection() {
             throw new Error('Please fill in URL, Base ID, and API Token first');
         }
 
-        // Ensure baseUrl is properly formatted
-        if (!config.baseUrl.startsWith('http://') && !config.baseUrl.startsWith('https://')) {
-            config.baseUrl = 'https://' + config.baseUrl;
-        }
-
+        await testConnectionInternal(config);
+        
         document.getElementById('connectionStatus').innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-spinner fa-spin me-2"></i>Testing connection...
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>Connection successful! 
+                Ready to create client configuration.
             </div>
         `;
-
-        // Test with proper API endpoint structure
-        const testUrl = `${config.baseUrl}/api/base/${config.baseId}`;
-        console.log('Testing connection to:', testUrl);
-
-        const response = await fetch(testUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${config.accessToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            document.getElementById('connectionStatus').innerHTML = `
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle me-2"></i>Connection successful! 
-                    Base: ${data.name || 'Connected'} (ID: ${config.baseId})
-                </div>
-            `;
-            // Store test config temporarily for auto setup
-            window.testConfig = config;
-        } else {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-        }
 
     } catch (error) {
         console.error('Connection test failed:', error);
@@ -315,6 +271,24 @@ async function testConnection() {
                 <i class="fas fa-exclamation-triangle me-2"></i>Connection failed: ${error.message}
             </div>
         `;
+    }
+}
+
+async function testConnectionInternal(config) {
+    // Initialize API temporarily
+    window.teableAPI.init(config);
+
+    // Test the actual API connection using the testConnection method
+    try {
+        const result = await window.teableAPI.testConnection();
+        if (result.success) {
+            console.log('API connection test successful:', result);
+            return true;
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        throw new Error(`API connection failed: ${error.message}`);
     }
 }
 
@@ -350,14 +324,14 @@ function activateConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-
+        
         if (!config) {
             throw new Error('Configuration not found');
         }
 
         // Set as active configuration
         localStorage.setItem('teable_client_config', JSON.stringify(config));
-
+        
         // Update status
         configs.forEach(c => c.status = 'inactive');
         config.status = 'active';
@@ -376,7 +350,7 @@ function editConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-
+        
         if (!config) {
             throw new Error('Configuration not found');
         }
@@ -409,25 +383,13 @@ async function testConfigConnection(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-
+        
         if (!config) {
             throw new Error('Configuration not found');
         }
 
-        // Test connection internally
-        const testConfig = { ...config };
-        if (!testConfig.baseUrl.startsWith('http://') && !testConfig.baseUrl.startsWith('https://')) {
-            testConfig.baseUrl = 'https://' + testConfig.baseUrl;
-        }
-
-        window.teableAPI.init(testConfig);
-        const result = await window.teableAPI.testConnection();
-
-        if (result.success) {
-            showAlert('success', `Connection test successful for: ${config.clientName}`);
-        } else {
-            throw new Error(result.error || 'Unknown connection error');
-        }
+        await testConnectionInternal(config);
+        showAlert('success', `Connection test successful for: ${config.clientName}`);
 
     } catch (error) {
         console.error('Config connection test failed:', error);
@@ -439,7 +401,7 @@ function deleteConfig(index) {
     try {
         const configs = getStoredConfigs();
         const config = configs[index];
-
+        
         if (!config) {
             throw new Error('Configuration not found');
         }
@@ -478,7 +440,7 @@ function showSuccessModal(config) {
             <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
             <h4>Client "${config.clientName}" Created Successfully!</h4>
         </div>
-
+        
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-user me-2"></i>Owner Details</h6>
@@ -487,7 +449,8 @@ function showSuccessModal(config) {
                     <li><strong>Role:</strong> Owner (Full Access)</li>
                     <li><strong>Status:</strong> Active</li>
                 </ul>
-            </div>
+            </div></div>
+        </div>
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i>System Setup</h6>
                 <ul class="list-unstyled">
@@ -498,7 +461,7 @@ function showSuccessModal(config) {
                 </ul>
             </div>
         </div>
-
+        
         <div class="alert alert-info mt-3">
             <h6><i class="fas fa-info-circle me-2"></i>Next Steps</h6>
             <ol class="mb-0">
@@ -531,7 +494,7 @@ function resetForm() {
 function showLoadingState(show) {
     const form = document.getElementById('clientConfigForm');
     const inputs = form.querySelectorAll('input, button');
-
+    
     inputs.forEach(input => {
         input.disabled = show;
     });
@@ -583,6 +546,19 @@ function backupData() {
     showAlert('info', 'Backup functionality will be implemented in the next version.');
 }
 
+function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = input.nextElementSibling?.querySelector('i');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        if (icon) icon.className = 'fas fa-eye';
+    }
+}
+
 function showAlert(type, message) {
     // Remove existing alerts
     const existingAlerts = document.querySelectorAll('.alert');
@@ -613,34 +589,6 @@ function showAlert(type, message) {
     }, 8000);
 }
 
-// Make functions globally available
-window.testConnection = testConnection;
-window.autoSetup = autoSetup;
-window.activateConfig = activateConfig;
-window.editConfig = editConfig;
-window.testConfigConnection = testConfigConnection;
-window.deleteConfig = deleteConfig;
-window.proceedToClient = proceedToClient;
-window.resetForm = resetForm;
-window.exportConfigs = exportConfigs;
-window.viewSystemLogs = viewSystemLogs;
-window.backupData = backupData;
-window.togglePasswordVisibility = togglePasswordVisibility;
-
-// Add toggle password visibility function
-function togglePasswordVisibility(inputId) {
-    const input = document.getElementById(inputId);
-    const icon = input.nextElementSibling?.querySelector('i');
-
-    if (input.type === 'password') {
-        input.type = 'text';
-        if (icon) icon.className = 'fas fa-eye-slash';
-    } else {
-        input.type = 'password';
-        if (icon) icon.className = 'fas fa-eye';
-    }
-}
-
 // Add CSS for better styling
 const style = document.createElement('style');
 style.textContent = `
@@ -653,28 +601,28 @@ style.textContent = `
         display: flex;
         align-items: center;
     }
-
+    
     .stat-icon {
         font-size: 2rem;
         margin-right: 1rem;
         opacity: 0.8;
     }
-
+    
     .stat-content h3 {
         font-size: 2.5rem;
         font-weight: bold;
         margin: 0;
     }
-
+    
     .stat-content p {
         margin: 0;
         opacity: 0.9;
     }
-
+    
     .config-card {
         transition: all 0.3s ease;
     }
-
+    
     .config-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);

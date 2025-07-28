@@ -458,30 +458,6 @@ body {
     background: #a8a8a8;
 }
 
-/* Permission indicators */
-.permission-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 4px;
-}
-
-.permission-indicator.permission-view {
-    background-color: #28a745;
-    border: 1px solid #1e7e34;
-}
-
-.permission-indicator.permission-edit {
-    background-color: #007bff;
-    border: 1px solid #0056b3;
-}
-
-.permission-indicator.permission-hidden {
-    background-color: #dc3545;
-    border: 1px solid #bd2130;
-}
-
 /* Utility Classes */
 .text-gradient {
     background: linear-gradient(45deg, #667eea, #764ba2);

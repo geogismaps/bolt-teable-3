@@ -68,10 +68,9 @@ class TeableAPI {
         try {
             // Test multiple endpoints to find working one
             const testEndpoints = [
+                `/api/table/${this.config.baseId}`, // Try base as table ID first
                 `/api/base/${this.config.baseId}/table`,
                 `/api/base/${this.config.baseId}`,
-                `/api/table?baseId=${this.config.baseId}`,
-                `/api/space/${this.config.spaceId}/base/${this.config.baseId}`,
                 `/api/space/${this.config.spaceId}`,
                 `/api/space`
             ];
