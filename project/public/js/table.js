@@ -32,10 +32,17 @@ async function initializeTableView() {
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Initialize API if needed
-        if (currentUser.userType === 'space_owner') {
-            window.teableAPI.init(window.teableAuth.clientConfig);
+        // Ensure API is initialized with proper client configuration
+        const clientConfig = window.teableAuth.clientConfig || 
+                           JSON.parse(localStorage.getItem('currentClientConfig') || '{}') ||
+                           JSON.parse(localStorage.getItem('teable_client_config') || '{}');
+
+        if (!clientConfig.baseUrl || !clientConfig.accessToken) {
+            throw new Error('No valid client configuration found. Please configure the system first in super-admin.html');
         }
+
+        console.log('🔧 Initializing Teable API for table view...');
+        window.teableAPI.init(clientConfig);
 
         // Ensure system tables exist
         await window.teableAPI.ensureSystemTables();

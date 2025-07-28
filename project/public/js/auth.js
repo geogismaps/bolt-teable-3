@@ -403,7 +403,7 @@ class TeableAuth {
             console.error('Error loading client config:', error);
             return null;
         }
-    }
+    },
 
     /**
      * Get available client configurations

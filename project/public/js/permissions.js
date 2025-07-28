@@ -54,10 +54,17 @@ async function initializePermissions() {
         document.getElementById('userDisplay').textContent = 
             `${session.firstName} ${session.lastName} (${session.role})`;
 
-        // Initialize API if needed
-        if (session.userType === 'space_owner') {
-            window.teableAPI.init(window.teableAuth.clientConfig);
+        // Ensure API is initialized with proper client configuration
+        const clientConfig = window.teableAuth.clientConfig || 
+                           JSON.parse(localStorage.getItem('currentClientConfig') || '{}') ||
+                           JSON.parse(localStorage.getItem('teable_client_config') || '{}');
+
+        if (!clientConfig.baseUrl || !clientConfig.accessToken) {
+            throw new Error('No valid client configuration found. Please configure the system first in super-admin.html');
         }
+
+        console.log('🔧 Initializing Teable API for permissions...');
+        window.teableAPI.init(clientConfig);
 
         // Ensure system tables exist
         await window.teableAPI.ensureSystemTables();
