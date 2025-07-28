@@ -21,10 +21,17 @@ async function initializeUserManagement() {
         document.getElementById('userDisplay').textContent = 
             `${session.firstName} ${session.lastName} (${session.role})`;
 
-        // Initialize API if needed
-        if (session.userType === 'space_owner') {
-            window.teableAPI.init(window.teableAuth.clientConfig);
+        // Always initialize API with client configuration
+        const clientConfig = window.teableAuth.clientConfig || 
+                           JSON.parse(localStorage.getItem('currentClientConfig') || '{}') ||
+                           JSON.parse(localStorage.getItem('teable_client_config') || '{}');
+
+        if (!clientConfig.baseUrl || !clientConfig.accessToken) {
+            throw new Error('No valid client configuration found. Please configure the system first.');
         }
+
+        console.log('🔧 Initializing Teable API with config...');
+        window.teableAPI.init(clientConfig);
 
         // Ensure system tables exist with all required fields
         console.log('🔧 Ensuring system tables exist...');
@@ -44,6 +51,13 @@ async function initializeUserManagement() {
     } catch (error) {
         console.error('User management initialization failed:', error);
         showError('Failed to initialize user management: ' + error.message);
+        
+        // If configuration is missing, redirect to setup
+        if (error.message.includes('No valid client configuration')) {
+            setTimeout(() => {
+                window.location.href = 'super-admin.html';
+            }, 3000);
+        }
     }
 }
 
