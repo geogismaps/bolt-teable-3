@@ -159,11 +159,27 @@ async function handleClientCreation(event) {
 
         console.log('Creating client configuration...');
 
-        // Test connection first
-        await testConnectionInternal(config);
+        // Ensure baseUrl is properly formatted
+        if (!config.baseUrl.startsWith('http://') && !config.baseUrl.startsWith('https://')) {
+            config.baseUrl = 'https://' + config.baseUrl;
+        }
 
-        // Initialize API with new config
+        // Initialize API with new config first
+        console.log('Initializing API with config:', {
+            baseUrl: config.baseUrl,
+            baseId: config.baseId,
+            spaceId: config.spaceId,
+            hasToken: !!config.accessToken
+        });
+        
         window.teableAPI.init(config);
+
+        // Test connection
+        console.log('Testing API connection...');
+        const testResult = await window.teableAPI.testConnection();
+        if (!testResult.success) {
+            throw new Error(`Connection test failed: ${testResult.error}`);
+        }
 
         // Create system tables
         console.log('Creating system tables...');
@@ -193,7 +209,7 @@ async function handleClientCreation(event) {
 
         await window.teableAPI.createRecord(window.teableAPI.systemTables.users, ownerUserData);
 
-        // Save configuration
+        // Save configuration with multiple storage keys for compatibility
         const fullConfig = {
             ...config,
             id: Date.now().toString(),
@@ -202,12 +218,19 @@ async function handleClientCreation(event) {
             userCount: 1
         };
 
+        // Store in multiple places for compatibility
+        localStorage.setItem('currentClientConfig', JSON.stringify(fullConfig));
+        localStorage.setItem('teable_client_config', JSON.stringify(fullConfig));
+        
+        // Update the configs array
         const configs = getStoredConfigs();
         configs.push(fullConfig);
         localStorage.setItem('teable_client_configs', JSON.stringify(configs));
 
-        // Set as active configuration
-        localStorage.setItem('teable_client_config', JSON.stringify(fullConfig));
+        // Ensure auth system picks up the new config
+        if (window.teableAuth) {
+            window.teableAuth.clientConfig = fullConfig;
+        }
 
         // Log initial activity
         try {
@@ -305,19 +328,26 @@ async function testConnection() {
 }
 
 async function testConnectionInternal(config) {
-    // Initialize API temporarily
-    window.teableAPI.init(config);
-
-    // Test the actual API connection using the testConnection method
     try {
+        // Ensure baseUrl is properly formatted
+        const testConfig = { ...config };
+        if (!testConfig.baseUrl.startsWith('http://') && !testConfig.baseUrl.startsWith('https://')) {
+            testConfig.baseUrl = 'https://' + testConfig.baseUrl;
+        }
+
+        // Initialize API temporarily
+        window.teableAPI.init(testConfig);
+
+        // Test the actual API connection using the testConnection method
         const result = await window.teableAPI.testConnection();
         if (result.success) {
             console.log('API connection test successful:', result);
             return true;
         } else {
-            throw new Error(result.error);
+            throw new Error(result.error || 'Unknown connection error');
         }
     } catch (error) {
+        console.error('API connection test failed:', error);
         throw new Error(`API connection failed: ${error.message}`);
     }
 }

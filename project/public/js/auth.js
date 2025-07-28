@@ -396,14 +396,14 @@ class TeableAuth {
                     hasAccessToken: !!this.clientConfig.accessToken
                 });
 
-                return this.clientConfig;
-            }
-            return null;
-        } catch (error) {
-            console.error('Error loading client config:', error);
-            return null;
+            return this.clientConfig;
         }
-    },
+        return null;
+    } catch (error) {
+        console.error('Error loading client config:', error);
+        return null;
+    }
+}
 
     /**
      * Get available client configurations
