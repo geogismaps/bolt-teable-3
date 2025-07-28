@@ -68,7 +68,7 @@ class TeableAuth {
                 await window.teableAPI.logActivity(
                     session.email, 
                     'user_login', 
-                    `User logged in as ${session.userType}`
+                    'User logged in as ' + session.userType
                 );
             } catch (logError) {
                 console.log('Failed to log activity:', logError.message);
@@ -95,7 +95,7 @@ class TeableAuth {
             // Step 2: Get user from local app_users table
             console.log('🔍 Checking local app_users table...');
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records?.find(u => 
+            const localUser = users.records && users.records.find(u => 
                 u.fields.email === email.toLowerCase() && 
                 (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
                 u.fields.admin_password_hash // Must have admin password set
@@ -159,7 +159,7 @@ class TeableAuth {
 
             // Get user from app_users table
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const user = users.records?.find(u => u.fields.email === email);
+            const user = users.records && users.records.find(u => u.fields.email === email);
 
             if (!user) {
                 throw new Error('User not found');
@@ -234,7 +234,7 @@ class TeableAuth {
      * Check if user is admin (owner or admin role)
      */
     isAdmin() {
-        return this.currentSession?.isAdmin || ['Owner', 'Admin'].includes(this.currentSession?.role);
+        return this.currentSession && (this.currentSession.isAdmin || ['Owner', 'Admin'].includes(this.currentSession.role));
     }
 
     /**
@@ -396,7 +396,7 @@ class TeableAuth {
         }
 
         // Ensure API is configured for authenticated users
-        if (this.clientConfig && !window.teableAPI.config.baseUrl) {
+        if (this.clientConfig && (!window.teableAPI.config || !window.teableAPI.config.baseUrl)) {
             window.teableAPI.init(this.clientConfig);
         }
 
@@ -424,7 +424,7 @@ window.teableAuth.init();
 // Utility functions for UI
 window.togglePasswordVisibility = function(inputId) {
     const input = document.getElementById(inputId);
-    const icon = input.nextElementSibling?.querySelector('i');
+    const icon = input.nextElementSibling && input.nextElementSibling.querySelector('i');
 
     if (input.type === 'password') {
         input.type = 'text';
