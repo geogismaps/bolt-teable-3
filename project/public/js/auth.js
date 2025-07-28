@@ -1,3 +1,4 @@
+
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -396,14 +397,14 @@ class TeableAuth {
                     hasAccessToken: !!this.clientConfig.accessToken
                 });
 
-            return this.clientConfig;
+                return this.clientConfig;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error loading client config:', error);
+            return null;
         }
-        return null;
-    } catch (error) {
-        console.error('Error loading client config:', error);
-        return null;
     }
-}
 
     /**
      * Get available client configurations
