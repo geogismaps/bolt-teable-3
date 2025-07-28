@@ -1,3 +1,4 @@
+
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -323,7 +324,7 @@ class TeableAuth {
 
             // Fallback to legacy clientConfig
             if (!configString) {
-                configString = localStorage.getItem('clientConfig');
+                configString = localStorage.getItem('teable_client_config');
             }
 
             if (configString) {
