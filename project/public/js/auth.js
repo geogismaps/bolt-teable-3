@@ -1,4 +1,3 @@
-
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -119,58 +118,7 @@ class TeableAuth {
                 throw new Error('Invalid admin password for space owner');
             }
 
-            // Step 4: Fetch current space owner from Teable.io for verification
-            console.log('🔍 Verifying against live Teable.io space data...');
-            let teableSpaceOwner = null;
-
-            try {
-                const endpoints = [
-                    `/api/space/${this.clientConfig.spaceId}/collaborators`,
-                    `/api/space/${this.clientConfig.spaceId}/collaborator`,
-                    `/api/space/${this.clientConfig.spaceId}`,
-                    `/api/space`
-                ];
-
-                for (const endpoint of endpoints) {
-                    try {
-                        const result = await window.teableAPI.request(endpoint);
-
-                        // Look for owner role
-                        if (result.collaborators) {
-                            teableSpaceOwner = result.collaborators.find(user => 
-                                user.role === 'Owner' || user.role === 'owner'
-                            );
-                        } else if (result.members) {
-                            teableSpaceOwner = result.members.find(user => 
-                                user.role === 'Owner' || user.role === 'owner'
-                            );
-                        } else if (result.owner) {
-                            teableSpaceOwner = result.owner;
-                        }
-
-                        if (teableSpaceOwner) break;
-
-                    } catch (endpointError) {
-                        console.log(`Endpoint ${endpoint} failed:`, endpointError.message);
-                    }
-                }
-
-                // Verify email matches current space owner
-                if (teableSpaceOwner && teableSpaceOwner.email) {
-                    if (teableSpaceOwner.email.toLowerCase() !== email.toLowerCase()) {
-                        throw new Error(`Authentication failed: You are not the current space owner. Current owner: ${teableSpaceOwner.email}`);
-                    }
-                    console.log('✅ Email verified against live Teable.io space data');
-                } else {
-                    console.log('⚠️ Could not verify against Teable.io - proceeding with local authentication');
-                }
-
-            } catch (teableError) {
-                console.log('⚠️ Could not verify against Teable.io:', teableError.message);
-                // Continue with local authentication
-            }
-
-            // Step 5: Update last login
+            // Step 4: Update last login
             try {
                 await window.teableAPI.updateRecord(
                     window.teableAPI.systemTables.users,
@@ -192,8 +140,7 @@ class TeableAuth {
                 userId: localUser.id,
                 accessToken: this.clientConfig.accessToken,
                 loginTime: new Date().toISOString(),
-                isAdmin: true,
-                teableSpaceOwner: teableSpaceOwner || { email: email, verified: false }
+                isAdmin: true
             };
 
         } catch (error) {
@@ -243,7 +190,7 @@ class TeableAuth {
                 email: user.fields.email,
                 firstName: user.fields.first_name,
                 lastName: user.fields.last_name,
-                role: user.fields.role || 'Viewer', // Using Teable.io role
+                role: user.fields.role || 'Viewer',
                 userId: user.id,
                 loginTime: new Date().toISOString(),
                 isAdmin: ['Owner', 'Admin'].includes(user.fields.role)
