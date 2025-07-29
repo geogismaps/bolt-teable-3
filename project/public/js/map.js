@@ -3463,6 +3463,11 @@ async function refreshAttributeTable(layerId) {
 let isTableEditingMode = false;
 let editingChanges = new Map(); // Store pending changes
 
+// Initialize editing changes map
+if (typeof editingChanges === 'undefined') {
+    editingChanges = new Map();
+}
+
 function startTableEditing(layerId) {
     isTableEditingMode = true;
     editingChanges.clear();
@@ -3513,24 +3518,37 @@ async function saveTableEditing(layerId) {
         saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
         saveBtn.disabled = true;
         
+        // Group changes by record ID for batch processing
+        const recordChanges = new Map();
+        
+        for (const [key, change] of editingChanges) {
+            if (!recordChanges.has(change.recordId)) {
+                recordChanges.set(change.recordId, {});
+            }
+            recordChanges.get(change.recordId)[change.fieldName] = change.newValue;
+        }
+        
         // Save all pending changes
         let successCount = 0;
         let errorCount = 0;
         
-        for (const [key, change] of editingChanges) {
+        for (const [recordId, fieldsToUpdate] of recordChanges) {
             try {
-                const updateData = {};
-                updateData[change.fieldName] = change.newValue;
+                console.log(`Updating record ${recordId} with fields:`, fieldsToUpdate);
                 
-                await window.teableAPI.updateRecord(layer.tableId, change.recordId, updateData);
+                // Update record in Teable.io
+                await window.teableAPI.updateRecord(layer.tableId, recordId, fieldsToUpdate);
                 
                 // Update local data
-                const record = layer.records.find(r => r.id === change.recordId);
+                const record = layer.records.find(r => r.id === recordId);
                 if (record) {
-                    record.fields[change.fieldName] = change.newValue;
+                    // Update all changed fields in the record
+                    Object.keys(fieldsToUpdate).forEach(fieldName => {
+                        record.fields[fieldName] = fieldsToUpdate[fieldName];
+                    });
                     
                     // Update corresponding map feature
-                    const featureIndex = layer.features.findIndex(f => f.recordId === change.recordId);
+                    const featureIndex = layer.features.findIndex(f => f.recordId === recordId);
                     if (featureIndex !== -1 && layer.features[featureIndex]) {
                         layer.features[featureIndex].recordData = record.fields;
                         
@@ -3542,28 +3560,84 @@ async function saveTableEditing(layerId) {
                     }
                 }
                 
-                successCount++;
+                successCount += Object.keys(fieldsToUpdate).length;
+                console.log(`✅ Successfully updated record ${recordId}`);
+                
             } catch (error) {
-                console.error(`Error saving change for record ${change.recordId}:`, error);
-                errorCount++;
+                console.error(`❌ Error saving changes for record ${recordId}:`, error);
+                errorCount += Object.keys(fieldsToUpdate).length;
+                
+                // Mark failed cells visually
+                Object.keys(fieldsToUpdate).forEach(fieldName => {
+                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
+                    if (cell) {
+                        cell.style.backgroundColor = '#ffebee';
+                        cell.style.borderColor = '#f44336';
+                        cell.title = `Failed to save: ${error.message}`;
+                    }
+                });
+            }
+        }
+        
+        // Clear editing changes only for successfully saved records
+        const successfulRecords = [];
+        for (const [recordId, fieldsToUpdate] of recordChanges) {
+            let allFieldsSaved = true;
+            for (const fieldName of Object.keys(fieldsToUpdate)) {
+                const changeKey = `${recordId}_${fieldName}`;
+                if (editingChanges.has(changeKey)) {
+                    // Check if this field was successfully saved by looking for error styling
+                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
+                    if (cell && cell.style.backgroundColor === 'rgb(255, 235, 238)') {
+                        allFieldsSaved = false;
+                        break;
+                    }
+                }
+            }
+            if (allFieldsSaved) {
+                successfulRecords.push(recordId);
+            }
+        }
+        
+        // Remove successful changes from the pending changes map
+        for (const [key, change] of editingChanges) {
+            if (successfulRecords.includes(change.recordId)) {
+                editingChanges.delete(key);
             }
         }
         
         // Show results
         if (errorCount === 0) {
-            showSuccess(`All ${successCount} changes saved successfully!`);
+            showSuccess(`All ${successCount} field changes saved successfully to Teable.io!`);
+            exitTableEditing();
+        } else if (successCount > 0) {
+            showWarning(`${successCount} changes saved, ${errorCount} failed. Failed changes remain in editing mode - check console for details.`);
+            // Update save button to show remaining changes
+            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
+            saveBtn.disabled = false;
         } else {
-            showWarning(`${successCount} changes saved, ${errorCount} failed. Check console for details.`);
+            showError(`All ${errorCount} changes failed to save. Check console for details.`);
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
         }
         
-        // Refresh the table to show updated values
-        await refreshAttributeTable(layerId);
+        // Refresh the table to show updated values from Teable.io
+        if (successCount > 0) {
+            setTimeout(async () => {
+                await refreshAttributeTable(layerId);
+            }, 1000);
+        }
         
     } catch (error) {
-        console.error('Error saving table changes:', error);
+        console.error('Error in saveTableEditing:', error);
         showError('Failed to save changes: ' + error.message);
-    } finally {
-        exitTableEditing();
+        
+        // Restore button state
+        const saveBtn = document.getElementById('saveEditingBtn');
+        if (saveBtn) {
+            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
+            saveBtn.disabled = false;
+        }
     }
 }
 
