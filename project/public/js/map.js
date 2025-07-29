@@ -964,27 +964,106 @@ function toggleLayerVisibility(layerId) {
 
 function zoomToLayer(layerId) {
     const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) return;
-
-    if (layer.bounds) {
-        // Calculate appropriate zoom level based on layer size
-        const boundsSize = layer.bounds.getNorthEast().distanceTo(layer.bounds.getSouthWest());
-        let maxZoom = 20;
-        
-        if (boundsSize < 100) { // Very small area
-            maxZoom = 22;
-        } else if (boundsSize < 1000) { // Small area
-            maxZoom = 21;
-        } else if (boundsSize < 10000) { // Medium area
-            maxZoom = 19;
-        }
-        
-        map.fitBounds(layer.bounds.pad(0.05), {
-            maxZoom: maxZoom
-        });
+    if (!layer) {
+        showError('Layer not found for zooming');
+        return;
     }
 
-    showSuccess(`Zoomed to layer: ${layer.name} with enhanced detail`);
+    try {
+        // If layer has precalculated bounds, use them
+        if (layer.bounds && layer.bounds.isValid()) {
+            zoomToLayerBounds(layer);
+            return;
+        }
+
+        // Calculate bounds from features if not available
+        if (!layer.features || layer.features.length === 0) {
+            showWarning(`Layer "${layer.name}" has no features to zoom to`);
+            return;
+        }
+
+        const validFeatures = [];
+        layer.features.forEach(feature => {
+            if (feature.getLatLng) {
+                const latlng = feature.getLatLng();
+                if (latlng && !isNaN(latlng.lat) && !isNaN(latlng.lng)) {
+                    validFeatures.push(feature);
+                }
+            } else if (feature.getLatLngs) {
+                const latlngs = feature.getLatLngs();
+                if (latlngs && latlngs.length > 0) {
+                    validFeatures.push(feature);
+                }
+            } else if (feature.getBounds) {
+                const bounds = feature.getBounds();
+                if (bounds && bounds.isValid()) {
+                    validFeatures.push(feature);
+                }
+            }
+        });
+
+        if (validFeatures.length === 0) {
+            showError(`No valid features found in layer "${layer.name}"`);
+            return;
+        }
+
+        // Create feature group to calculate bounds
+        const featureGroup = new L.featureGroup(validFeatures);
+        const bounds = featureGroup.getBounds();
+
+        if (!bounds.isValid()) {
+            showError('Unable to calculate valid bounds for layer');
+            return;
+        }
+
+        // Update layer bounds for future use
+        layer.bounds = bounds;
+
+        // Zoom to calculated bounds
+        zoomToLayerBounds(layer);
+
+    } catch (error) {
+        console.error('Error zooming to layer:', error);
+        showError(`Failed to zoom to layer "${layer.name}": ${error.message}`);
+    }
+}
+
+function zoomToLayerBounds(layer) {
+    const bounds = layer.bounds;
+    
+    // Calculate appropriate zoom level and padding based on layer size
+    const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+    
+    let maxZoom, padding;
+    
+    if (boundsSize < 50) { // Very small layer (< 50 meters)
+        maxZoom = 22;
+        padding = 0.4;
+    } else if (boundsSize < 500) { // Small layer (< 500 meters)
+        maxZoom = 20;
+        padding = 0.3;
+    } else if (boundsSize < 5000) { // Medium layer (< 5 km)
+        maxZoom = 18;
+        padding = 0.2;
+    } else if (boundsSize < 50000) { // Large layer (< 50 km)
+        maxZoom = 16;
+        padding = 0.1;
+    } else { // Very large layer
+        maxZoom = 14;
+        padding = 0.05;
+    }
+    
+    map.fitBounds(bounds.pad(padding), {
+        maxZoom: maxZoom,
+        animate: true,
+        duration: 1
+    });
+
+    const sizeText = boundsSize < 1000 ? 
+        Math.round(boundsSize) + 'm' : 
+        (boundsSize / 1000).toFixed(1) + 'km';
+
+    showSuccess(`Zoomed to layer "${layer.name}" with ${layer.featureCount} features (extent: ${sizeText})`);
 }
 
 function showAttributeTable(layerId) {
@@ -1733,7 +1812,10 @@ function zoomToSelection(layerId) {
 
 function zoomToFeature(layerId, featureIndex, options = null) {
     const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer || !layer.features[featureIndex]) return;
+    if (!layer || !layer.features[featureIndex]) {
+        showError('Feature not found for zooming');
+        return;
+    }
 
     const feature = layer.features[featureIndex];
 
@@ -1741,42 +1823,97 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     window.currentPopupFeature = feature;
 
     const defaultOptions = {
-        padding: 0.15,
-        maxZoom: 22,
-        minZoom: 16
+        padding: 0.1,
+        maxZoom: 20,
+        minZoom: 12,
+        animate: true,
+        duration: 1
     };
 
     const zoomOptions = { ...defaultOptions, ...options };
 
-    if (feature.getBounds) {
-        // Polygon or complex geometry
-        const bounds = feature.getBounds();
-        const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
-        
-        // Adjust zoom based on feature size
-        let targetZoom = zoomOptions.maxZoom;
-        if (boundsSize > 1000) { // Large features
-            targetZoom = Math.min(zoomOptions.maxZoom - 2, 20);
-        } else if (boundsSize > 100) { // Medium features
-            targetZoom = Math.min(zoomOptions.maxZoom - 1, 21);
+    try {
+        if (feature.getBounds) {
+            // Polygon or complex geometry
+            const bounds = feature.getBounds();
+            
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature');
+                return;
+            }
+            
+            // Calculate the size of the feature
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+            
+            // Determine appropriate zoom level based on feature size
+            let targetZoom;
+            let padding;
+            
+            if (boundsSize < 10) { // Very small features (< 10 meters)
+                targetZoom = 22;
+                padding = 0.3;
+            } else if (boundsSize < 100) { // Small features (< 100 meters)
+                targetZoom = 20;
+                padding = 0.2;
+            } else if (boundsSize < 1000) { // Medium features (< 1 km)
+                targetZoom = 18;
+                padding = 0.15;
+            } else if (boundsSize < 10000) { // Large features (< 10 km)
+                targetZoom = 16;
+                padding = 0.1;
+            } else { // Very large features
+                targetZoom = 14;
+                padding = 0.05;
+            }
+            
+            // Apply zoom with calculated parameters
+            map.fitBounds(bounds.pad(padding), {
+                maxZoom: Math.min(targetZoom, 22),
+                animate: zoomOptions.animate,
+                duration: zoomOptions.duration
+            });
+            
+        } else if (feature.getLatLng) {
+            // Point geometry
+            const latlng = feature.getLatLng();
+            
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point feature');
+                return;
+            }
+            
+            // For points, use a high zoom level for detail
+            const targetZoom = 19;
+            map.setView(latlng, targetZoom, {
+                animate: zoomOptions.animate,
+                duration: zoomOptions.duration
+            });
+            
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
         }
+
+        // Wait a moment then open popup
+        setTimeout(() => {
+            if (feature.getPopup && feature.getPopup()) {
+                feature.openPopup();
+            } else if (feature.bindPopup) {
+                // Create popup if it doesn't exist
+                const record = layer.records[featureIndex];
+                if (record && record.fields) {
+                    const popupContent = createFeaturePopup(record.fields, layer);
+                    feature.bindPopup(popupContent).openPopup();
+                }
+            }
+        }, zoomOptions.animate ? 500 : 100);
+
+        showSuccess(`Zoomed to feature with enhanced detail (bounds size: ${feature.getBounds ? Math.round(feature.getBounds().getNorthEast().distanceTo(feature.getBounds().getSouthWest())) + 'm' : 'point'})`);
         
-        map.fitBounds(bounds.pad(zoomOptions.padding), {
-            maxZoom: targetZoom
-        });
-    } else if (feature.getLatLng) {
-        // Point geometry - zoom closer for points
-        const latlng = feature.getLatLng();
-        const targetZoom = Math.max(zoomOptions.minZoom + 2, 18);
-        map.setView(latlng, targetZoom);
+    } catch (error) {
+        console.error('Error zooming to feature:', error);
+        showError('Failed to zoom to feature: ' + error.message);
     }
-
-    // Open popup if feature has one
-    if (feature.getPopup && feature.getPopup()) {
-        feature.openPopup();
-    }
-
-    showSuccess('Zoomed to feature with enhanced detail level');
 }
 
 function showFeatureInfo(layerId, featureIndex) {
@@ -4121,29 +4258,95 @@ function adjustMapForDockedTable() {
 
 // Global functions for popup zoom controls
 window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
-    if (!window.currentPopupFeature) return;
-
-    const options = {
-        close: { padding: 0.05, maxZoom: 22, minZoom: 18 },
-        medium: { padding: 0.2, maxZoom: 20, minZoom: 14 },
-        far: { padding: 0.4, maxZoom: 16, minZoom: 10 }
-    };
-
-    const zoomOptions = options[zoomType] || options.close;
-    
-    if (window.currentPopupFeature.getBounds) {
-        // Polygon geometry
-        const bounds = window.currentPopupFeature.getBounds();
-        map.fitBounds(bounds.pad(zoomOptions.padding), {
-            maxZoom: zoomOptions.maxZoom
-        });
-    } else if (window.currentPopupFeature.getLatLng) {
-        // Point geometry
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.setView(latlng, zoomOptions.maxZoom);
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for zooming');
+        return;
     }
-    
-    showSuccess(`Zoomed to feature - ${zoomType} view`);
+
+    const feature = window.currentPopupFeature;
+
+    try {
+        if (feature.getBounds) {
+            // Polygon geometry
+            const bounds = feature.getBounds();
+            
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature zoom');
+                return;
+            }
+            
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+            
+            let zoomConfig;
+            switch (zoomType) {
+                case 'close':
+                    zoomConfig = { 
+                        padding: boundsSize < 100 ? 0.4 : 0.2, 
+                        maxZoom: boundsSize < 100 ? 22 : 20 
+                    };
+                    break;
+                case 'medium':
+                    zoomConfig = { 
+                        padding: 0.3, 
+                        maxZoom: 18 
+                    };
+                    break;
+                case 'far':
+                    zoomConfig = { 
+                        padding: 0.5, 
+                        maxZoom: 16 
+                    };
+                    break;
+                default:
+                    zoomConfig = { padding: 0.2, maxZoom: 20 };
+            }
+            
+            map.fitBounds(bounds.pad(zoomConfig.padding), {
+                maxZoom: zoomConfig.maxZoom,
+                animate: true,
+                duration: 0.8
+            });
+            
+        } else if (feature.getLatLng) {
+            // Point geometry
+            const latlng = feature.getLatLng();
+            
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point zoom');
+                return;
+            }
+            
+            let targetZoom;
+            switch (zoomType) {
+                case 'close':
+                    targetZoom = 21;
+                    break;
+                case 'medium':
+                    targetZoom = 18;
+                    break;
+                case 'far':
+                    targetZoom = 15;
+                    break;
+                default:
+                    targetZoom = 19;
+            }
+            
+            map.setView(latlng, targetZoom, {
+                animate: true,
+                duration: 0.8
+            });
+            
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
+        }
+        
+        showSuccess(`Zoomed to feature - ${zoomType} view`);
+        
+    } catch (error) {
+        console.error('Error in popup zoom:', error);
+        showError('Failed to zoom to feature: ' + error.message);
+    }
 };
 
 window.centerCurrentPopupFeature = function() {
