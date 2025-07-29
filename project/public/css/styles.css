@@ -547,48 +547,74 @@ body {
     z-index: 12;
 }
 
-/* Enhanced feature label styles */
-.enhanced-feature-label {
+/* Polygon label styles - positioned inside features */
+.polygon-label-marker {
     background: none !important;
     border: none !important;
     box-shadow: none !important;
     z-index: 1000 !important;
 }
 
-.enhanced-feature-label .label-content {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-    z-index: 1001 !important;
-    position: relative;
+.polygon-label {
+    user-select: none;
+    cursor: default;
     display: inline-block;
-    transform: translateZ(0); /* Force hardware acceleration */
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.enhanced-feature-label:before,
-.enhanced-feature-label:after {
+.polygon-label-marker:before,
+.polygon-label-marker:after {
     display: none !important;
 }
 
-/* Reduce feature opacity when labels are enabled */
-.labeled-feature {
-    opacity: 0.8 !important;
+/* Point label styles - positioned above markers */
+.point-label-marker {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 1000 !important;
 }
 
-/* Improve label readability on different backgrounds */
-.label-content {
-    transition: all 0.2s ease-in-out;
+.point-label {
+    user-select: none;
+    cursor: default;
+    display: inline-block;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.enhanced-feature-label:hover .label-content {
-    transform: scale(1.1);
-    z-index: 1002 !important;
+.point-label-marker:before,
+.point-label-marker:after {
+    display: none !important;
+}
+
+/* General label improvements */
+.polygon-label, .point-label {
+    transition: opacity 0.3s ease;
+}
+
+/* Hover effects for better interaction */
+.leaflet-interactive:hover ~ .polygon-label-marker .polygon-label,
+.leaflet-interactive:hover ~ .point-label-marker .point-label {
+    opacity: 0.8;
 }
 
 /* Responsive label sizing */
 @media (max-width: 768px) {
-    .enhanced-feature-label .label-content {
+    .polygon-label, .point-label {
         font-size: 10px !important;
-        padding: 2px 4px !important;
-        max-width: 80px !important;
+        padding: 1px 3px !important;
+        max-width: 60px !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .polygon-label, .point-label {
+        font-size: 9px !important;
+        max-width: 50px !important;
     }
 }
 

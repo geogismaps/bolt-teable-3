@@ -2769,78 +2769,108 @@ function applyLabelsToLayer(layer) {
     const labels = layer.properties.labels;
     if (!labels.enabled || !labels.field) return;
 
-    const labelMarkers = [];
+    const labelElements = [];
 
     layer.features.forEach((feature, index) => {
         const record = layer.records[index];
         if (!record || !record.fields[labels.field]) return;
 
-        let labelPosition;
-        if (feature.getLatLng) {
-            labelPosition = feature.getLatLng();
-        } else if (feature.getBounds) {
-            // For polygons, get the centroid for better label placement
-            const bounds = feature.getBounds();
-            labelPosition = bounds.getCenter();
-        } else {
-            return;
-        }
-
         const labelText = String(record.fields[labels.field]);
         const fontSize = labels.fontSize || 12;
         const color = labels.color || '#2c3e50';
         const background = labels.background !== false;
-        
-        // Calculate dynamic label positioning to avoid overlap
-        const offset = calculateLabelOffset(labelPosition, index, labelMarkers.length);
-        
-        const labelMarker = L.marker(labelPosition, {
-            icon: L.divIcon({
-                className: 'enhanced-feature-label',
-                html: `<div class="label-content" style="
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    font-size: ${fontSize}px;
-                    color: ${color};
-                    font-weight: 600;
-                    text-align: center;
-                    white-space: nowrap;
-                    pointer-events: none;
-                    line-height: 1.2;
-                    max-width: 120px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    ${background ? `
-                        background: rgba(255, 255, 255, 0.95);
-                        padding: 4px 8px;
-                        border-radius: 6px;
-                        border: 2px solid ${color};
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-                        backdrop-filter: blur(2px);
-                    ` : `
-                        text-shadow: 2px 2px 4px rgba(0,0,0,0.8), -1px -1px 0px rgba(255,255,255,0.9);
-                    `}
-                ">${truncateText(labelText, 15)}</div>`,
-                iconSize: [null, null],
-                iconAnchor: [offset.x, offset.y]
-            }),
-            zIndexOffset: 1000
-        });
 
-        // Reduce feature opacity when labels are shown
-        if (feature.setStyle) {
-            const currentStyle = feature.options;
-            feature.setStyle({
-                ...currentStyle,
-                fillOpacity: (currentStyle.fillOpacity || 0.7) * 0.7,
-                className: 'labeled-feature'
+        // For polygons, use tooltip approach for better integration
+        if (feature.getBounds) {
+            // Calculate the visual center of the polygon for better label placement
+            const bounds = feature.getBounds();
+            const center = bounds.getCenter();
+            
+            // Create a transparent marker at the center for label positioning
+            const labelMarker = L.marker(center, {
+                icon: L.divIcon({
+                    className: 'polygon-label-marker',
+                    html: `<div class="polygon-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -50%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                }),
+                interactive: false
             });
-        }
 
-        labelMarkers.push(labelMarker);
+            labelElements.push(labelMarker);
+
+        } else if (feature.getLatLng) {
+            // For point features, use the existing approach but improved
+            const labelPosition = feature.getLatLng();
+            
+            const labelMarker = L.marker(labelPosition, {
+                icon: L.divIcon({
+                    className: 'point-label-marker',
+                    html: `<div class="point-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -200%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                }),
+                interactive: false
+            });
+
+            labelElements.push(labelMarker);
+        }
     });
 
-    if (labelMarkers.length > 0) {
-        layer.labelGroup = L.layerGroup(labelMarkers);
+    if (labelElements.length > 0) {
+        layer.labelGroup = L.layerGroup(labelElements);
         if (layer.visible) {
             layer.labelGroup.addTo(map);
         }
