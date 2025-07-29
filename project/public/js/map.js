@@ -1281,30 +1281,17 @@ async function createEnhancedTableBody(layer) {
                     const cellClass = permission === 'edit' ? 'editable-cell' : 'readonly-cell';
                     const borderColor = permission === 'edit' ? 'border-success' : 'border-info';
                     
-                    if (permission === 'edit') {
-                        bodyHTML += `
-                            <td class="${cellClass} ${borderColor}" 
-                                data-field="${field}" 
-                                data-record-id="${record.id}"
-                                data-original-value="${escapeHtml(originalValue || '')}"
-                                title="Editable field: ${originalValue || ''}">
-                                <div class="editable-content">
-                                    ${escapeHtml(displayValue)}
-                                    <i class="fas fa-edit edit-icon ms-1 text-success"></i>
-                                </div>
-                            </td>
-                        `;
-                    } else {
-                        bodyHTML += `
-                            <td class="${cellClass} ${borderColor}" 
-                                title="View only: ${originalValue || ''}">
-                                <div class="readonly-content">
-                                    ${escapeHtml(displayValue)}
-                                    <i class="fas fa-eye view-icon ms-1 text-info"></i>
-                                </div>
-                            </td>
-                        `;
-                    }
+                    bodyHTML += `
+                        <td class="${cellClass} ${borderColor}" 
+                            data-field="${field}" 
+                            data-record-id="${record.id}"
+                            data-original-value="${escapeHtml(originalValue || '')}"
+                            title="${permission === 'edit' ? 'Editable field' : 'View only'}: ${originalValue || ''}">
+                            <div class="${permission === 'edit' ? 'editable-content' : 'readonly-content'}">
+                                ${escapeHtml(displayValue)}
+                            </div>
+                        </td>
+                    `;
                 }
             }
         });
@@ -3495,18 +3482,16 @@ function startTableEditing(layerId) {
     const editableCells = document.querySelectorAll('.editable-cell');
     editableCells.forEach(cell => {
         cell.style.cursor = 'pointer';
+        cell.style.backgroundColor = '#f8f9fa';
         cell.onclick = function() { startInlineEdit(this); };
         
         // Add visual indicator for editing mode
-        const editIcon = cell.querySelector('.edit-icon');
-        if (editIcon) {
-            editIcon.style.opacity = '1';
-            editIcon.style.color = '#007bff';
-        }
+        cell.style.borderLeft = '3px solid #007bff';
+        cell.title = 'Click to edit this field';
     });
     
     // Show editing mode indicator
-    showInfo('Editing mode enabled. Click on editable cells to modify values.');
+    showSuccess('Editing mode enabled. Click on blue-bordered cells to modify values.');
     
     // Add editing mode visual indicators
     const toolbar = document.querySelector('.docked-table-toolbar');
@@ -3601,14 +3586,12 @@ function exitTableEditing() {
     const editableCells = document.querySelectorAll('.editable-cell');
     editableCells.forEach(cell => {
         cell.style.cursor = 'default';
+        cell.style.backgroundColor = '';
         cell.onclick = null;
         
-        // Reset edit icon appearance
-        const editIcon = cell.querySelector('.edit-icon');
-        if (editIcon) {
-            editIcon.style.opacity = '0.6';
-            editIcon.style.color = '#28a745';
-        }
+        // Reset visual indicators
+        cell.style.borderLeft = '3px solid #28a745';
+        cell.title = 'Editable field (click Start Editing to modify)';
     });
     
     // Remove editing mode visual indicators

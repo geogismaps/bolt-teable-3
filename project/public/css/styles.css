@@ -632,3 +632,29 @@ body {
     50% { opacity: 0.7; }
     100% { opacity: 1; }
 }
+
+.editable-cell {
+                cursor: default;
+                transition: all 0.2s;
+                border-left: 3px solid transparent;
+                position: relative;
+            }
+            .editable-cell.editing-enabled {
+                cursor: pointer;
+                background-color: #f8f9fa;
+            }
+            .editable-cell.editing-enabled:hover {
+                background-color: #e9ecef;
+            }
+            .readonly-cell {
+                border-left: 3px solid transparent;
+            }
+            .border-success {
+                border-left-color: #28a745 !important;
+            }
+            .border-info {
+                border-left-color: #17a2b8 !important;
+            }
+            .border-danger {
+                border-left-color: #dc3545 !important;
+            }
