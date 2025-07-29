@@ -1049,35 +1049,41 @@ async function createDockedAttributeTable(layer) {
             </div>
             <div class="docked-table-toolbar">
                 <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
-                                <i class="fas fa-check-square me-1"></i>Select All
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
-                                <i class="fas fa-square me-1"></i>Clear Selection
-                            </button>
-                            <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
-                                <i class="fas fa-search-plus me-1"></i>Zoom to Selection
-                            </button>
-                            ${canEditRecords() ? `
-                                <button class="btn btn-sm btn-outline-warning" onclick="addNewRecord('${layer.id}')" title="Add New Record">
-                                    <i class="fas fa-plus me-1"></i>Add Record
+                    <div class="col-md-12">
+                        <div class="d-flex gap-2 flex-wrap justify-content-between align-items-center">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
+                                    <i class="fas fa-check-square me-1"></i>Select All
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedRecords('${layer.id}')" id="deleteSelectedBtn" disabled>
-                                    <i class="fas fa-trash me-1"></i>Delete Selected
+                                <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection('${layer.id}')">
+                                    <i class="fas fa-square me-1"></i>Clear Selection
                                 </button>
-                            ` : ''}
-                            <button class="btn btn-sm btn-outline-info" onclick="exportTableData('${layer.id}')">
-                                <i class="fas fa-download me-1"></i>Export CSV
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-4 text-end">
-                        <div class="text-muted small">
-                            <div><span id="selectedCount">0</span> of ${layer.records.length} features selected</div>
-                            <div class="permission-indicator">
-                                ${getPermissionIndicator()}
+                                <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
+                                    <i class="fas fa-search-plus me-1"></i>Zoom to Selection
+                                </button>
+                                ${canEditRecords() ? `
+                                    <button class="btn btn-sm btn-primary" onclick="startTableEditing('${layer.id}')" id="startEditingBtn">
+                                        <i class="fas fa-edit me-1"></i>Start Editing
+                                    </button>
+                                    <button class="btn btn-sm btn-success" onclick="saveTableEditing('${layer.id}')" id="saveEditingBtn" style="display: none;">
+                                        <i class="fas fa-save me-1"></i>Save Editing
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="addNewRecord('${layer.id}')" title="Add New Record">
+                                        <i class="fas fa-plus me-1"></i>Add Record
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedRecords('${layer.id}')" id="deleteSelectedBtn" disabled>
+                                        <i class="fas fa-trash me-1"></i>Delete Selected
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-sm btn-outline-info" onclick="exportTableData('${layer.id}')">
+                                    <i class="fas fa-download me-1"></i>Export CSV
+                                </button>
+                            </div>
+                            <div class="text-muted small">
+                                <div><span id="selectedCount">0</span> of ${layer.records.length} features selected</div>
+                                <div class="permission-indicator">
+                                    ${getPermissionIndicator()}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1281,8 +1287,7 @@ async function createEnhancedTableBody(layer) {
                                 data-field="${field}" 
                                 data-record-id="${record.id}"
                                 data-original-value="${escapeHtml(originalValue || '')}"
-                                title="Click to edit: ${originalValue || ''}"
-                                onclick="startInlineEdit(this)">
+                                title="Editable field: ${originalValue || ''}">
                                 <div class="editable-content">
                                     ${escapeHtml(displayValue)}
                                     <i class="fas fa-edit edit-icon ms-1 text-success"></i>
@@ -2860,6 +2865,12 @@ function setupInlineEditing(layer) {
 }
 
 function startInlineEdit(cell) {
+    // Only allow editing in editing mode
+    if (!isTableEditingMode) {
+        showWarning('Please click "Start Editing" button first to enable editing mode.');
+        return;
+    }
+    
     if (cell.querySelector('.inline-editor')) {
         return; // Already editing
     }
@@ -2986,10 +2997,6 @@ async function saveInlineEdit(button, recordId, fieldName) {
     }
     
     try {
-        // Show loading state
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        button.disabled = true;
-        
         // Get table ID from row
         const row = cell.closest('tr');
         const tableId = row.getAttribute('data-table-id');
@@ -3014,50 +3021,45 @@ async function saveInlineEdit(button, recordId, fieldName) {
             throw new Error(`Invalid ${fieldType} value: ${rawValue}`);
         }
         
-        // Update record in Teable.io
-        const updateData = {};
-        updateData[fieldName] = convertedValue;
+        // Store the change for batch saving
+        const changeKey = `${recordId}_${fieldName}`;
+        editingChanges.set(changeKey, {
+            recordId: recordId,
+            fieldName: fieldName,
+            newValue: convertedValue,
+            originalValue: originalValue,
+            fieldType: fieldType
+        });
         
-        await window.teableAPI.updateRecord(tableId, recordId, updateData);
-        
-        // Update local data
-        const record = layer.records.find(r => r.id === recordId);
-        if (record) {
-            record.fields[fieldName] = convertedValue;
-            
-            // Update the corresponding map feature
-            const featureIndex = parseInt(row.getAttribute('data-feature-index'));
-            if (layer.features[featureIndex]) {
-                layer.features[featureIndex].recordData = record.fields;
-                
-                // Update popup if it exists
-                if (layer.features[featureIndex].getPopup()) {
-                    const newPopupContent = createFeaturePopup(record.fields, layer);
-                    layer.features[featureIndex].getPopup().setContent(newPopupContent);
-                }
-            }
-        }
-        
-        // Update cell display with converted value
+        // Update cell display with new value
         const displayValue = String(convertedValue).length > 50 ? 
             String(convertedValue).substring(0, 50) + '...' : String(convertedValue);
         cell.setAttribute('data-original-value', convertedValue);
-        cell.title = `Click to edit: ${convertedValue}`;
+        cell.title = `Modified: ${convertedValue} (will be saved when you click Save Editing)`;
         cell.innerHTML = `
-            <div class="editable-content">
+            <div class="editable-content modified">
                 ${escapeHtml(displayValue)}
-                <i class="fas fa-edit edit-icon ms-1 text-success"></i>
+                <i class="fas fa-edit edit-icon ms-1" style="color: #ffc107;"></i>
+                <i class="fas fa-clock ms-1 text-warning" title="Pending save"></i>
             </div>
         `;
         
-        // Re-add click handler
+        // Re-add click handler for further editing
         cell.onclick = function() { startInlineEdit(this); };
         
-        showSuccess(`Field "${fieldName}" updated successfully!`);
+        // Update save button to show pending changes count
+        const saveBtn = document.getElementById('saveEditingBtn');
+        if (saveBtn) {
+            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
+            saveBtn.classList.add('btn-warning');
+            saveBtn.classList.remove('btn-success');
+        }
+        
+        showInfo(`Field "${fieldName}" marked for saving. Click "Save Editing" to commit all changes.`);
         
     } catch (error) {
-        console.error('Error updating field:', error);
-        showError(`Failed to update field: ${error.message}`);
+        console.error('Error processing field change:', error);
+        showError(`Invalid value: ${error.message}`);
         
         // Restore original content
         cancelInlineEdit(button, originalValue);
@@ -3156,6 +3158,27 @@ function cancelInlineEdit(button, originalValue) {
     const cell = button.closest('td');
     const displayValue = originalValue.length > 50 ? originalValue.substring(0, 50) + '...' : originalValue;
     
+    // Check if this field had pending changes and remove them
+    const recordId = cell.getAttribute('data-record-id');
+    const fieldName = cell.getAttribute('data-field');
+    const changeKey = `${recordId}_${fieldName}`;
+    
+    if (editingChanges.has(changeKey)) {
+        editingChanges.delete(changeKey);
+        
+        // Update save button
+        const saveBtn = document.getElementById('saveEditingBtn');
+        if (saveBtn) {
+            if (editingChanges.size === 0) {
+                saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
+                saveBtn.classList.remove('btn-warning');
+                saveBtn.classList.add('btn-success');
+            } else {
+                saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
+            }
+        }
+    }
+    
     cell.innerHTML = `
         <div class="editable-content">
             ${escapeHtml(displayValue)}
@@ -3163,8 +3186,10 @@ function cancelInlineEdit(button, originalValue) {
         </div>
     `;
     
-    // Re-add click handler
-    cell.onclick = function() { startInlineEdit(this); };
+    // Re-add click handler if in editing mode
+    if (isTableEditingMode) {
+        cell.onclick = function() { startInlineEdit(this); };
+    }
 }
 
 async function addNewRecord(layerId) {
@@ -3454,6 +3479,145 @@ async function refreshAttributeTable(layerId) {
     }
 }
 
+// Table editing mode management
+let isTableEditingMode = false;
+let editingChanges = new Map(); // Store pending changes
+
+function startTableEditing(layerId) {
+    isTableEditingMode = true;
+    editingChanges.clear();
+    
+    // Toggle button visibility
+    document.getElementById('startEditingBtn').style.display = 'none';
+    document.getElementById('saveEditingBtn').style.display = 'inline-block';
+    
+    // Enable inline editing for all editable cells
+    const editableCells = document.querySelectorAll('.editable-cell');
+    editableCells.forEach(cell => {
+        cell.style.cursor = 'pointer';
+        cell.onclick = function() { startInlineEdit(this); };
+        
+        // Add visual indicator for editing mode
+        const editIcon = cell.querySelector('.edit-icon');
+        if (editIcon) {
+            editIcon.style.opacity = '1';
+            editIcon.style.color = '#007bff';
+        }
+    });
+    
+    // Show editing mode indicator
+    showInfo('Editing mode enabled. Click on editable cells to modify values.');
+    
+    // Add editing mode visual indicators
+    const toolbar = document.querySelector('.docked-table-toolbar');
+    if (toolbar) {
+        toolbar.classList.add('editing-mode');
+    }
+}
+
+async function saveTableEditing(layerId) {
+    if (editingChanges.size === 0) {
+        // No changes to save, just exit editing mode
+        exitTableEditing();
+        showInfo('No changes to save. Editing mode disabled.');
+        return;
+    }
+    
+    try {
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer) {
+            throw new Error('Layer not found');
+        }
+        
+        // Show saving indicator
+        const saveBtn = document.getElementById('saveEditingBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+        saveBtn.disabled = true;
+        
+        // Save all pending changes
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const [key, change] of editingChanges) {
+            try {
+                const updateData = {};
+                updateData[change.fieldName] = change.newValue;
+                
+                await window.teableAPI.updateRecord(layer.tableId, change.recordId, updateData);
+                
+                // Update local data
+                const record = layer.records.find(r => r.id === change.recordId);
+                if (record) {
+                    record.fields[change.fieldName] = change.newValue;
+                    
+                    // Update corresponding map feature
+                    const featureIndex = layer.features.findIndex(f => f.recordId === change.recordId);
+                    if (featureIndex !== -1 && layer.features[featureIndex]) {
+                        layer.features[featureIndex].recordData = record.fields;
+                        
+                        // Update popup if it exists
+                        if (layer.features[featureIndex].getPopup()) {
+                            const newPopupContent = createFeaturePopup(record.fields, layer);
+                            layer.features[featureIndex].getPopup().setContent(newPopupContent);
+                        }
+                    }
+                }
+                
+                successCount++;
+            } catch (error) {
+                console.error(`Error saving change for record ${change.recordId}:`, error);
+                errorCount++;
+            }
+        }
+        
+        // Show results
+        if (errorCount === 0) {
+            showSuccess(`All ${successCount} changes saved successfully!`);
+        } else {
+            showWarning(`${successCount} changes saved, ${errorCount} failed. Check console for details.`);
+        }
+        
+        // Refresh the table to show updated values
+        await refreshAttributeTable(layerId);
+        
+    } catch (error) {
+        console.error('Error saving table changes:', error);
+        showError('Failed to save changes: ' + error.message);
+    } finally {
+        exitTableEditing();
+    }
+}
+
+function exitTableEditing() {
+    isTableEditingMode = false;
+    editingChanges.clear();
+    
+    // Toggle button visibility
+    document.getElementById('startEditingBtn').style.display = 'inline-block';
+    document.getElementById('saveEditingBtn').style.display = 'none';
+    
+    // Disable inline editing
+    const editableCells = document.querySelectorAll('.editable-cell');
+    editableCells.forEach(cell => {
+        cell.style.cursor = 'default';
+        cell.onclick = null;
+        
+        // Reset edit icon appearance
+        const editIcon = cell.querySelector('.edit-icon');
+        if (editIcon) {
+            editIcon.style.opacity = '0.6';
+            editIcon.style.color = '#28a745';
+        }
+    });
+    
+    // Remove editing mode visual indicators
+    const toolbar = document.querySelector('.docked-table-toolbar');
+    if (toolbar) {
+        toolbar.classList.remove('editing-mode');
+    }
+}
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -3503,6 +3667,9 @@ window.deleteRecord = deleteRecord;
 window.deleteSelectedRecords = deleteSelectedRecords;
 window.refreshAttributeTable = refreshAttributeTable;
 window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.startTableEditing = startTableEditing;
+window.saveTableEditing = saveTableEditing;
+window.exitTableEditing = exitTableEditing;
 window.filterPopupFields = filterPopupFields;
 window.copyToClipboard = copyToClipboard;
 window.previewPopup = previewPopup;
