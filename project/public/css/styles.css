@@ -547,16 +547,49 @@ body {
     z-index: 12;
 }
 
-/* Feature label styles */
-.feature-label {
+/* Enhanced feature label styles */
+.enhanced-feature-label {
     background: none !important;
     border: none !important;
     box-shadow: none !important;
+    z-index: 1000 !important;
 }
 
-.feature-label div {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    z-index: 1000;
+.enhanced-feature-label .label-content {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    z-index: 1001 !important;
+    position: relative;
+    display: inline-block;
+    transform: translateZ(0); /* Force hardware acceleration */
+}
+
+.enhanced-feature-label:before,
+.enhanced-feature-label:after {
+    display: none !important;
+}
+
+/* Reduce feature opacity when labels are enabled */
+.labeled-feature {
+    opacity: 0.8 !important;
+}
+
+/* Improve label readability on different backgrounds */
+.label-content {
+    transition: all 0.2s ease-in-out;
+}
+
+.enhanced-feature-label:hover .label-content {
+    transform: scale(1.1);
+    z-index: 1002 !important;
+}
+
+/* Responsive label sizing */
+@media (max-width: 768px) {
+    .enhanced-feature-label .label-content {
+        font-size: 10px !important;
+        padding: 2px 4px !important;
+        max-width: 80px !important;
+    }
 }
 
 /* Fullscreen Map Styles */

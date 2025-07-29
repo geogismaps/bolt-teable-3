@@ -2779,39 +2779,62 @@ function applyLabelsToLayer(layer) {
         if (feature.getLatLng) {
             labelPosition = feature.getLatLng();
         } else if (feature.getBounds) {
-            labelPosition = feature.getBounds().getCenter();
+            // For polygons, get the centroid for better label placement
+            const bounds = feature.getBounds();
+            labelPosition = bounds.getCenter();
         } else {
             return;
         }
 
         const labelText = String(record.fields[labels.field]);
         const fontSize = labels.fontSize || 12;
-        const color = labels.color || '#333333';
+        const color = labels.color || '#2c3e50';
         const background = labels.background !== false;
+        
+        // Calculate dynamic label positioning to avoid overlap
+        const offset = calculateLabelOffset(labelPosition, index, labelMarkers.length);
         
         const labelMarker = L.marker(labelPosition, {
             icon: L.divIcon({
-                className: 'feature-label',
-                html: `<div style="
+                className: 'enhanced-feature-label',
+                html: `<div class="label-content" style="
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     font-size: ${fontSize}px;
                     color: ${color};
-                    font-weight: bold;
+                    font-weight: 600;
                     text-align: center;
                     white-space: nowrap;
                     pointer-events: none;
-                    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+                    line-height: 1.2;
+                    max-width: 120px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                     ${background ? `
-                        background: rgba(255,255,255,0.8);
-                        padding: 2px 6px;
-                        border-radius: 3px;
-                        border: 1px solid rgba(0,0,0,0.3);
-                    ` : ''}
-                ">${labelText}</div>`,
+                        background: rgba(255, 255, 255, 0.95);
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        border: 2px solid ${color};
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+                        backdrop-filter: blur(2px);
+                    ` : `
+                        text-shadow: 2px 2px 4px rgba(0,0,0,0.8), -1px -1px 0px rgba(255,255,255,0.9);
+                    `}
+                ">${truncateText(labelText, 15)}</div>`,
                 iconSize: [null, null],
-                iconAnchor: [0, 0]
+                iconAnchor: [offset.x, offset.y]
             }),
             zIndexOffset: 1000
         });
+
+        // Reduce feature opacity when labels are shown
+        if (feature.setStyle) {
+            const currentStyle = feature.options;
+            feature.setStyle({
+                ...currentStyle,
+                fillOpacity: (currentStyle.fillOpacity || 0.7) * 0.7,
+                className: 'labeled-feature'
+            });
+        }
 
         labelMarkers.push(labelMarker);
     });
@@ -2822,6 +2845,31 @@ function applyLabelsToLayer(layer) {
             layer.labelGroup.addTo(map);
         }
     }
+}
+
+function calculateLabelOffset(position, index, totalLabels) {
+    // Calculate smart positioning to reduce overlap
+    const baseOffset = 15;
+    const spacing = 25;
+    
+    // For small numbers of features, use center positioning
+    if (totalLabels < 10) {
+        return { x: 0, y: 0 };
+    }
+    
+    // For larger numbers, create a slight offset pattern
+    const angle = (index * 45) % 360; // Rotate through different angles
+    const radius = baseOffset + (index % 3) * 5; // Vary the distance
+    
+    const x = Math.cos(angle * Math.PI / 180) * radius;
+    const y = Math.sin(angle * Math.PI / 180) * radius;
+    
+    return { x: Math.round(x), y: Math.round(y) };
+}
+
+function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 1) + '…';
 }
 
 // Additional iTool utility functions
