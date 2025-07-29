@@ -3512,6 +3512,11 @@ async function saveTableEditing(layerId) {
             throw new Error('Layer not found');
         }
         
+        // Check if API is available
+        if (!window.teableAPI) {
+            throw new Error('Teable API not available. Please check your configuration.');
+        }
+        
         // Show saving indicator
         const saveBtn = document.getElementById('saveEditingBtn');
         const originalText = saveBtn.innerHTML;
@@ -3528,16 +3533,31 @@ async function saveTableEditing(layerId) {
             recordChanges.get(change.recordId)[change.fieldName] = change.newValue;
         }
         
+        console.log(`Saving ${editingChanges.size} changes across ${recordChanges.size} records...`);
+        
         // Save all pending changes
         let successCount = 0;
         let errorCount = 0;
+        const failedChanges = [];
         
         for (const [recordId, fieldsToUpdate] of recordChanges) {
             try {
                 console.log(`Updating record ${recordId} with fields:`, fieldsToUpdate);
                 
-                // Update record in Teable.io
-                await window.teableAPI.updateRecord(layer.tableId, recordId, fieldsToUpdate);
+                // Check if updateRecord method exists
+                if (typeof window.teableAPI.updateRecord !== 'function') {
+                    // Fallback: try to use other available methods
+                    if (typeof window.teableAPI.modifyRecord === 'function') {
+                        await window.teableAPI.modifyRecord(layer.tableId, recordId, fieldsToUpdate);
+                    } else if (typeof window.teableAPI.patchRecord === 'function') {
+                        await window.teableAPI.patchRecord(layer.tableId, recordId, fieldsToUpdate);
+                    } else {
+                        throw new Error('No suitable update method found in teableAPI');
+                    }
+                } else {
+                    // Use the standard updateRecord method
+                    await window.teableAPI.updateRecord(layer.tableId, recordId, fieldsToUpdate);
+                }
                 
                 // Update local data
                 const record = layer.records.find(r => r.id === recordId);
@@ -3560,6 +3580,19 @@ async function saveTableEditing(layerId) {
                     }
                 }
                 
+                // Mark cells as successfully saved
+                Object.keys(fieldsToUpdate).forEach(fieldName => {
+                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
+                    if (cell) {
+                        cell.style.backgroundColor = '#d4edda';
+                        cell.style.borderColor = '#28a745';
+                        cell.title = 'Successfully saved to Teable.io';
+                        
+                        // Update the original value to the new value
+                        cell.setAttribute('data-original-value', fieldsToUpdate[fieldName]);
+                    }
+                });
+                
                 successCount += Object.keys(fieldsToUpdate).length;
                 console.log(`✅ Successfully updated record ${recordId}`);
                 
@@ -3567,65 +3600,71 @@ async function saveTableEditing(layerId) {
                 console.error(`❌ Error saving changes for record ${recordId}:`, error);
                 errorCount += Object.keys(fieldsToUpdate).length;
                 
+                // Store failed changes
+                Object.keys(fieldsToUpdate).forEach(fieldName => {
+                    failedChanges.push(`${recordId}_${fieldName}`);
+                });
+                
                 // Mark failed cells visually
                 Object.keys(fieldsToUpdate).forEach(fieldName => {
                     const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
                     if (cell) {
-                        cell.style.backgroundColor = '#ffebee';
-                        cell.style.borderColor = '#f44336';
+                        cell.style.backgroundColor = '#f8d7da';
+                        cell.style.borderColor = '#dc3545';
                         cell.title = `Failed to save: ${error.message}`;
                     }
                 });
             }
         }
         
-        // Clear editing changes only for successfully saved records
-        const successfulRecords = [];
-        for (const [recordId, fieldsToUpdate] of recordChanges) {
-            let allFieldsSaved = true;
-            for (const fieldName of Object.keys(fieldsToUpdate)) {
-                const changeKey = `${recordId}_${fieldName}`;
-                if (editingChanges.has(changeKey)) {
-                    // Check if this field was successfully saved by looking for error styling
-                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
-                    if (cell && cell.style.backgroundColor === 'rgb(255, 235, 238)') {
-                        allFieldsSaved = false;
-                        break;
-                    }
-                }
-            }
-            if (allFieldsSaved) {
-                successfulRecords.push(recordId);
-            }
-        }
-        
-        // Remove successful changes from the pending changes map
+        // Clear only successful changes from the pending changes map
+        const changesToRemove = [];
         for (const [key, change] of editingChanges) {
-            if (successfulRecords.includes(change.recordId)) {
-                editingChanges.delete(key);
+            if (!failedChanges.includes(key)) {
+                changesToRemove.push(key);
             }
         }
         
-        // Show results
+        changesToRemove.forEach(key => {
+            editingChanges.delete(key);
+        });
+        
+        // Show results and update UI
         if (errorCount === 0) {
             showSuccess(`All ${successCount} field changes saved successfully to Teable.io!`);
-            exitTableEditing();
+            
+            // Reset save button and exit editing mode
+            saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
+            saveBtn.disabled = false;
+            
+            // Auto-exit editing mode after successful save
+            setTimeout(() => {
+                exitTableEditing();
+            }, 1500);
+            
         } else if (successCount > 0) {
-            showWarning(`${successCount} changes saved, ${errorCount} failed. Failed changes remain in editing mode - check console for details.`);
+            showWarning(`${successCount} changes saved successfully, ${errorCount} failed. Failed changes remain for retry.`);
+            
             // Update save button to show remaining changes
+            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Retry Save (${editingChanges.size})`;
+            saveBtn.disabled = false;
+            saveBtn.classList.add('btn-warning');
+            saveBtn.classList.remove('btn-success');
+            
+        } else {
+            showError(`All ${errorCount} changes failed to save. Check your connection and permissions.`);
+            
+            // Restore save button
             saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
             saveBtn.disabled = false;
-        } else {
-            showError(`All ${errorCount} changes failed to save. Check console for details.`);
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
+            saveBtn.classList.add('btn-danger');
+            saveBtn.classList.remove('btn-success');
         }
         
-        // Refresh the table to show updated values from Teable.io
-        if (successCount > 0) {
-            setTimeout(async () => {
-                await refreshAttributeTable(layerId);
-            }, 1000);
+        // Show detailed error information if available
+        if (errorCount > 0) {
+            console.log('Failed to save the following changes:', failedChanges);
+            showError(`Save failed for ${errorCount} field(s). Check console for details.`);
         }
         
     } catch (error) {
@@ -3637,6 +3676,8 @@ async function saveTableEditing(layerId) {
         if (saveBtn) {
             saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
             saveBtn.disabled = false;
+            saveBtn.classList.add('btn-danger');
+            saveBtn.classList.remove('btn-success');
         }
     }
 }
@@ -3646,10 +3687,23 @@ function exitTableEditing() {
     editingChanges.clear();
     
     // Toggle button visibility
-    document.getElementById('startEditingBtn').style.display = 'inline-block';
-    document.getElementById('saveEditingBtn').style.display = 'none';
+    const startBtn = document.getElementById('startEditingBtn');
+    const saveBtn = document.getElementById('saveEditingBtn');
     
-    // Disable inline editing
+    if (startBtn) {
+        startBtn.style.display = 'inline-block';
+    }
+    
+    if (saveBtn) {
+        saveBtn.style.display = 'none';
+        // Reset save button classes and text
+        saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
+        saveBtn.classList.remove('btn-warning', 'btn-danger');
+        saveBtn.classList.add('btn-success');
+        saveBtn.disabled = false;
+    }
+    
+    // Disable inline editing and reset cell styles
     const editableCells = document.querySelectorAll('.editable-cell');
     editableCells.forEach(cell => {
         cell.style.cursor = 'default';
@@ -3659,6 +3713,13 @@ function exitTableEditing() {
         // Reset visual indicators
         cell.style.borderLeft = '3px solid #28a745';
         cell.title = 'Editable field (click Start Editing to modify)';
+        
+        // Remove any success/error styling
+        if (cell.style.backgroundColor === 'rgb(212, 237, 218)' || 
+            cell.style.backgroundColor === 'rgb(248, 215, 218)') {
+            cell.style.backgroundColor = '';
+            cell.style.borderColor = '';
+        }
     });
     
     // Remove editing mode visual indicators
@@ -3666,6 +3727,20 @@ function exitTableEditing() {
     if (toolbar) {
         toolbar.classList.remove('editing-mode');
     }
+    
+    // Remove any modified content indicators
+    const modifiedElements = document.querySelectorAll('.editable-content.modified');
+    modifiedElements.forEach(element => {
+        element.classList.remove('modified');
+        element.style.backgroundColor = '';
+        element.style.borderLeft = '';
+        
+        // Remove pending save indicators
+        const pendingIcons = element.querySelectorAll('.fa-clock');
+        pendingIcons.forEach(icon => icon.remove());
+    });
+    
+    showInfo('Editing mode disabled. All changes have been processed.');
 }
 
 // Make functions globally available
