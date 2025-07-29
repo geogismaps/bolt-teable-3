@@ -967,10 +967,24 @@ function zoomToLayer(layerId) {
     if (!layer) return;
 
     if (layer.bounds) {
-        map.fitBounds(layer.bounds.pad(0.1));
+        // Calculate appropriate zoom level based on layer size
+        const boundsSize = layer.bounds.getNorthEast().distanceTo(layer.bounds.getSouthWest());
+        let maxZoom = 20;
+        
+        if (boundsSize < 100) { // Very small area
+            maxZoom = 22;
+        } else if (boundsSize < 1000) { // Small area
+            maxZoom = 21;
+        } else if (boundsSize < 10000) { // Medium area
+            maxZoom = 19;
+        }
+        
+        map.fitBounds(layer.bounds.pad(0.05), {
+            maxZoom: maxZoom
+        });
     }
 
-    showSuccess(`Zoomed to layer: ${layer.name}`);
+    showSuccess(`Zoomed to layer: ${layer.name} with enhanced detail`);
 }
 
 function showAttributeTable(layerId) {
@@ -1727,9 +1741,9 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     window.currentPopupFeature = feature;
 
     const defaultOptions = {
-        padding: 0.3,
-        maxZoom: 18,
-        minZoom: 10
+        padding: 0.15,
+        maxZoom: 22,
+        minZoom: 16
     };
 
     const zoomOptions = { ...defaultOptions, ...options };
@@ -1737,13 +1751,24 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     if (feature.getBounds) {
         // Polygon or complex geometry
         const bounds = feature.getBounds();
+        const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+        
+        // Adjust zoom based on feature size
+        let targetZoom = zoomOptions.maxZoom;
+        if (boundsSize > 1000) { // Large features
+            targetZoom = Math.min(zoomOptions.maxZoom - 2, 20);
+        } else if (boundsSize > 100) { // Medium features
+            targetZoom = Math.min(zoomOptions.maxZoom - 1, 21);
+        }
+        
         map.fitBounds(bounds.pad(zoomOptions.padding), {
-            maxZoom: zoomOptions.maxZoom
+            maxZoom: targetZoom
         });
     } else if (feature.getLatLng) {
-        // Point geometry
+        // Point geometry - zoom closer for points
         const latlng = feature.getLatLng();
-        map.setView(latlng, Math.max(zoomOptions.minZoom, map.getZoom()));
+        const targetZoom = Math.max(zoomOptions.minZoom + 2, 18);
+        map.setView(latlng, targetZoom);
     }
 
     // Open popup if feature has one
@@ -1751,7 +1776,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
         feature.openPopup();
     }
 
-    showSuccess('Zoomed to feature');
+    showSuccess('Zoomed to feature with enhanced detail level');
 }
 
 function showFeatureInfo(layerId, featureIndex) {
@@ -4099,12 +4124,26 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
     if (!window.currentPopupFeature) return;
 
     const options = {
-        close: { padding: 0.8, maxZoom: 20, minZoom: 16 },
-        medium: { padding: 0.4, maxZoom: 16, minZoom: 12 },
-        far: { padding: 0.2, maxZoom: 12, minZoom: 8 }
+        close: { padding: 0.05, maxZoom: 22, minZoom: 18 },
+        medium: { padding: 0.2, maxZoom: 20, minZoom: 14 },
+        far: { padding: 0.4, maxZoom: 16, minZoom: 10 }
     };
 
-    zoomToFeature(window.currentPopupFeature, options[zoomType] || options.close);
+    const zoomOptions = options[zoomType] || options.close;
+    
+    if (window.currentPopupFeature.getBounds) {
+        // Polygon geometry
+        const bounds = window.currentPopupFeature.getBounds();
+        map.fitBounds(bounds.pad(zoomOptions.padding), {
+            maxZoom: zoomOptions.maxZoom
+        });
+    } else if (window.currentPopupFeature.getLatLng) {
+        // Point geometry
+        const latlng = window.currentPopupFeature.getLatLng();
+        map.setView(latlng, zoomOptions.maxZoom);
+    }
+    
+    showSuccess(`Zoomed to feature - ${zoomType} view`);
 };
 
 window.centerCurrentPopupFeature = function() {
@@ -4155,16 +4194,33 @@ window.zoomToAllLayers = function() {
     const group = new L.featureGroup(allFeatures);
     const bounds = group.getBounds();
 
-    // Calculate adaptive padding
+    // Calculate adaptive padding and zoom level
     const latSpan = bounds.getNorth() - bounds.getSouth();
     const lngSpan = bounds.getEast() - bounds.getWest();
     const maxSpan = Math.max(latSpan, lngSpan);
 
-    let padding = maxSpan < 0.01 ? 0.3 : maxSpan < 0.1 ? 0.2 : 0.1;
+    let padding, maxZoom;
+    if (maxSpan < 0.001) { // Very small area
+        padding = 0.5;
+        maxZoom = 22;
+    } else if (maxSpan < 0.01) { // Small area
+        padding = 0.3;
+        maxZoom = 20;
+    } else if (maxSpan < 0.1) { // Medium area
+        padding = 0.15;
+        maxZoom = 18;
+    } else { // Large area
+        padding = 0.05;
+        maxZoom = 16;
+    }
 
-    map.fitBounds(bounds.pad(padding), { animate: true, duration: 1 });
+    map.fitBounds(bounds.pad(padding), { 
+        animate: true, 
+        duration: 1,
+        maxZoom: maxZoom
+    });
 
-    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features`);
+    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features at enhanced detail level`);
 };
 
 // Event listeners for property controls

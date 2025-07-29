@@ -717,3 +717,56 @@ body {
             .border-danger {
                 border-left-color: #dc3545 !important;
             }
+/* Label styling for different zoom levels */
+.polygon-label-marker, .point-label-marker {
+    z-index: 1000;
+}
+
+.polygon-label, .point-label {
+    pointer-events: none;
+    user-select: none;
+    transition: all 0.3s ease;
+}
+
+/* Enhanced visibility at higher zoom levels */
+.leaflet-zoom-animated {
+    transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Improved feature rendering at high zoom */
+.leaflet-interactive {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.leaflet-interactive:hover {
+    stroke-width: 3 !important;
+    filter: brightness(1.1);
+}
+
+/* Better popup positioning at high zoom */
+.leaflet-popup {
+    margin-bottom: 20px;
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Enhanced zoom controls */
+.leaflet-control-zoom {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.leaflet-control-zoom a {
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: #0d6efd;
+    color: white;
+}
