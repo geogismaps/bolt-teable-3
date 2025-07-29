@@ -2868,16 +2868,52 @@ function startInlineEdit(cell) {
     const recordId = cell.getAttribute('data-record-id');
     const originalValue = cell.getAttribute('data-original-value') || '';
     
-    // Create input element
+    // Get table ID and layer for field type detection
+    const row = cell.closest('tr');
+    const tableId = row.getAttribute('data-table-id');
+    const layer = mapLayers.find(l => l.tableId === tableId);
+    
+    // Detect field type
+    const fieldType = layer ? detectFieldType(layer, fieldName, originalValue) : 'text';
+    
+    // Create input element with appropriate type and validation
     const input = document.createElement('input');
-    input.type = 'text';
     input.className = 'inline-editor';
     input.value = originalValue;
     
-    // Create save/cancel buttons
+    // Set input type and attributes based on field type
+    switch (fieldType) {
+        case 'number':
+            input.type = 'number';
+            input.step = 'any';
+            input.placeholder = 'Enter number';
+            break;
+        case 'boolean':
+            input.type = 'text';
+            input.placeholder = 'true or false';
+            input.setAttribute('list', 'booleanOptions');
+            // Create datalist for boolean options
+            if (!document.getElementById('booleanOptions')) {
+                const datalist = document.createElement('datalist');
+                datalist.id = 'booleanOptions';
+                datalist.innerHTML = '<option value="true"><option value="false">';
+                document.body.appendChild(datalist);
+            }
+            break;
+        case 'date':
+            input.type = 'date';
+            input.placeholder = 'YYYY-MM-DD';
+            break;
+        default:
+            input.type = 'text';
+            input.placeholder = 'Enter text';
+    }
+    
+    // Create save/cancel buttons with field type indicator
     const buttonsDiv = document.createElement('div');
     buttonsDiv.className = 'save-cancel-buttons';
     buttonsDiv.innerHTML = `
+        <small class="text-muted me-2">${fieldType}</small>
         <button class="btn btn-xs btn-success me-1" onclick="saveInlineEdit(this, '${recordId}', '${fieldName}')">
             <i class="fas fa-check"></i>
         </button>
@@ -2903,15 +2939,48 @@ function startInlineEdit(cell) {
             cancelInlineEdit(buttonsDiv.querySelector('.btn-secondary'), originalValue);
         }
     });
+    
+    // Add real-time validation feedback
+    input.addEventListener('input', function() {
+        const value = this.value;
+        let isValid = true;
+        let errorMessage = '';
+        
+        if (value !== '' && value !== null && value !== undefined) {
+            try {
+                convertValueByType(value, fieldType);
+            } catch (error) {
+                isValid = false;
+                errorMessage = error.message;
+            }
+        }
+        
+        // Update input styling based on validation
+        if (isValid) {
+            this.style.borderColor = '#28a745';
+            this.style.backgroundColor = '#f8fff9';
+            this.title = '';
+        } else {
+            this.style.borderColor = '#dc3545';
+            this.style.backgroundColor = '#fff5f5';
+            this.title = errorMessage;
+        }
+        
+        // Enable/disable save button
+        const saveButton = buttonsDiv.querySelector('.btn-success');
+        if (saveButton) {
+            saveButton.disabled = !isValid;
+        }
+    });
 }
 
 async function saveInlineEdit(button, recordId, fieldName) {
     const cell = button.closest('td');
     const input = cell.querySelector('.inline-editor');
-    const newValue = input.value;
+    const rawValue = input.value;
     const originalValue = cell.getAttribute('data-original-value') || '';
     
-    if (newValue === originalValue) {
+    if (rawValue === originalValue) {
         cancelInlineEdit(button, originalValue);
         return;
     }
@@ -2929,37 +2998,51 @@ async function saveInlineEdit(button, recordId, fieldName) {
             throw new Error('Table ID not found');
         }
         
+        // Get layer and field information for type validation
+        const layer = mapLayers.find(l => l.tableId === tableId);
+        if (!layer) {
+            throw new Error('Layer not found');
+        }
+        
+        // Detect field type and convert value accordingly
+        let convertedValue = rawValue;
+        const fieldType = detectFieldType(layer, fieldName, rawValue);
+        
+        try {
+            convertedValue = convertValueByType(rawValue, fieldType);
+        } catch (conversionError) {
+            throw new Error(`Invalid ${fieldType} value: ${rawValue}`);
+        }
+        
         // Update record in Teable.io
         const updateData = {};
-        updateData[fieldName] = newValue;
+        updateData[fieldName] = convertedValue;
         
         await window.teableAPI.updateRecord(tableId, recordId, updateData);
         
         // Update local data
-        const layer = mapLayers.find(l => l.tableId === tableId);
-        if (layer) {
-            const record = layer.records.find(r => r.id === recordId);
-            if (record) {
-                record.fields[fieldName] = newValue;
+        const record = layer.records.find(r => r.id === recordId);
+        if (record) {
+            record.fields[fieldName] = convertedValue;
+            
+            // Update the corresponding map feature
+            const featureIndex = parseInt(row.getAttribute('data-feature-index'));
+            if (layer.features[featureIndex]) {
+                layer.features[featureIndex].recordData = record.fields;
                 
-                // Update the corresponding map feature
-                const featureIndex = parseInt(row.getAttribute('data-feature-index'));
-                if (layer.features[featureIndex]) {
-                    layer.features[featureIndex].recordData = record.fields;
-                    
-                    // Update popup if it exists
-                    if (layer.features[featureIndex].getPopup()) {
-                        const newPopupContent = createFeaturePopup(record.fields, layer);
-                        layer.features[featureIndex].getPopup().setContent(newPopupContent);
-                    }
+                // Update popup if it exists
+                if (layer.features[featureIndex].getPopup()) {
+                    const newPopupContent = createFeaturePopup(record.fields, layer);
+                    layer.features[featureIndex].getPopup().setContent(newPopupContent);
                 }
             }
         }
         
-        // Update cell display
-        const displayValue = newValue.length > 50 ? newValue.substring(0, 50) + '...' : newValue;
-        cell.setAttribute('data-original-value', newValue);
-        cell.title = `Click to edit: ${newValue}`;
+        // Update cell display with converted value
+        const displayValue = String(convertedValue).length > 50 ? 
+            String(convertedValue).substring(0, 50) + '...' : String(convertedValue);
+        cell.setAttribute('data-original-value', convertedValue);
+        cell.title = `Click to edit: ${convertedValue}`;
         cell.innerHTML = `
             <div class="editable-content">
                 ${escapeHtml(displayValue)}
@@ -2978,6 +3061,94 @@ async function saveInlineEdit(button, recordId, fieldName) {
         
         // Restore original content
         cancelInlineEdit(button, originalValue);
+    }
+}
+
+function detectFieldType(layer, fieldName, value) {
+    // First check existing data to determine field type
+    if (layer.records && layer.records.length > 0) {
+        for (const record of layer.records) {
+            const existingValue = record.fields[fieldName];
+            if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
+                if (typeof existingValue === 'number') {
+                    return 'number';
+                } else if (typeof existingValue === 'boolean') {
+                    return 'boolean';
+                } else if (typeof existingValue === 'string') {
+                    // Check if it's a date string
+                    if (existingValue.match(/^\d{4}-\d{2}-\d{2}/)) {
+                        return 'date';
+                    }
+                    return 'text';
+                }
+            }
+        }
+    }
+    
+    // If no existing data, try to infer from the input value
+    if (value === '' || value === null || value === undefined) {
+        return 'text';
+    }
+    
+    // Check if it's a number
+    if (!isNaN(parseFloat(value)) && isFinite(value)) {
+        return 'number';
+    }
+    
+    // Check if it's a boolean
+    if (value.toLowerCase() === 'true' || value.toLowerCase() === 'false') {
+        return 'boolean';
+    }
+    
+    // Check if it's a date
+    if (value.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return 'date';
+    }
+    
+    return 'text';
+}
+
+function convertValueByType(value, fieldType) {
+    if (value === '' || value === null || value === undefined) {
+        return null;
+    }
+    
+    switch (fieldType) {
+        case 'number':
+            const numValue = parseFloat(value);
+            if (isNaN(numValue) || !isFinite(numValue)) {
+                throw new Error(`"${value}" is not a valid number`);
+            }
+            return numValue;
+            
+        case 'boolean':
+            if (typeof value === 'boolean') {
+                return value;
+            }
+            const strValue = String(value).toLowerCase();
+            if (strValue === 'true' || strValue === '1' || strValue === 'yes') {
+                return true;
+            } else if (strValue === 'false' || strValue === '0' || strValue === 'no') {
+                return false;
+            } else {
+                throw new Error(`"${value}" is not a valid boolean value`);
+            }
+            
+        case 'date':
+            // Basic date validation
+            if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const date = new Date(value);
+                if (isNaN(date.getTime())) {
+                    throw new Error(`"${value}" is not a valid date`);
+                }
+                return value;
+            } else {
+                throw new Error(`"${value}" is not a valid date format (YYYY-MM-DD)`);
+            }
+            
+        case 'text':
+        default:
+            return String(value);
     }
 }
 
