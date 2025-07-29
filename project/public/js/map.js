@@ -1012,22 +1012,32 @@ function showLayerProperties(layerId) {
     }
 }
 
-function createDockedAttributeTable(layer) {
+async function createDockedAttributeTable(layer) {
     // Remove existing docked table if present
     const existingTable = document.getElementById('dockedAttributeTable');
     if (existingTable) {
         existingTable.remove();
     }
 
-    // Create docked attribute table HTML
+    // Load field permissions for current user
+    const fieldPermissions = await loadFieldPermissionsForTable(layer.tableId);
+    
+    // Store permissions on layer for later use
+    layer.fieldPermissions = fieldPermissions;
+
+    // Create docked attribute table HTML with enhanced permissions
     const dockedTableHTML = `
         <div id="dockedAttributeTable" class="docked-attribute-table">
             <div class="docked-table-header">
                 <div class="d-flex justify-content-between align-items-center">
                     <h6 class="mb-0">
                         <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
+                        <span class="badge bg-info ms-2">${getUserRoleBadge()}</span>
                     </h6>
                     <div class="docked-table-controls">
+                        <button class="btn btn-sm btn-outline-light" onclick="refreshAttributeTable('${layer.id}')" title="Refresh">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
                         <button class="btn btn-sm btn-outline-light" onclick="toggleDockedTableSize()" title="Toggle Size">
                             <i class="fas fa-expand-alt" id="tableToggleIcon"></i>
                         </button>
@@ -1039,8 +1049,8 @@ function createDockedAttributeTable(layer) {
             </div>
             <div class="docked-table-toolbar">
                 <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <div class="d-flex gap-2">
+                    <div class="col-md-8">
+                        <div class="d-flex gap-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-primary" onclick="selectAllRows('${layer.id}')">
                                 <i class="fas fa-check-square me-1"></i>Select All
                             </button>
@@ -1050,27 +1060,40 @@ function createDockedAttributeTable(layer) {
                             <button class="btn btn-sm btn-outline-success" onclick="zoomToSelection('${layer.id}')" id="zoomToSelectionBtn" disabled>
                                 <i class="fas fa-search-plus me-1"></i>Zoom to Selection
                             </button>
+                            ${canEditRecords() ? `
+                                <button class="btn btn-sm btn-outline-warning" onclick="addNewRecord('${layer.id}')" title="Add New Record">
+                                    <i class="fas fa-plus me-1"></i>Add Record
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedRecords('${layer.id}')" id="deleteSelectedBtn" disabled>
+                                    <i class="fas fa-trash me-1"></i>Delete Selected
+                                </button>
+                            ` : ''}
                             <button class="btn btn-sm btn-outline-info" onclick="exportTableData('${layer.id}')">
                                 <i class="fas fa-download me-1"></i>Export CSV
                             </button>
                         </div>
                     </div>
-                    <div class="col-md-6 text-end">
-                        <span class="text-muted">
-                            <span id="selectedCount">0</span> of ${layer.records.length} features selected
-                        </span>
+                    <div class="col-md-4 text-end">
+                        <div class="text-muted small">
+                            <div><span id="selectedCount">0</span> of ${layer.records.length} features selected</div>
+                            <div class="permission-indicator">
+                                ${getPermissionIndicator()}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="docked-table-content">
-                <table class="table table-sm table-striped mb-0" id="attributeTable">
-                    <thead class="table-dark sticky-top">
-                        ${createTableHeader(layer)}
-                    </thead>
-                    <tbody>
-                        ${createTableBody(layer)}
-                    </tbody>
-                </table>
+                <div id="attributeTableContainer">
+                    <table class="table table-sm table-striped mb-0" id="attributeTable">
+                        <thead class="table-dark sticky-top">
+                            ${await createEnhancedTableHeader(layer)}
+                        </thead>
+                        <tbody>
+                            ${await createEnhancedTableBody(layer)}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
@@ -1081,9 +1104,107 @@ function createDockedAttributeTable(layer) {
 
     // Adjust map height to accommodate the docked table
     adjustMapForDockedTable();
+    
+    // Setup inline editing handlers
+    setupInlineEditing(layer);
 }
 
-function createTableHeader(layer) {
+async function loadFieldPermissionsForTable(tableId) {
+    try {
+        if (!window.teableAPI.systemTables.permissions) {
+            console.log('Permissions system not initialized, using default permissions');
+            return {};
+        }
+
+        const currentUser = window.teableAuth.getCurrentSession();
+        if (!currentUser) {
+            return {};
+        }
+
+        // Get field permissions for current user and table
+        const permissionsData = await window.teableAPI.getRecords(window.teableAPI.systemTables.permissions);
+        const permissions = permissionsData.records || [];
+
+        const fieldPermissions = {};
+        permissions.forEach(perm => {
+            const fields = perm.fields;
+            if (fields.user_email === currentUser.email && fields.table_id === tableId) {
+                fieldPermissions[fields.field_name] = fields.permission_type;
+            }
+        });
+
+        console.log(`Loaded field permissions for table ${tableId}:`, fieldPermissions);
+        return fieldPermissions;
+    } catch (error) {
+        console.error('Error loading field permissions:', error);
+        return {};
+    }
+}
+
+function getFieldPermission(fieldName, layer) {
+    if (!layer.fieldPermissions) {
+        return getDefaultPermissionByRole();
+    }
+    
+    return layer.fieldPermissions[fieldName] || getDefaultPermissionByRole();
+}
+
+function getDefaultPermissionByRole() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return 'view';
+    
+    const role = currentUser.role?.toLowerCase() || 'viewer';
+    
+    // Map roles to permissions
+    const rolePermissions = {
+        'creator': 'edit',
+        'owner': 'edit', 
+        'editor': 'edit',
+        'commenter': 'view',
+        'viewer': 'view'
+    };
+    
+    return rolePermissions[role] || 'view';
+}
+
+function canEditRecords() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return false;
+    
+    const role = currentUser.role?.toLowerCase() || 'viewer';
+    return role === 'creator' || role === 'owner' || role === 'editor';
+}
+
+function getUserRoleBadge() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return 'Unknown';
+    
+    const role = currentUser.role || 'Viewer';
+    const roleColors = {
+        'creator': 'danger',
+        'owner': 'danger',
+        'editor': 'success', 
+        'commenter': 'warning',
+        'viewer': 'secondary'
+    };
+    
+    const colorClass = roleColors[role.toLowerCase()] || 'secondary';
+    return `<span class="badge bg-${colorClass}">${role}</span>`;
+}
+
+function getPermissionIndicator() {
+    const editCount = document.querySelectorAll('.field-editable').length;
+    const viewCount = document.querySelectorAll('.field-viewonly').length;
+    const hiddenCount = document.querySelectorAll('.field-hidden').length;
+    
+    return `
+        <span class="text-success" title="Editable fields"><i class="fas fa-edit"></i> ${editCount}</span>
+        <span class="text-info ms-2" title="View-only fields"><i class="fas fa-eye"></i> ${viewCount}</span>
+        ${hiddenCount > 0 ? `<span class="text-danger ms-2" title="Hidden fields"><i class="fas fa-eye-slash"></i> ${hiddenCount}</span>` : ''}
+    `;
+}
+
+async function createEnhancedTableHeader(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
     const fields = Object.keys(layer.records[0].fields || {});
@@ -1092,54 +1213,116 @@ function createTableHeader(layer) {
     // Add selection checkbox column
     headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
 
-    // Add field columns
+    // Add field columns with permission indicators
     fields.forEach(field => {
         if (field !== layer.geometryField) {
-            headerHTML += `<th>${field}</th>`;
+            const permission = getFieldPermission(field, layer);
+            
+            if (permission !== 'hidden') {
+                const permissionIcon = permission === 'edit' ? 
+                    '<i class="fas fa-edit text-success" title="Editable"></i>' : 
+                    '<i class="fas fa-eye text-info" title="View Only"></i>';
+                
+                const permissionClass = permission === 'edit' ? 'field-editable' : 'field-viewonly';
+                
+                headerHTML += `
+                    <th class="${permissionClass}">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span>${field}</span>
+                            ${permissionIcon}
+                        </div>
+                    </th>
+                `;
+            }
         }
     });
 
     // Add actions column
-    headerHTML += '<th style="width: 100px;">Actions</th>';
+    headerHTML += '<th style="width: 120px;">Actions</th>';
     headerHTML += '</tr>';
 
     return headerHTML;
 }
 
-function createTableBody(layer) {
+async function createEnhancedTableBody(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
     const fields = Object.keys(layer.records[0].fields || {});
     let bodyHTML = '';
 
     layer.records.forEach((record, index) => {
-        bodyHTML += `<tr data-record-id="${record.id}" data-feature-index="${index}">`;
+        bodyHTML += `<tr data-record-id="${record.id}" data-feature-index="${index}" data-table-id="${layer.tableId}">`;
 
         // Add selection checkbox
         bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
 
-        // Add field data
+        // Add field data with permission-based editing
         fields.forEach(field => {
             if (field !== layer.geometryField) {
-                let value = record.fields[field];
-                if (value === null || value === undefined) {
-                    value = '';
-                } else if (typeof value === 'string' && value.length > 50) {
-                    value = value.substring(0, 50) + '...';
+                const permission = getFieldPermission(field, layer);
+                
+                if (permission !== 'hidden') {
+                    let value = record.fields[field];
+                    const originalValue = value;
+                    
+                    if (value === null || value === undefined) {
+                        value = '';
+                    }
+                    
+                    const displayValue = typeof value === 'string' && value.length > 50 ? 
+                        value.substring(0, 50) + '...' : value;
+                    
+                    const cellClass = permission === 'edit' ? 'editable-cell' : 'readonly-cell';
+                    const borderColor = permission === 'edit' ? 'border-success' : 'border-info';
+                    
+                    if (permission === 'edit') {
+                        bodyHTML += `
+                            <td class="${cellClass} ${borderColor}" 
+                                data-field="${field}" 
+                                data-record-id="${record.id}"
+                                data-original-value="${escapeHtml(originalValue || '')}"
+                                title="Click to edit: ${originalValue || ''}"
+                                onclick="startInlineEdit(this)">
+                                <div class="editable-content">
+                                    ${escapeHtml(displayValue)}
+                                    <i class="fas fa-edit edit-icon ms-1 text-success"></i>
+                                </div>
+                            </td>
+                        `;
+                    } else {
+                        bodyHTML += `
+                            <td class="${cellClass} ${borderColor}" 
+                                title="View only: ${originalValue || ''}">
+                                <div class="readonly-content">
+                                    ${escapeHtml(displayValue)}
+                                    <i class="fas fa-eye view-icon ms-1 text-info"></i>
+                                </div>
+                            </td>
+                        `;
+                    }
                 }
-                bodyHTML += `<td title="${record.fields[field] || ''}">${value}</td>`;
             }
         });
 
-        // Add actions
+        // Add actions with permission-based controls
         bodyHTML += `
             <td>
-                <button class="btn btn-xs btn-outline-primary" onclick="zoomToFeature('${layer.id}', ${index})" title="Zoom to Feature">
-                    <i class="fas fa-search-plus"></i>
-                </button>
-                <button class="btn btn-xs btn-outline-info" onclick="showFeatureInfo('${layer.id}', ${index})" title="Show Info">
-                    <i class="fas fa-info-circle"></i>
-                </button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-xs btn-outline-primary" onclick="zoomToFeature('${layer.id}', ${index})" title="Zoom to Feature">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <button class="btn btn-xs btn-outline-info" onclick="showFeatureInfo('${layer.id}', ${index})" title="Show Info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                    ${canEditRecords() ? `
+                        <button class="btn btn-xs btn-outline-warning" onclick="editRecord('${layer.id}', '${record.id}', ${index})" title="Edit Record">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-xs btn-outline-danger" onclick="deleteRecord('${layer.id}', '${record.id}', ${index})" title="Delete Record">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
             </td>
         `;
 
@@ -1147,6 +1330,12 @@ function createTableBody(layer) {
     });
 
     return bodyHTML;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function populatePropertiesModal(layer) {
@@ -2612,6 +2801,488 @@ function handlePopupToggle() {
     }
 }
 
+// Inline editing functionality
+function setupInlineEditing(layer) {
+    // Add CSS for inline editing if not already added
+    if (!document.getElementById('inlineEditingStyles')) {
+        const styles = document.createElement('style');
+        styles.id = 'inlineEditingStyles';
+        styles.textContent = `
+            .editable-cell {
+                cursor: pointer;
+                transition: background-color 0.2s;
+                border-left: 3px solid transparent;
+            }
+            .editable-cell:hover {
+                background-color: #f8f9fa;
+            }
+            .readonly-cell {
+                border-left: 3px solid transparent;
+            }
+            .border-success {
+                border-left-color: #28a745 !important;
+            }
+            .border-info {
+                border-left-color: #17a2b8 !important;
+            }
+            .border-danger {
+                border-left-color: #dc3545 !important;
+            }
+            .edit-icon, .view-icon {
+                opacity: 0.6;
+                font-size: 0.75em;
+            }
+            .editable-cell:hover .edit-icon {
+                opacity: 1;
+            }
+            .inline-editor {
+                width: 100%;
+                border: 2px solid #007bff;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 0.875rem;
+                background: #fff;
+            }
+            .inline-editor:focus {
+                outline: none;
+                border-color: #0056b3;
+                box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+            }
+            .save-cancel-buttons {
+                margin-top: 4px;
+            }
+            .permission-indicator .badge {
+                font-size: 0.7em;
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+}
+
+function startInlineEdit(cell) {
+    if (cell.querySelector('.inline-editor')) {
+        return; // Already editing
+    }
+    
+    const fieldName = cell.getAttribute('data-field');
+    const recordId = cell.getAttribute('data-record-id');
+    const originalValue = cell.getAttribute('data-original-value') || '';
+    
+    // Create input element
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-editor';
+    input.value = originalValue;
+    
+    // Create save/cancel buttons
+    const buttonsDiv = document.createElement('div');
+    buttonsDiv.className = 'save-cancel-buttons';
+    buttonsDiv.innerHTML = `
+        <button class="btn btn-xs btn-success me-1" onclick="saveInlineEdit(this, '${recordId}', '${fieldName}')">
+            <i class="fas fa-check"></i>
+        </button>
+        <button class="btn btn-xs btn-secondary" onclick="cancelInlineEdit(this, '${escapeHtml(originalValue)}')">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Replace cell content
+    cell.innerHTML = '';
+    cell.appendChild(input);
+    cell.appendChild(buttonsDiv);
+    
+    // Focus and select input
+    input.focus();
+    input.select();
+    
+    // Handle Enter and Escape keys
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            saveInlineEdit(buttonsDiv.querySelector('.btn-success'), recordId, fieldName);
+        } else if (e.key === 'Escape') {
+            cancelInlineEdit(buttonsDiv.querySelector('.btn-secondary'), originalValue);
+        }
+    });
+}
+
+async function saveInlineEdit(button, recordId, fieldName) {
+    const cell = button.closest('td');
+    const input = cell.querySelector('.inline-editor');
+    const newValue = input.value;
+    const originalValue = cell.getAttribute('data-original-value') || '';
+    
+    if (newValue === originalValue) {
+        cancelInlineEdit(button, originalValue);
+        return;
+    }
+    
+    try {
+        // Show loading state
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        button.disabled = true;
+        
+        // Get table ID from row
+        const row = cell.closest('tr');
+        const tableId = row.getAttribute('data-table-id');
+        
+        if (!tableId) {
+            throw new Error('Table ID not found');
+        }
+        
+        // Update record in Teable.io
+        const updateData = {};
+        updateData[fieldName] = newValue;
+        
+        await window.teableAPI.updateRecord(tableId, recordId, updateData);
+        
+        // Update local data
+        const layer = mapLayers.find(l => l.tableId === tableId);
+        if (layer) {
+            const record = layer.records.find(r => r.id === recordId);
+            if (record) {
+                record.fields[fieldName] = newValue;
+                
+                // Update the corresponding map feature
+                const featureIndex = parseInt(row.getAttribute('data-feature-index'));
+                if (layer.features[featureIndex]) {
+                    layer.features[featureIndex].recordData = record.fields;
+                    
+                    // Update popup if it exists
+                    if (layer.features[featureIndex].getPopup()) {
+                        const newPopupContent = createFeaturePopup(record.fields, layer);
+                        layer.features[featureIndex].getPopup().setContent(newPopupContent);
+                    }
+                }
+            }
+        }
+        
+        // Update cell display
+        const displayValue = newValue.length > 50 ? newValue.substring(0, 50) + '...' : newValue;
+        cell.setAttribute('data-original-value', newValue);
+        cell.title = `Click to edit: ${newValue}`;
+        cell.innerHTML = `
+            <div class="editable-content">
+                ${escapeHtml(displayValue)}
+                <i class="fas fa-edit edit-icon ms-1 text-success"></i>
+            </div>
+        `;
+        
+        // Re-add click handler
+        cell.onclick = function() { startInlineEdit(this); };
+        
+        showSuccess(`Field "${fieldName}" updated successfully!`);
+        
+    } catch (error) {
+        console.error('Error updating field:', error);
+        showError(`Failed to update field: ${error.message}`);
+        
+        // Restore original content
+        cancelInlineEdit(button, originalValue);
+    }
+}
+
+function cancelInlineEdit(button, originalValue) {
+    const cell = button.closest('td');
+    const displayValue = originalValue.length > 50 ? originalValue.substring(0, 50) + '...' : originalValue;
+    
+    cell.innerHTML = `
+        <div class="editable-content">
+            ${escapeHtml(displayValue)}
+            <i class="fas fa-edit edit-icon ms-1 text-success"></i>
+        </div>
+    `;
+    
+    // Re-add click handler
+    cell.onclick = function() { startInlineEdit(this); };
+}
+
+async function addNewRecord(layerId) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+    
+    if (!canEditRecords()) {
+        showError('You do not have permission to add records');
+        return;
+    }
+    
+    try {
+        // Get editable fields
+        const fields = Object.keys(layer.records[0].fields || {}).filter(field => 
+            field !== layer.geometryField && 
+            getFieldPermission(field, layer) === 'edit'
+        );
+        
+        if (fields.length === 0) {
+            showError('No editable fields available');
+            return;
+        }
+        
+        // Show modal for new record
+        showNewRecordModal(layer, fields);
+        
+    } catch (error) {
+        console.error('Error adding new record:', error);
+        showError('Failed to add new record: ' + error.message);
+    }
+}
+
+function showNewRecordModal(layer, editableFields) {
+    const modalHTML = `
+        <div class="modal fade" id="newRecordModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-plus me-2"></i>Add New Record - ${layer.name}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            This will create a new record in the Teable.io table. Only editable fields are shown.
+                        </div>
+                        <form id="newRecordForm">
+                            <div class="row">
+                                ${editableFields.map(field => `
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">
+                                            ${field}
+                                            <span class="badge bg-success ms-1">Editable</span>
+                                        </label>
+                                        <input type="text" class="form-control" name="${field}" placeholder="Enter ${field}">
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="saveNewRecord('${layer.id}')">
+                            <i class="fas fa-save me-1"></i>Save Record
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal
+    const existingModal = document.getElementById('newRecordModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('newRecordModal'));
+    modal.show();
+}
+
+async function saveNewRecord(layerId) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+    
+    try {
+        // Get form data
+        const form = document.getElementById('newRecordForm');
+        const formData = new FormData(form);
+        const recordData = {};
+        
+        for (const [key, value] of formData.entries()) {
+            recordData[key] = value;
+        }
+        
+        // Add geometry field if it exists (empty for now)
+        if (layer.geometryField) {
+            recordData[layer.geometryField] = '';
+        }
+        
+        // Create record in Teable.io
+        const newRecord = await window.teableAPI.createRecord(layer.tableId, recordData);
+        
+        // Add to local layer data
+        layer.records.push(newRecord);
+        layer.featureCount++;
+        
+        // Refresh the attribute table
+        await refreshAttributeTable(layerId);
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('newRecordModal'));
+        modal.hide();
+        
+        showSuccess('New record added successfully!');
+        
+    } catch (error) {
+        console.error('Error saving new record:', error);
+        showError('Failed to save new record: ' + error.message);
+    }
+}
+
+async function deleteRecord(layerId, recordId, featureIndex) {
+    if (!canEditRecords()) {
+        showError('You do not have permission to delete records');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
+        return;
+    }
+    
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+    
+    try {
+        // Delete from Teable.io
+        await window.teableAPI.deleteRecord(layer.tableId, recordId);
+        
+        // Remove from local data
+        layer.records = layer.records.filter(r => r.id !== recordId);
+        layer.featureCount--;
+        
+        // Remove feature from map if it exists
+        if (layer.features[featureIndex]) {
+            if (layer.leafletLayer.hasLayer(layer.features[featureIndex])) {
+                layer.leafletLayer.removeLayer(layer.features[featureIndex]);
+            }
+            layer.features.splice(featureIndex, 1);
+        }
+        
+        // Refresh the attribute table
+        await refreshAttributeTable(layerId);
+        
+        // Update layer list and statistics
+        updateLayersList();
+        updateMapStatistics();
+        
+        showSuccess('Record deleted successfully!');
+        
+    } catch (error) {
+        console.error('Error deleting record:', error);
+        showError('Failed to delete record: ' + error.message);
+    }
+}
+
+async function deleteSelectedRecords(layerId) {
+    if (!canEditRecords()) {
+        showError('You do not have permission to delete records');
+        return;
+    }
+    
+    const selectedCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector:checked');
+    if (selectedCheckboxes.length === 0) {
+        showWarning('No records selected for deletion');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${selectedCheckboxes.length} selected record(s)? This action cannot be undone.`)) {
+        return;
+    }
+    
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) {
+        showError('Layer not found');
+        return;
+    }
+    
+    try {
+        const recordsToDelete = [];
+        selectedCheckboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            const recordId = row.getAttribute('data-record-id');
+            recordsToDelete.push(recordId);
+        });
+        
+        // Delete from Teable.io
+        for (const recordId of recordsToDelete) {
+            await window.teableAPI.deleteRecord(layer.tableId, recordId);
+        }
+        
+        // Remove from local data
+        layer.records = layer.records.filter(r => !recordsToDelete.includes(r.id));
+        layer.featureCount -= recordsToDelete.length;
+        
+        // Remove features from map
+        layer.features = layer.features.filter((feature, index) => {
+            if (recordsToDelete.includes(feature.recordId)) {
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+                return false;
+            }
+            return true;
+        });
+        
+        // Clear selection
+        selectedFeatures = [];
+        
+        // Refresh the attribute table
+        await refreshAttributeTable(layerId);
+        
+        // Update layer list and statistics
+        updateLayersList();
+        updateMapStatistics();
+        
+        showSuccess(`${recordsToDelete.length} record(s) deleted successfully!`);
+        
+    } catch (error) {
+        console.error('Error deleting selected records:', error);
+        showError('Failed to delete selected records: ' + error.message);
+    }
+}
+
+async function refreshAttributeTable(layerId) {
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (!layer) return;
+    
+    try {
+        // Reload data from Teable.io
+        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1000 });
+        const records = recordsData.records || [];
+        
+        // Update layer data
+        layer.records = records;
+        layer.featureCount = records.length;
+        
+        // Recreate the attribute table
+        const tableContainer = document.getElementById('attributeTableContainer');
+        if (tableContainer) {
+            tableContainer.innerHTML = `
+                <table class="table table-sm table-striped mb-0" id="attributeTable">
+                    <thead class="table-dark sticky-top">
+                        ${await createEnhancedTableHeader(layer)}
+                    </thead>
+                    <tbody>
+                        ${await createEnhancedTableBody(layer)}
+                    </tbody>
+                </table>
+            `;
+            
+            // Reapply inline editing
+            setupInlineEditing(layer);
+        }
+        
+        // Update selection count
+        updateSelectionCount();
+        
+    } catch (error) {
+        console.error('Error refreshing attribute table:', error);
+        showError('Failed to refresh attribute table: ' + error.message);
+    }
+}
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -2652,6 +3323,14 @@ window.showFeatureInfo = showFeatureInfo;
 window.exportTableData = exportTableData;
 window.clearSelection = clearSelection;
 window.toggleAllRows = toggleAllRows;
+window.startInlineEdit = startInlineEdit;
+window.saveInlineEdit = saveInlineEdit;
+window.cancelInlineEdit = cancelInlineEdit;
+window.addNewRecord = addNewRecord;
+window.saveNewRecord = saveNewRecord;
+window.deleteRecord = deleteRecord;
+window.deleteSelectedRecords = deleteSelectedRecords;
+window.refreshAttributeTable = refreshAttributeTable;
 window.updatePopupFieldSelection = updatePopupFieldSelection;
 window.filterPopupFields = filterPopupFields;
 window.copyToClipboard = copyToClipboard;
