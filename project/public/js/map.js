@@ -1225,18 +1225,11 @@ async function createEnhancedTableHeader(layer) {
             const permission = getFieldPermission(field, layer);
             
             if (permission !== 'hidden') {
-                const permissionIcon = permission === 'edit' ? 
-                    '<i class="fas fa-edit text-success" title="Editable"></i>' : 
-                    '<i class="fas fa-eye text-info" title="View Only"></i>';
-                
                 const permissionClass = permission === 'edit' ? 'field-editable' : 'field-viewonly';
                 
                 headerHTML += `
                     <th class="${permissionClass}">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <span>${field}</span>
-                            ${permissionIcon}
-                        </div>
+                        <span>${field}</span>
                     </th>
                 `;
             }
