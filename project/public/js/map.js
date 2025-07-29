@@ -1457,25 +1457,39 @@ function populateFieldSelectors(layer) {
         if (currentValue) labelFieldSelect.value = currentValue;
     }
 
-    // Populate graduated field selector
+    // Populate graduated field selector with proper numeric detection
     const graduatedFieldSelect = document.getElementById('propGraduatedField');
     if (graduatedFieldSelect) {
         const currentValue = graduatedFieldSelect.value;
         graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
+        
         fields.forEach(field => {
-            // Try to determine if field is numeric by checking sample values
-            const isNumeric = layer.records.some(record => {
+            // Check if field contains numeric values
+            let numericCount = 0;
+            let totalCount = 0;
+            
+            layer.records.forEach(record => {
                 const value = record.fields[field];
-                return !isNaN(parseFloat(value)) && isFinite(value);
+                if (value !== null && value !== undefined && value !== '') {
+                    totalCount++;
+                    const numValue = parseFloat(value);
+                    if (!isNaN(numValue) && isFinite(numValue)) {
+                        numericCount++;
+                    }
+                }
             });
-
+            
+            // Consider field numeric if at least 80% of values are numeric
+            const isNumeric = totalCount > 0 && (numericCount / totalCount) >= 0.8;
+            
             if (isNumeric) {
                 const option = document.createElement('option');
                 option.value = field;
-                option.textContent = field;
+                option.textContent = `${field} (${numericCount}/${totalCount} numeric)`;
                 graduatedFieldSelect.appendChild(option);
             }
         });
+        
         if (currentValue) graduatedFieldSelect.value = currentValue;
     }
 
@@ -1485,9 +1499,18 @@ function populateFieldSelectors(layer) {
         const currentValue = categorizedFieldSelect.value;
         categorizedFieldSelect.innerHTML = '<option value="">Select field...</option>';
         fields.forEach(field => {
+            // Count unique values for categorization
+            const uniqueValues = new Set();
+            layer.records.forEach(record => {
+                const value = record.fields[field];
+                if (value !== null && value !== undefined && value !== '') {
+                    uniqueValues.add(value);
+                }
+            });
+            
             const option = document.createElement('option');
             option.value = field;
-            option.textContent = field;
+            option.textContent = `${field} (${uniqueValues.size} unique values)`;
             categorizedFieldSelect.appendChild(option);
         });
         if (currentValue) categorizedFieldSelect.value = currentValue;
@@ -2196,7 +2219,13 @@ function switchPropertiesTab(tabName) {
 }
 
 function updateSymbologyType() {
-    const symbologyType = document.getElementById('propSymbologyType').value;
+    const symbologyTypeSelect = document.getElementById('propSymbologyType');
+    if (!symbologyTypeSelect) {
+        console.error('Symbology type selector not found');
+        return;
+    }
+    
+    const symbologyType = symbologyTypeSelect.value;
     const singleControls = document.getElementById('propSingleSymbol');
     const graduatedControls = document.getElementById('propGraduated');
     const categorizedControls = document.getElementById('propCategorized');
@@ -2206,17 +2235,36 @@ function updateSymbologyType() {
     if (graduatedControls) graduatedControls.style.display = 'none';
     if (categorizedControls) categorizedControls.style.display = 'none';
 
-    // Show relevant controls
+    // Show relevant controls based on selection
     switch (symbologyType) {
         case 'single':
-            if (singleControls) singleControls.style.display = 'block';
+            if (singleControls) {
+                singleControls.style.display = 'block';
+                console.log('Showing single symbology controls');
+            }
             break;
         case 'graduated':
-            if (graduatedControls) graduatedControls.style.display = 'block';
+            if (graduatedControls) {
+                graduatedControls.style.display = 'block';
+                console.log('Showing graduated symbology controls');
+                // Populate field selectors when switching to graduated
+                if (window.currentPropertiesLayer) {
+                    populateFieldSelectors(window.currentPropertiesLayer);
+                }
+            }
             break;
         case 'categorized':
-            if (categorizedControls) categorizedControls.style.display = 'block';
+            if (categorizedControls) {
+                categorizedControls.style.display = 'block';
+                console.log('Showing categorized symbology controls');
+                // Populate field selectors when switching to categorized
+                if (window.currentPropertiesLayer) {
+                    populateFieldSelectors(window.currentPropertiesLayer);
+                }
+            }
             break;
+        default:
+            console.warn('Unknown symbology type:', symbologyType);
     }
 }
 
@@ -2271,40 +2319,72 @@ function deselectAllPopupFields() {
 
 function generateGraduatedSymbology() {
     const field = document.getElementById('propGraduatedField').value;
-    const classes = parseInt(document.getElementById('propGraduatedClasses').value);
-    const colorRamp = document.getElementById('propColorRamp').value;
+    const classesInput = document.getElementById('propGraduatedClasses');
+    const colorRampSelect = document.getElementById('propColorRamp');
 
     if (!field || !window.currentPropertiesLayer) {
         showError('Please select a field for graduated symbology');
         return;
     }
 
+    if (!classesInput || !colorRampSelect) {
+        showError('Graduated symbology controls not found');
+        return;
+    }
+
+    const classes = parseInt(classesInput.value) || 5;
+    const colorRamp = colorRampSelect.value || 'blues';
+
     const layer = window.currentPropertiesLayer;
-    const values = layer.records.map(record => parseFloat(record.fields[field])).filter(v => !isNaN(v));
+    
+    // Extract numeric values from the selected field
+    const values = [];
+    layer.records.forEach(record => {
+        const value = record.fields[field];
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && isFinite(numValue)) {
+            values.push(numValue);
+        }
+    });
 
     if (values.length === 0) {
         showError('No numeric values found in the selected field');
         return;
     }
 
-    // Calculate class breaks
+    // Calculate class breaks using equal intervals
     values.sort((a, b) => a - b);
     const min = values[0];
     const max = values[values.length - 1];
+    
+    if (min === max) {
+        showError('All values are the same, cannot create graduated symbology');
+        return;
+    }
+    
     const interval = (max - min) / classes;
-
-    // Generate color ramp
+    const breaks = [];
     const colors = generateColorRamp(colorRamp, classes);
 
-    // Create legend
-    let legendHTML = '<div class="graduated-legend">';
+    // Create legend with proper styling
+    let legendHTML = '<div class="graduated-legend mt-3">';
+    legendHTML += '<h6>Legend Preview</h6>';
+    
     for (let i = 0; i < classes; i++) {
-        const minVal = (min + i * interval).toFixed(2);
-        const maxVal = (min + (i + 1) * interval).toFixed(2);
+        const minVal = min + (i * interval);
+        const maxVal = min + ((i + 1) * interval);
+        breaks.push(maxVal);
+        
         legendHTML += `
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: ${colors[i]}"></div>
-                <span>${minVal} - ${maxVal}</span>
+            <div class="legend-item d-flex align-items-center mb-2">
+                <div class="legend-color me-2" style="
+                    background-color: ${colors[i]}; 
+                    width: 20px; 
+                    height: 20px; 
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                "></div>
+                <span class="small">${minVal.toFixed(2)} - ${maxVal.toFixed(2)}</span>
             </div>
         `;
     }
@@ -2317,16 +2397,22 @@ function generateGraduatedSymbology() {
 
     // Update layer properties
     if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+    
     layer.properties.symbology = {
         type: 'graduated',
         field: field,
         classes: classes,
         colorRamp: colorRamp,
-        breaks: Array.from({length: classes}, (_, i) => min + (i + 1) * interval),
-        colors: colors
+        breaks: breaks,
+        colors: colors,
+        min: min,
+        max: max,
+        interval: interval
     };
 
-    showSuccess('Graduated symbology generated successfully');
+    showSuccess(`Graduated symbology generated with ${classes} classes for field "${field}"`);
+    console.log('Generated graduated symbology:', layer.properties.symbology);
 }
 
 function generateCategorizedSymbology() {
@@ -2338,23 +2424,48 @@ function generateCategorizedSymbology() {
     }
 
     const layer = window.currentPropertiesLayer;
-    const uniqueValues = [...new Set(layer.records.map(record => record.fields[field]).filter(v => v != null))];
+    
+    // Extract unique values with counts
+    const valueCount = new Map();
+    layer.records.forEach(record => {
+        const value = record.fields[field];
+        if (value !== null && value !== undefined && value !== '') {
+            const stringValue = String(value);
+            valueCount.set(stringValue, (valueCount.get(stringValue) || 0) + 1);
+        }
+    });
+
+    const uniqueValues = Array.from(valueCount.keys());
 
     if (uniqueValues.length === 0) {
         showError('No values found in the selected field');
         return;
     }
 
-    // Generate colors
+    if (uniqueValues.length > 20) {
+        showWarning(`Field has ${uniqueValues.length} unique values. Consider using a field with fewer categories for better visualization.`);
+    }
+
+    // Generate colors using a better color palette
     const colors = generateColorPalette(uniqueValues.length);
 
-    // Create legend
-    let legendHTML = '<div class="categorized-legend">';
+    // Create legend with counts and better styling
+    let legendHTML = '<div class="categorized-legend mt-3">';
+    legendHTML += '<h6>Legend Preview</h6>';
+    
     uniqueValues.forEach((value, index) => {
+        const count = valueCount.get(value);
         legendHTML += `
-            <div class="legend-item">
-                <div class="legend-color" style="background-color: ${colors[index]}"></div>
-                <span>${value}</span>
+            <div class="legend-item d-flex align-items-center mb-2">
+                <div class="legend-color me-2" style="
+                    background-color: ${colors[index]}; 
+                    width: 20px; 
+                    height: 20px; 
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                "></div>
+                <span class="small flex-grow-1">${value}</span>
+                <span class="badge bg-secondary ms-2">${count}</span>
             </div>
         `;
     });
@@ -2367,17 +2478,21 @@ function generateCategorizedSymbology() {
 
     // Update layer properties
     if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+    
     layer.properties.symbology = {
         type: 'categorized',
         field: field,
         categories: uniqueValues.map((value, index) => ({
             value: value,
             color: colors[index],
-            label: String(value)
+            label: String(value),
+            count: valueCount.get(value)
         }))
     };
 
-    showSuccess('Categorized symbology generated successfully');
+    showSuccess(`Categorized symbology generated with ${uniqueValues.length} categories for field "${field}"`);
+    console.log('Generated categorized symbology:', layer.properties.symbology);
 }
 
 function generateColorRamp(rampName, count) {
@@ -2576,25 +2691,72 @@ function cancelProperties() {
 }
 
 function applyLayerStyling(layer) {
-    if (!layer.features || !layer.properties) return;
+    if (!layer.features || !layer.properties || !layer.properties.symbology) return;
 
     const symbology = layer.properties.symbology;
 
-    layer.features.forEach(feature => {
-        if (feature.setStyle) {
-            feature.setStyle({
-                fillColor: symbology.fillColor || '#3498db',
-                color: symbology.borderColor || '#2c3e50',
-                weight: symbology.borderWidth || 2,
-                fillOpacity: symbology.fillOpacity || 0.7
-            });
+    layer.features.forEach((feature, index) => {
+        if (!feature.setStyle) return;
+
+        let style = {
+            weight: symbology.borderWidth || 2,
+            fillOpacity: symbology.fillOpacity || 0.7
+        };
+
+        // Apply styling based on symbology type
+        switch (symbology.type) {
+            case 'single':
+                style.fillColor = symbology.fillColor || '#3498db';
+                style.color = symbology.borderColor || '#2c3e50';
+                break;
+
+            case 'graduated':
+                const featureValue = parseFloat(feature.recordData[symbology.field]);
+                if (!isNaN(featureValue)) {
+                    // Find which class the value belongs to
+                    let classIndex = 0;
+                    for (let i = 0; i < symbology.breaks.length; i++) {
+                        if (featureValue <= symbology.breaks[i]) {
+                            classIndex = i;
+                            break;
+                        }
+                    }
+                    style.fillColor = symbology.colors[classIndex] || '#3498db';
+                    style.color = symbology.borderColor || '#2c3e50';
+                } else {
+                    // Use default color for non-numeric values
+                    style.fillColor = '#cccccc';
+                    style.color = '#999999';
+                }
+                break;
+
+            case 'categorized':
+                const featureCategory = String(feature.recordData[symbology.field]);
+                const category = symbology.categories.find(cat => String(cat.value) === featureCategory);
+                if (category) {
+                    style.fillColor = category.color;
+                    style.color = symbology.borderColor || '#2c3e50';
+                } else {
+                    // Use default color for uncategorized values
+                    style.fillColor = '#cccccc';
+                    style.color = '#999999';
+                }
+                break;
+
+            default:
+                style.fillColor = symbology.fillColor || '#3498db';
+                style.color = symbology.borderColor || '#2c3e50';
         }
+
+        feature.setStyle(style);
     });
 
     // Apply labels if enabled
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
     }
+
+    console.log(`Applied ${symbology.type} symbology to layer "${layer.name}"`);
 }
 
 function applyLabelsToLayer(layer) {
