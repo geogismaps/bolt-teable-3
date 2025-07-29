@@ -602,60 +602,20 @@ body {
     opacity: 0.8;
 }
 
-/* Enhanced label styles for better visibility */
-.enhanced-polygon-label-marker,
-.enhanced-point-label-marker {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    z-index: 1500 !important;
-}
-
-.enhanced-polygon-label,
-.enhanced-point-label {
-    user-select: none;
-    cursor: default;
-    display: inline-block;
-    transition: all 0.3s ease;
-    letter-spacing: 0.5px;
-}
-
-.enhanced-polygon-label-marker:before,
-.enhanced-polygon-label-marker:after,
-.enhanced-point-label-marker:before,
-.enhanced-point-label-marker:after {
-    display: none !important;
-}
-
-/* Zoom-responsive label sizing */
+/* Responsive label sizing */
 @media (max-width: 768px) {
-    .polygon-label, .point-label,
-    .enhanced-polygon-label, .enhanced-point-label {
-        font-size: 11px !important;
-        padding: 2px 4px !important;
-        max-width: 70px !important;
+    .polygon-label, .point-label {
+        font-size: 10px !important;
+        padding: 1px 3px !important;
+        max-width: 60px !important;
     }
 }
 
 @media (max-width: 576px) {
-    .polygon-label, .point-label,
-    .enhanced-polygon-label, .enhanced-point-label {
-        font-size: 10px !important;
-        max-width: 60px !important;
-        padding: 1px 3px !important;
+    .polygon-label, .point-label {
+        font-size: 9px !important;
+        max-width: 50px !important;
     }
-}
-
-/* High zoom level optimizations */
-.leaflet-zoom-animated .enhanced-polygon-label,
-.leaflet-zoom-animated .enhanced-point-label {
-    transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-/* Better contrast for labels */
-.enhanced-polygon-label,
-.enhanced-point-label {
-    filter: drop-shadow(0 0 3px rgba(255,255,255,0.8));
 }
 
 /* Fullscreen Map Styles */

@@ -1727,9 +1727,9 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     window.currentPopupFeature = feature;
 
     const defaultOptions = {
-        padding: 0.1,
-        maxZoom: 22,
-        minZoom: 16
+        padding: 0.3,
+        maxZoom: 18,
+        minZoom: 10
     };
 
     const zoomOptions = { ...defaultOptions, ...options };
@@ -1737,36 +1737,13 @@ function zoomToFeature(layerId, featureIndex, options = null) {
     if (feature.getBounds) {
         // Polygon or complex geometry
         const bounds = feature.getBounds();
-        const center = bounds.getCenter();
-        
-        // Calculate optimal zoom based on feature size
-        const boundsSize = Math.max(
-            bounds.getNorth() - bounds.getSouth(),
-            bounds.getEast() - bounds.getWest()
-        );
-        
-        let targetZoom;
-        if (boundsSize < 0.0001) {
-            targetZoom = 22; // Very small features
-        } else if (boundsSize < 0.001) {
-            targetZoom = 20; // Small features
-        } else if (boundsSize < 0.01) {
-            targetZoom = 18; // Medium features
-        } else {
-            targetZoom = 16; // Larger features
-        }
-        
-        // Use the higher of calculated zoom or minimum zoom
-        targetZoom = Math.max(targetZoom, zoomOptions.minZoom);
-        targetZoom = Math.min(targetZoom, zoomOptions.maxZoom);
-        
-        map.setView(center, targetZoom, { animate: true, duration: 0.8 });
-        
+        map.fitBounds(bounds.pad(zoomOptions.padding), {
+            maxZoom: zoomOptions.maxZoom
+        });
     } else if (feature.getLatLng) {
-        // Point geometry - zoom in close for better label visibility
+        // Point geometry
         const latlng = feature.getLatLng();
-        const targetZoom = Math.max(20, map.getZoom());
-        map.setView(latlng, targetZoom, { animate: true, duration: 0.8 });
+        map.setView(latlng, Math.max(zoomOptions.minZoom, map.getZoom()));
     }
 
     // Open popup if feature has one
@@ -1774,7 +1751,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
         feature.openPopup();
     }
 
-    showSuccess('Zoomed to feature with enhanced view');
+    showSuccess('Zoomed to feature');
 }
 
 function showFeatureInfo(layerId, featureIndex) {
@@ -2799,49 +2776,47 @@ function applyLabelsToLayer(layer) {
         if (!record || !record.fields[labels.field]) return;
 
         const labelText = String(record.fields[labels.field]);
-        const fontSize = Math.max(labels.fontSize || 12, 12); // Minimum font size of 12px
+        const fontSize = labels.fontSize || 12;
         const color = labels.color || '#2c3e50';
         const background = labels.background !== false;
 
-        // Enhanced label styling for better visibility at higher zoom levels
-        const labelStyle = `
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: ${fontSize}px;
-            color: ${color};
-            font-weight: 700;
-            text-align: center;
-            white-space: nowrap;
-            pointer-events: none;
-            line-height: 1.3;
-            position: absolute;
-            z-index: 1500;
-            min-width: 30px;
-            ${background ? `
-                background: rgba(255, 255, 255, 0.95);
-                padding: 3px 8px;
-                border-radius: 6px;
-                border: 2px solid ${color};
-                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            ` : `
-                text-shadow: 
-                    -2px -2px 0px rgba(255,255,255,0.9),
-                    2px -2px 0px rgba(255,255,255,0.9),
-                    -2px 2px 0px rgba(255,255,255,0.9),
-                    2px 2px 0px rgba(255,255,255,0.9),
-                    0px 0px 4px rgba(0,0,0,0.9),
-                    0px 0px 8px rgba(255,255,255,0.8);
-            `}
-        `;
-
-        // For polygons, use enhanced positioning
+        // For polygons, use tooltip approach for better integration
         if (feature.getBounds) {
+            // Calculate the visual center of the polygon for better label placement
             const bounds = feature.getBounds();
             const center = bounds.getCenter();
             
+            // Create a transparent marker at the center for label positioning
             const labelMarker = L.marker(center, {
                 icon: L.divIcon({
-                    className: 'enhanced-polygon-label-marker',
-                    html: `<div class="enhanced-polygon-label" style="${labelStyle}transform: translate(-50%, -50%);">${truncateText(labelText, 8)}</div>`,
+                    className: 'polygon-label-marker',
+                    html: `<div class="polygon-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -50%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
                     iconSize: [0, 0],
                     iconAnchor: [0, 0]
                 }),
@@ -2851,13 +2826,39 @@ function applyLabelsToLayer(layer) {
             labelElements.push(labelMarker);
 
         } else if (feature.getLatLng) {
-            // For point features with enhanced positioning
+            // For point features, use the existing approach but improved
             const labelPosition = feature.getLatLng();
             
             const labelMarker = L.marker(labelPosition, {
                 icon: L.divIcon({
-                    className: 'enhanced-point-label-marker',
-                    html: `<div class="enhanced-point-label" style="${labelStyle}transform: translate(-50%, -250%);">${truncateText(labelText, 8)}</div>`,
+                    className: 'point-label-marker',
+                    html: `<div class="point-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -200%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
                     iconSize: [0, 0],
                     iconAnchor: [0, 0]
                 }),
@@ -4098,23 +4099,12 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
     if (!window.currentPopupFeature) return;
 
     const options = {
-        close: { padding: 0.05, maxZoom: 22, minZoom: 20 },
-        medium: { padding: 0.1, maxZoom: 18, minZoom: 16 },
-        far: { padding: 0.2, maxZoom: 16, minZoom: 14 }
+        close: { padding: 0.8, maxZoom: 20, minZoom: 16 },
+        medium: { padding: 0.4, maxZoom: 16, minZoom: 12 },
+        far: { padding: 0.2, maxZoom: 12, minZoom: 8 }
     };
 
-    const selectedOptions = options[zoomType] || options.close;
-    
-    if (window.currentPopupFeature.getBounds) {
-        const bounds = window.currentPopupFeature.getBounds();
-        const center = bounds.getCenter();
-        map.setView(center, selectedOptions.maxZoom, { animate: true, duration: 0.8 });
-    } else if (window.currentPopupFeature.getLatLng) {
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.setView(latlng, selectedOptions.maxZoom, { animate: true, duration: 0.8 });
-    }
-    
-    showSuccess(`Zoomed to ${zoomType} view`);
+    zoomToFeature(window.currentPopupFeature, options[zoomType] || options.close);
 };
 
 window.centerCurrentPopupFeature = function() {
