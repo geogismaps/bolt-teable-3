@@ -50,12 +50,16 @@ async function initializeMap() {
             window.teableAPI.init(window.teableAuth.clientConfig);
         }
 
-        // Initialize Leaflet map
-        map = L.map('map').setView([20.5937, 78.9629], 5);
+        // Initialize Leaflet map with maximum zoom level 25
+        map = L.map('map', {
+            maxZoom: 25,
+            zoomControl: true
+        }).setView([20.5937, 78.9629], 5);
 
-        // Add default base layer
+        // Add default base layer with maximum zoom level 25
         L.tileLayer(baseMaps.openstreetmap.url, {
-            attribution: baseMaps.openstreetmap.attribution
+            attribution: baseMaps.openstreetmap.attribution,
+            maxZoom: 25
         }).addTo(map);
 
         // Initialize measurement group
@@ -1037,19 +1041,19 @@ function zoomToLayerBounds(layer) {
     let maxZoom, padding;
     
     if (boundsSize < 50) { // Very small layer (< 50 meters)
-        maxZoom = 22;
+        maxZoom = 25;
         padding = 0.4;
     } else if (boundsSize < 500) { // Small layer (< 500 meters)
-        maxZoom = 20;
+        maxZoom = 25;
         padding = 0.3;
     } else if (boundsSize < 5000) { // Medium layer (< 5 km)
-        maxZoom = 18;
+        maxZoom = 23;
         padding = 0.2;
     } else if (boundsSize < 50000) { // Large layer (< 50 km)
-        maxZoom = 16;
+        maxZoom = 21;
         padding = 0.1;
     } else { // Very large layer
-        maxZoom = 14;
+        maxZoom = 19;
         padding = 0.05;
     }
     
@@ -1824,7 +1828,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
 
     const defaultOptions = {
         padding: 0.05,
-        maxZoom: 22, // Maximum possible zoom level
+        maxZoom: 25, // Maximum possible zoom level
         minZoom: 10,
         animate: true,
         duration: 1
@@ -1850,37 +1854,37 @@ function zoomToFeature(layerId, featureIndex, options = null) {
             let padding;
             
             if (boundsSize < 1) { // Extremely small features (< 1 meter)
-                targetZoom = 22; // Maximum zoom
+                targetZoom = 25; // Maximum zoom
                 padding = 0.5;   // More padding for very small features
             } else if (boundsSize < 5) { // Very small features (< 5 meters)
-                targetZoom = 22;
+                targetZoom = 25;
                 padding = 0.4;
             } else if (boundsSize < 10) { // Small features (< 10 meters)
-                targetZoom = 21;
+                targetZoom = 25;
                 padding = 0.3;
             } else if (boundsSize < 25) { // Small features (< 25 meters)
-                targetZoom = 20;
+                targetZoom = 24;
                 padding = 0.25;
             } else if (boundsSize < 50) { // Medium-small features (< 50 meters)
-                targetZoom = 19;
+                targetZoom = 23;
                 padding = 0.2;
             } else if (boundsSize < 100) { // Medium features (< 100 meters)
-                targetZoom = 18;
+                targetZoom = 22;
                 padding = 0.15;
             } else if (boundsSize < 500) { // Medium-large features (< 500 meters)
-                targetZoom = 17;
+                targetZoom = 21;
                 padding = 0.1;
             } else if (boundsSize < 1000) { // Large features (< 1 km)
-                targetZoom = 16;
+                targetZoom = 20;
                 padding = 0.08;
             } else if (boundsSize < 5000) { // Very large features (< 5 km)
-                targetZoom = 15;
+                targetZoom = 19;
                 padding = 0.06;
             } else if (boundsSize < 10000) { // Huge features (< 10 km)
-                targetZoom = 14;
+                targetZoom = 18;
                 padding = 0.05;
             } else { // Massive features
-                targetZoom = 13;
+                targetZoom = 17;
                 padding = 0.03;
             }
             
@@ -1901,7 +1905,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
             }
             
             // For points, use maximum zoom level for ultimate detail
-            const targetZoom = 22; // Maximum possible zoom
+            const targetZoom = 25; // Maximum possible zoom
             map.setView(latlng, targetZoom, {
                 animate: zoomOptions.animate,
                 duration: zoomOptions.duration
@@ -1929,7 +1933,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
         const sizeText = feature.getBounds ? 
             (boundsSize < 1000 ? Math.round(boundsSize) + 'm' : (boundsSize / 1000).toFixed(1) + 'km') : 
             'point';
-        showSuccess(`Zoomed to feature with maximum detail (size: ${sizeText}, zoom: ${feature.getBounds ? targetZoom : 22})`);
+        showSuccess(`Zoomed to feature with maximum detail (size: ${sizeText}, zoom: ${feature.getBounds ? targetZoom : 25})`);
         
     } catch (error) {
         console.error('Error zooming to feature:', error);
@@ -2067,11 +2071,12 @@ function changeBasemap() {
         }
     });
 
-    // Add new base layer
+    // Add new base layer with maximum zoom level 25
     const basemap = baseMaps[basemapType];
     if (basemap) {
         L.tileLayer(basemap.url, {
-            attribution: basemap.attribution
+            attribution: basemap.attribution,
+            maxZoom: 25
         }).addTo(map);
     }
 }
@@ -4303,37 +4308,37 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
                 case 'close':
                     // Maximum zoom configuration for closest view
                     if (boundsSize < 1) {
-                        zoomConfig = { padding: 0.5, maxZoom: 22 };
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
                     } else if (boundsSize < 10) {
-                        zoomConfig = { padding: 0.4, maxZoom: 22 };
+                        zoomConfig = { padding: 0.4, maxZoom: 25 };
                     } else if (boundsSize < 50) {
-                        zoomConfig = { padding: 0.3, maxZoom: 21 };
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
                     } else if (boundsSize < 100) {
-                        zoomConfig = { padding: 0.2, maxZoom: 20 };
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
                     } else {
-                        zoomConfig = { padding: 0.15, maxZoom: 19 };
+                        zoomConfig = { padding: 0.15, maxZoom: 22 };
                     }
                     break;
                 case 'medium':
                     zoomConfig = { 
                         padding: 0.3, 
-                        maxZoom: Math.max(16, Math.min(18, 22 - Math.floor(Math.log10(boundsSize + 1))))
+                        maxZoom: Math.max(18, Math.min(22, 25 - Math.floor(Math.log10(boundsSize + 1))))
                     };
                     break;
                 case 'far':
                     zoomConfig = { 
                         padding: 0.5, 
-                        maxZoom: Math.max(12, Math.min(16, 20 - Math.floor(Math.log10(boundsSize + 1))))
+                        maxZoom: Math.max(15, Math.min(20, 23 - Math.floor(Math.log10(boundsSize + 1))))
                     };
                     break;
                 default:
                     // Default to close view for maximum detail
                     if (boundsSize < 1) {
-                        zoomConfig = { padding: 0.5, maxZoom: 22 };
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
                     } else if (boundsSize < 25) {
-                        zoomConfig = { padding: 0.3, maxZoom: 21 };
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
                     } else {
-                        zoomConfig = { padding: 0.2, maxZoom: 20 };
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
                     }
             }
             
@@ -4355,16 +4360,16 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
             let targetZoom;
             switch (zoomType) {
                 case 'close':
-                    targetZoom = 22; // Maximum possible zoom
+                    targetZoom = 25; // Maximum possible zoom
                     break;
                 case 'medium':
-                    targetZoom = 19;
+                    targetZoom = 22;
                     break;
                 case 'far':
-                    targetZoom = 16;
+                    targetZoom = 19;
                     break;
                 default:
-                    targetZoom = 22; // Default to maximum zoom
+                    targetZoom = 25; // Default to maximum zoom
             }
             
             map.setView(latlng, targetZoom, {
@@ -4442,16 +4447,16 @@ window.zoomToAllLayers = function() {
     let padding, maxZoom;
     if (maxSpan < 0.001) { // Very small area
         padding = 0.5;
-        maxZoom = 22;
+        maxZoom = 25;
     } else if (maxSpan < 0.01) { // Small area
         padding = 0.3;
-        maxZoom = 20;
+        maxZoom = 23;
     } else if (maxSpan < 0.1) { // Medium area
         padding = 0.15;
-        maxZoom = 18;
+        maxZoom = 21;
     } else { // Large area
         padding = 0.05;
-        maxZoom = 16;
+        maxZoom = 19;
     }
 
     map.fitBounds(bounds.pad(padding), { 
