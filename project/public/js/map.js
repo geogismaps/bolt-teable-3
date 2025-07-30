@@ -1765,13 +1765,15 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
         }
     }
 
-    // Update selection count
+    // Update selection count and info
     updateSelectionCount();
+    updateSelectionInfo();
 }
 
 function updateSelectionCount() {
     const countElement = document.getElementById('selectedCount');
     const zoomButton = document.getElementById('zoomToSelectionBtn');
+    const deleteButton = document.getElementById('deleteSelectedBtn');
 
     if (countElement) {
         countElement.textContent = selectedFeatures.length;
@@ -1779,6 +1781,51 @@ function updateSelectionCount() {
 
     if (zoomButton) {
         zoomButton.disabled = selectedFeatures.length === 0;
+    }
+    
+    if (deleteButton) {
+        deleteButton.disabled = selectedFeatures.length === 0;
+    }
+    
+    // Update selection info text
+    updateSelectionInfo();
+}
+
+function updateSelectionInfo() {
+    const selectedCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector:checked');
+    const selectedCount = selectedCheckboxes.length;
+    const totalFeatures = document.querySelectorAll('#dockedAttributeTable tbody tr').length;
+    
+    // Update selection counter in the toolbar
+    const selectionInfo = document.querySelector('.docked-table-toolbar .text-muted div');
+    if (selectionInfo) {
+        if (selectedCount === 0) {
+            selectionInfo.innerHTML = `<span id="selectedCount">0</span> of ${totalFeatures} features selected`;
+        } else {
+            selectionInfo.innerHTML = `<span id="selectedCount">${selectedCount}</span> of ${totalFeatures} features selected`;
+        }
+    }
+    
+    // Enable/disable action buttons based on selection
+    const deleteBtn = document.getElementById('deleteSelectedBtn');
+    const zoomBtn = document.getElementById('zoomToSelectionBtn');
+    
+    if (deleteBtn) {
+        deleteBtn.disabled = selectedCount === 0;
+        if (selectedCount > 0) {
+            deleteBtn.title = `Delete ${selectedCount} selected record(s)`;
+        } else {
+            deleteBtn.title = 'Select records to delete';
+        }
+    }
+    
+    if (zoomBtn) {
+        zoomBtn.disabled = selectedCount === 0;
+        if (selectedCount > 0) {
+            zoomBtn.title = `Zoom to ${selectedCount} selected feature(s)`;
+        } else {
+            zoomBtn.title = 'Select features to zoom to';
+        }
     }
 }
 
@@ -3791,59 +3838,194 @@ async function deleteSelectedRecords(layerId) {
         return;
     }
     
-    if (!confirm(`Are you sure you want to delete ${selectedCheckboxes.length} selected record(s)? This action cannot be undone.`)) {
-        return;
-    }
-    
     const layer = mapLayers.find(l => l.id === layerId);
     if (!layer) {
         showError('Layer not found');
         return;
     }
     
-    try {
-        const recordsToDelete = [];
-        selectedCheckboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            const recordId = row.getAttribute('data-record-id');
-            recordsToDelete.push(recordId);
-        });
+    const recordsToDelete = [];
+    const featuresToDelete = [];
+    
+    // Collect records and their corresponding features
+    selectedCheckboxes.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        const recordId = row.getAttribute('data-record-id');
+        const featureIndex = parseInt(row.getAttribute('data-feature-index'));
         
-        // Delete from Teable.io
-        for (const recordId of recordsToDelete) {
-            await window.teableAPI.deleteRecord(layer.tableId, recordId);
+        if (recordId) {
+            recordsToDelete.push(recordId);
+            
+            // Find corresponding feature
+            const feature = layer.features.find(f => f.recordId === recordId);
+            if (feature) {
+                featuresToDelete.push(feature);
+            }
+        }
+    });
+    
+    // Enhanced confirmation dialog with detailed information
+    const confirmationMessage = `🗑️ DELETE CONFIRMATION
+    
+You are about to permanently delete:
+• ${recordsToDelete.length} record(s) from the attribute table
+• ${featuresToDelete.length} geometry feature(s) from the map
+• All associated data from Teable.io table "${layer.name}"
+
+⚠️ THIS ACTION CANNOT BE UNDONE ⚠️
+
+Are you sure you want to proceed with the deletion?`;
+    
+    // Show enhanced confirmation dialog
+    const confirmed = confirm(confirmationMessage);
+    if (!confirmed) {
+        showInfo('Deletion cancelled by user');
+        return;
+    }
+    
+    try {
+        // Show progress indicator
+        showInfo(`🔄 Deleting ${recordsToDelete.length} selected record(s)...`);
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const failedRecords = [];
+        
+        // Delete records from Teable.io one by one with progress tracking
+        for (let i = 0; i < recordsToDelete.length; i++) {
+            const recordId = recordsToDelete[i];
+            
+            try {
+                console.log(`🗑️ Deleting record ${i + 1}/${recordsToDelete.length}: ${recordId}`);
+                await window.teableAPI.deleteRecord(layer.tableId, recordId);
+                successCount++;
+                
+                // Update progress
+                if (recordsToDelete.length > 5) {
+                    showInfo(`⏳ Deleting... ${successCount}/${recordsToDelete.length} completed`);
+                }
+                
+            } catch (deleteError) {
+                console.error(`❌ Failed to delete record ${recordId}:`, deleteError);
+                errorCount++;
+                failedRecords.push(recordId);
+            }
         }
         
-        // Remove from local data
-        layer.records = layer.records.filter(r => !recordsToDelete.includes(r.id));
-        layer.featureCount -= recordsToDelete.length;
+        // Remove successfully deleted records from local data
+        const successfullyDeleted = recordsToDelete.filter(id => !failedRecords.includes(id));
         
-        // Remove features from map
-        layer.features = layer.features.filter((feature, index) => {
-            if (recordsToDelete.includes(feature.recordId)) {
-                if (layer.leafletLayer.hasLayer(feature)) {
-                    layer.leafletLayer.removeLayer(feature);
+        if (successfullyDeleted.length > 0) {
+            // Update layer records
+            layer.records = layer.records.filter(r => !successfullyDeleted.includes(r.id));
+            layer.featureCount = Math.max(0, layer.featureCount - successfullyDeleted.length);
+            
+            // Remove features from map and clear from selectedFeatures
+            layer.features = layer.features.filter((feature, index) => {
+                if (successfullyDeleted.includes(feature.recordId)) {
+                    // Remove from map display
+                    if (layer.leafletLayer && layer.leafletLayer.hasLayer(feature)) {
+                        layer.leafletLayer.removeLayer(feature);
+                    }
+                    
+                    // Remove from global selectedFeatures array
+                    const selectedIndex = selectedFeatures.indexOf(feature);
+                    if (selectedIndex !== -1) {
+                        selectedFeatures.splice(selectedIndex, 1);
+                    }
+                    
+                    // Remove feature popup if open
+                    if (feature.getPopup && feature.getPopup() && map.hasLayer(feature.getPopup())) {
+                        map.closePopup(feature.getPopup());
+                    }
+                    
+                    console.log(`✅ Removed feature from map for record: ${feature.recordId}`);
+                    return false; // Remove from features array
                 }
-                return false;
-            }
-            return true;
+                return true; // Keep in features array
+            });
+            
+            // Update feature indices for remaining features
+            layer.features.forEach((feature, newIndex) => {
+                feature.featureIndex = newIndex;
+            });
+        }
+        
+        // Clear all row selections in the attribute table
+        const allCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
+        allCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
         });
         
-        // Clear selection
-        selectedFeatures = [];
+        // Clear master checkbox
+        const masterCheckbox = document.querySelector('#dockedAttributeTable thead .row-selector input[type="checkbox"]');
+        if (masterCheckbox) {
+            masterCheckbox.checked = false;
+        }
         
-        // Refresh the attribute table
+        // Refresh the attribute table to reflect changes
         await refreshAttributeTable(layerId);
         
-        // Update layer list and statistics
+        // Update UI components
         updateLayersList();
         updateMapStatistics();
+        updateSelectionCount();
         
-        showSuccess(`${recordsToDelete.length} record(s) deleted successfully!`);
+        // Enable/disable buttons based on new selection state
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        if (deleteBtn) {
+            deleteBtn.disabled = true;
+        }
+        
+        const zoomToSelectionBtn = document.getElementById('zoomToSelectionBtn');
+        if (zoomToSelectionBtn) {
+            zoomToSelectionBtn.disabled = true;
+        }
+        
+        // Show final result message
+        if (errorCount === 0) {
+            showSuccess(`✅ Successfully deleted ${successCount} record(s) and their geometry features!
+            
+🗺️ Map updated: ${successCount} feature(s) removed
+📊 Teable.io updated: All records permanently deleted
+📈 Layer statistics refreshed`);
+        } else if (successCount > 0) {
+            showWarning(`⚠️ Deletion completed with some issues:
+            
+✅ Successfully deleted: ${successCount} record(s)
+❌ Failed to delete: ${errorCount} record(s)
+            
+The successfully deleted features have been removed from both the map and Teable.io.
+Failed deletions: ${failedRecords.join(', ')}`);
+        } else {
+            showError(`❌ Failed to delete any of the selected ${recordsToDelete.length} record(s).
+            
+Please check your connection and permissions, then try again.`);
+        }
+        
+        // Log the deletion activity
+        try {
+            const currentUser = window.teableAuth?.getCurrentSession();
+            if (currentUser && window.teableAPI?.logActivity) {
+                await window.teableAPI.logActivity(
+                    currentUser.email,
+                    'records_deleted',
+                    `Bulk deleted ${successCount} records from layer "${layer.name}"`
+                );
+            }
+        } catch (logError) {
+            console.log('Failed to log deletion activity:', logError.message);
+        }
         
     } catch (error) {
-        console.error('Error deleting selected records:', error);
-        showError('Failed to delete selected records: ' + error.message);
+        console.error('Error in bulk delete operation:', error);
+        showError(`Failed to delete selected records: ${error.message}
+        
+Please try the following:
+1. Check your internet connection
+2. Verify you have delete permissions
+3. Try deleting fewer records at once
+4. Contact your administrator if the problem persists`);
     }
 }
 
