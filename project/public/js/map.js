@@ -3660,27 +3660,109 @@ async function addNewRecord(layerId) {
     }
     
     try {
-        // Get editable fields
-        const fields = Object.keys(layer.records[0].fields || {}).filter(field => 
-            field !== layer.geometryField && 
+        // Get all fields from layer (not just first record)
+        let allFields = [];
+        if (layer.records && layer.records.length > 0) {
+            // Get all unique field names from all records
+            const fieldSet = new Set();
+            layer.records.forEach(record => {
+                if (record.fields) {
+                    Object.keys(record.fields).forEach(field => {
+                        if (field !== layer.geometryField) {
+                            fieldSet.add(field);
+                        }
+                    });
+                }
+            });
+            allFields = Array.from(fieldSet);
+        } else {
+            // If no records exist, get fields from table schema
+            try {
+                const tableFields = await window.teableAPI.getTableFields(layer.tableId);
+                allFields = tableFields.map(field => field.name).filter(name => name !== layer.geometryField);
+            } catch (error) {
+                console.warn('Could not get table fields:', error);
+                allFields = [];
+            }
+        }
+        
+        // Filter to only editable fields
+        const editableFields = allFields.filter(field => 
             getFieldPermission(field, layer) === 'edit'
         );
         
-        if (fields.length === 0) {
-            showError('No editable fields available');
-            return;
+        if (editableFields.length === 0) {
+            showWarning('No editable fields available. You can still create a record, but it will only contain default values.');
+            // Still allow creation with empty record
         }
         
         // Show modal for new record
-        showNewRecordModal(layer, fields);
+        showNewRecordModal(layer, editableFields);
         
     } catch (error) {
-        console.error('Error adding new record:', error);
-        showError('Failed to add new record: ' + error.message);
+        console.error('Error preparing new record:', error);
+        showError('Failed to prepare new record: ' + error.message);
     }
 }
 
 function showNewRecordModal(layer, editableFields) {
+    // Get field types for better input controls
+    const getInputType = (fieldName) => {
+        if (layer.records && layer.records.length > 0) {
+            // Analyze existing data to determine field type
+            for (const record of layer.records) {
+                const value = record.fields[fieldName];
+                if (value !== null && value !== undefined && value !== '') {
+                    if (typeof value === 'number') {
+                        return 'number';
+                    } else if (typeof value === 'boolean') {
+                        return 'checkbox';
+                    } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+                        return 'date';
+                    }
+                }
+            }
+        }
+        return 'text';
+    };
+
+    const createFieldInput = (field) => {
+        const inputType = getInputType(field);
+        let inputHTML = '';
+        
+        switch (inputType) {
+            case 'number':
+                inputHTML = `<input type="number" step="any" class="form-control" name="${field}" placeholder="Enter ${field}">`;
+                break;
+            case 'checkbox':
+                inputHTML = `
+                    <select class="form-control" name="${field}">
+                        <option value="">Select...</option>
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                `;
+                break;
+            case 'date':
+                inputHTML = `<input type="date" class="form-control" name="${field}" placeholder="Enter ${field}">`;
+                break;
+            default:
+                inputHTML = `<input type="text" class="form-control" name="${field}" placeholder="Enter ${field}">`;
+        }
+        
+        return `
+            <div class="col-md-6 mb-3">
+                <label class="form-label">
+                    ${field}
+                    <span class="badge bg-success ms-1">Editable</span>
+                    <small class="text-muted">(${inputType})</small>
+                </label>
+                ${inputHTML}
+                <div class="invalid-feedback"></div>
+            </div>
+        `;
+    };
+
     const modalHTML = `
         <div class="modal fade" id="newRecordModal" tabindex="-1">
             <div class="modal-dialog modal-lg">
@@ -3694,25 +3776,25 @@ function showNewRecordModal(layer, editableFields) {
                     <div class="modal-body">
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            This will create a new record in the Teable.io table. Only editable fields are shown.
+                            This will create a new record in the Teable.io table "${layer.name}". 
+                            ${editableFields.length > 0 ? `${editableFields.length} editable fields available.` : 'No specific fields configured - record will be created with default values.'}
                         </div>
-                        <form id="newRecordForm">
-                            <div class="row">
-                                ${editableFields.map(field => `
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">
-                                            ${field}
-                                            <span class="badge bg-success ms-1">Editable</span>
-                                        </label>
-                                        <input type="text" class="form-control" name="${field}" placeholder="Enter ${field}">
-                                    </div>
-                                `).join('')}
-                            </div>
+                        <form id="newRecordForm" novalidate>
+                            ${editableFields.length > 0 ? `
+                                <div class="row">
+                                    ${editableFields.map(field => createFieldInput(field)).join('')}
+                                </div>
+                            ` : `
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    No editable fields configured. A basic record will be created.
+                                </div>
+                            `}
                         </form>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-success" onclick="saveNewRecord('${layer.id}')">
+                        <button type="button" class="btn btn-success" onclick="saveNewRecord('${layer.id}')" id="saveNewRecordBtn">
                             <i class="fas fa-save me-1"></i>Save Record
                         </button>
                     </div>
@@ -3733,6 +3815,23 @@ function showNewRecordModal(layer, editableFields) {
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('newRecordModal'));
     modal.show();
+    
+    // Add form validation
+    const form = document.getElementById('newRecordForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveNewRecord(layer.id);
+        });
+        
+        // Add real-time validation
+        const inputs = form.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('blur', function() {
+                validateField(this);
+            });
+        });
+    }
 }
 
 async function saveNewRecord(layerId) {
@@ -3742,40 +3841,207 @@ async function saveNewRecord(layerId) {
         return;
     }
     
+    const saveBtn = document.getElementById('saveNewRecordBtn');
+    const originalText = saveBtn ? saveBtn.innerHTML : '';
+    
     try {
-        // Get form data
+        // Show saving state
+        if (saveBtn) {
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+            saveBtn.disabled = true;
+        }
+        
+        // Get and validate form data
         const form = document.getElementById('newRecordForm');
+        if (!form) {
+            throw new Error('Form not found');
+        }
+        
+        // Validate form first
+        if (!validateNewRecordForm(form)) {
+            throw new Error('Please fix the validation errors before saving');
+        }
+        
         const formData = new FormData(form);
         const recordData = {};
         
+        // Process form data with proper type conversion
         for (const [key, value] of formData.entries()) {
-            recordData[key] = value;
+            if (value !== '' && value !== null && value !== undefined) {
+                // Convert value based on field type
+                const fieldType = detectFieldType(layer, key, value);
+                try {
+                    recordData[key] = convertValueByType(value, fieldType);
+                } catch (conversionError) {
+                    throw new Error(`Invalid ${fieldType} value for field "${key}": ${value}`);
+                }
+            } else {
+                // Leave empty fields as null
+                recordData[key] = null;
+            }
         }
         
-        // Add geometry field if it exists (empty for now)
-        if (layer.geometryField) {
+        // Add geometry field as empty if it exists
+        if (layer.geometryField && !recordData.hasOwnProperty(layer.geometryField)) {
             recordData[layer.geometryField] = '';
         }
+        
+        console.log('Creating new record with data:', recordData);
         
         // Create record in Teable.io
         const newRecord = await window.teableAPI.createRecord(layer.tableId, recordData);
         
+        console.log('Successfully created record:', newRecord);
+        
         // Add to local layer data
-        layer.records.push(newRecord);
-        layer.featureCount++;
-        
-        // Refresh the attribute table
-        await refreshAttributeTable(layerId);
-        
-        // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('newRecordModal'));
-        modal.hide();
-        
-        showSuccess('New record added successfully!');
+        if (newRecord) {
+            layer.records.push(newRecord);
+            layer.featureCount = layer.records.length;
+            
+            // Update layer bounds if needed
+            updateLayerBounds(layer);
+            
+            // Refresh the attribute table to show the new record
+            await refreshAttributeTable(layerId);
+            
+            // Update layer statistics
+            updateLayersList();
+            updateMapStatistics();
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newRecordModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            showSuccess(`✅ New record added successfully to "${layer.name}"!
+            
+📊 Record created in Teable.io table
+📋 Attribute table updated
+📈 Layer statistics refreshed`);
+            
+            // Log the activity
+            try {
+                const currentUser = window.teableAuth?.getCurrentSession();
+                if (currentUser && window.teableAPI?.logActivity) {
+                    await window.teableAPI.logActivity(
+                        currentUser.email,
+                        'record_created',
+                        `Created new record in layer "${layer.name}"`
+                    );
+                }
+            } catch (logError) {
+                console.log('Failed to log activity:', logError.message);
+            }
+        } else {
+            throw new Error('Record creation returned empty result');
+        }
         
     } catch (error) {
         console.error('Error saving new record:', error);
-        showError('Failed to save new record: ' + error.message);
+        
+        // Show detailed error message
+        let errorMessage = 'Failed to save new record: ' + error.message;
+        
+        if (error.message.includes('400')) {
+            errorMessage += '\n\nThis usually means there\'s a validation error. Please check:';
+            errorMessage += '\n• All required fields are filled';
+            errorMessage += '\n• Data types match field requirements';
+            errorMessage += '\n• Field values are within acceptable ranges';
+        }
+        
+        showError(errorMessage);
+        
+        // Restore button state
+        if (saveBtn) {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        }
+    }
+}
+
+// Helper function to validate the new record form
+function validateNewRecordForm(form) {
+    let isValid = true;
+    const inputs = form.querySelectorAll('input, select');
+    
+    inputs.forEach(input => {
+        if (!validateField(input)) {
+            isValid = false;
+        }
+    });
+    
+    return isValid;
+}
+
+// Helper function to validate individual fields
+function validateField(input) {
+    const value = input.value;
+    const fieldName = input.name;
+    const type = input.type;
+    let isValid = true;
+    let errorMessage = '';
+    
+    // Skip validation for empty optional fields
+    if (value === '' || value === null || value === undefined) {
+        input.classList.remove('is-invalid');
+        return true;
+    }
+    
+    // Type-specific validation
+    switch (type) {
+        case 'number':
+            if (isNaN(parseFloat(value)) || !isFinite(value)) {
+                isValid = false;
+                errorMessage = 'Must be a valid number';
+            }
+            break;
+        case 'date':
+            if (!value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                isValid = false;
+                errorMessage = 'Must be a valid date (YYYY-MM-DD)';
+            }
+            break;
+        case 'email':
+            if (!value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+                isValid = false;
+                errorMessage = 'Must be a valid email address';
+            }
+            break;
+    }
+    
+    // Update field styling and error message
+    if (isValid) {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+    } else {
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+        const feedback = input.parentNode.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.textContent = errorMessage;
+        }
+    }
+    
+    return isValid;
+}
+
+// Helper function to update layer bounds after adding records
+function updateLayerBounds(layer) {
+    if (!layer.features || layer.features.length === 0) return;
+    
+    try {
+        const validFeatures = layer.features.filter(feature => 
+            (feature.getLatLng && feature.getLatLng()) || 
+            (feature.getBounds && feature.getBounds().isValid())
+        );
+        
+        if (validFeatures.length > 0) {
+            const group = new L.featureGroup(validFeatures);
+            layer.bounds = group.getBounds();
+        }
+    } catch (error) {
+        console.warn('Could not update layer bounds:', error);
     }
 }
 
@@ -4034,38 +4300,106 @@ async function refreshAttributeTable(layerId) {
     if (!layer) return;
     
     try {
-        // Reload data from Teable.io
+        console.log(`Refreshing attribute table for layer: ${layer.name}`);
+        
+        // Reload fresh data from Teable.io
         const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1000 });
         const records = recordsData.records || [];
         
+        console.log(`Loaded ${records.length} records from Teable.io`);
+        
         // Update layer data
+        const oldRecordCount = layer.records.length;
         layer.records = records;
         layer.featureCount = records.length;
         
-        // Recreate the attribute table
+        // Update the attribute table if it's currently visible
         const tableContainer = document.getElementById('attributeTableContainer');
         if (tableContainer) {
-            tableContainer.innerHTML = `
-                <table class="table table-sm table-striped mb-0" id="attributeTable">
-                    <thead class="table-dark sticky-top">
-                        ${await createEnhancedTableHeader(layer)}
-                    </thead>
-                    <tbody>
-                        ${await createEnhancedTableBody(layer)}
-                    </tbody>
-                </table>
-            `;
+            // Show loading indicator
+            tableContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Refreshing...</div>';
             
-            // Reapply inline editing
-            setupInlineEditing(layer);
+            // Recreate the attribute table with fresh data
+            setTimeout(async () => {
+                try {
+                    tableContainer.innerHTML = `
+                        <table class="table table-sm table-striped mb-0" id="attributeTable">
+                            <thead class="table-dark sticky-top">
+                                ${await createEnhancedTableHeader(layer)}
+                            </thead>
+                            <tbody>
+                                ${await createEnhancedTableBody(layer)}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    // Reapply inline editing functionality
+                    setupInlineEditing(layer);
+                    
+                    // Update table header with new count
+                    const headerElement = document.querySelector('.docked-table-header h6');
+                    if (headerElement) {
+                        headerElement.innerHTML = `
+                            <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
+                            <span class="badge bg-info ms-2">${getUserRoleBadge()}</span>
+                        `;
+                    }
+                    
+                    // Update record count in toolbar
+                    const recordCountElements = document.querySelectorAll('.docked-table-toolbar .text-muted');
+                    recordCountElements.forEach(element => {
+                        if (element.textContent.includes('features selected')) {
+                            element.innerHTML = `<span id="selectedCount">0</span> of ${records.length} features selected`;
+                        }
+                    });
+                    
+                    console.log(`Attribute table refreshed: ${oldRecordCount} → ${records.length} records`);
+                    
+                } catch (tableError) {
+                    console.error('Error recreating table:', tableError);
+                    tableContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Error loading table data: ${tableError.message}
+                        </div>
+                    `;
+                }
+            }, 100);
         }
         
-        // Update selection count
+        // Clear any selections since data has changed
+        selectedFeatures.length = 0;
         updateSelectionCount();
+        
+        // Update layer statistics
+        updateLayersList();
+        updateMapStatistics();
+        
+        // Show success message if record count changed
+        if (oldRecordCount !== records.length) {
+            const changeText = records.length > oldRecordCount ? 
+                `Added ${records.length - oldRecordCount} record(s)` : 
+                `Removed ${oldRecordCount - records.length} record(s)`;
+            showInfo(`Attribute table refreshed - ${changeText}. Total: ${records.length} records`);
+        }
         
     } catch (error) {
         console.error('Error refreshing attribute table:', error);
         showError('Failed to refresh attribute table: ' + error.message);
+        
+        // Show error in table if it exists
+        const tableContainer = document.getElementById('attributeTableContainer');
+        if (tableContainer) {
+            tableContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Failed to load fresh data: ${error.message}
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="refreshAttributeTable('${layerId}')">
+                        <i class="fas fa-retry me-1"></i>Retry
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
