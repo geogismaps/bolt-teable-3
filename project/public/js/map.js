@@ -1436,8 +1436,23 @@ function populatePropertiesModal(layer) {
     // Populate field selectors
     populateFieldSelectors(layer);
 
-    // Symbology tab
-        const symbology = layer.properties?.symbology || {};
+    // Symbology tab - ensure defaults are set
+        let symbology = layer.properties?.symbology || {};
+        
+        // Initialize symbology with defaults if missing
+        if (!layer.properties) layer.properties = {};
+        if (!layer.properties.symbology) {
+            layer.properties.symbology = {
+                type: 'single',
+                fillColor: '#3498db',
+                borderColor: '#2c3e50',
+                borderWidth: 2,
+                fillOpacity: 0.7
+            };
+            symbology = layer.properties.symbology;
+            console.log('Initialized default symbology for layer:', layer.name);
+        }
+        
         const propSymbologyType = document.getElementById('propSymbologyType');
         const propFillColor = document.getElementById('propFillColor');
         const propBorderColor = document.getElementById('propBorderColor');
@@ -1446,7 +1461,10 @@ function populatePropertiesModal(layer) {
         const fillOpacityValue = document.getElementById('fillOpacityValue');
         const borderWidthValue = document.getElementById('borderWidthValue');
         
-        if (propSymbologyType) propSymbologyType.value = symbology.type || 'single';
+        if (propSymbologyType) {
+            propSymbologyType.value = symbology.type || 'single';
+            console.log('Set symbology type to:', symbology.type || 'single');
+        }
         if (propFillColor) propFillColor.value = symbology.fillColor || '#3498db';
         if (propBorderColor) propBorderColor.value = symbology.borderColor || '#2c3e50';
         if (propBorderWidth) propBorderWidth.value = symbology.borderWidth || 2;
@@ -1526,8 +1544,10 @@ function populatePropertiesModal(layer) {
         handleTemplateChange();
         handlePopupToggle();
 
-        // Update symbology type display
-        updateSymbologyType();
+        // Update symbology type display - call this after all values are set
+        setTimeout(() => {
+            updateSymbologyType();
+        }, 100);
         
     } catch (error) {
         console.error('Error populating properties modal:', error);
@@ -2461,53 +2481,126 @@ function updateSymbologyType() {
     }
     
     const symbologyType = symbologyTypeSelect.value;
+    console.log('Updating symbology type to:', symbologyType);
+    
+    // Get all symbology control sections
     const singleControls = document.getElementById('propSingleSymbol');
     const graduatedControls = document.getElementById('propGraduated');
     const categorizedControls = document.getElementById('propCategorized');
 
+    // Debug: Check if elements exist
+    console.log('Control elements found:', {
+        single: !!singleControls,
+        graduated: !!graduatedControls,
+        categorized: !!categorizedControls
+    });
+
     // Hide all controls first
-    if (singleControls) singleControls.style.display = 'none';
-    if (graduatedControls) graduatedControls.style.display = 'none';
-    if (categorizedControls) categorizedControls.style.display = 'none';
+    if (singleControls) {
+        singleControls.style.display = 'none';
+        console.log('Hidden single controls');
+    }
+    if (graduatedControls) {
+        graduatedControls.style.display = 'none';
+        console.log('Hidden graduated controls');
+    }
+    if (categorizedControls) {
+        categorizedControls.style.display = 'none';
+        console.log('Hidden categorized controls');
+    }
 
     // Show relevant controls based on selection
     switch (symbologyType) {
         case 'single':
             if (singleControls) {
                 singleControls.style.display = 'block';
-                console.log('Showing single symbology controls');
+                console.log('✅ Showing single symbology controls');
+                
+                // Ensure the single symbol styling is properly initialized
+                if (window.currentPropertiesLayer) {
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+                    
+                    // Set default single symbol properties if not already set
+                    if (layer.properties.symbology.type !== 'single') {
+                        layer.properties.symbology.type = 'single';
+                        layer.properties.symbology.fillColor = layer.properties.symbology.fillColor || '#3498db';
+                        layer.properties.symbology.borderColor = layer.properties.symbology.borderColor || '#2c3e50';
+                        layer.properties.symbology.borderWidth = layer.properties.symbology.borderWidth || 2;
+                        layer.properties.symbology.fillOpacity = layer.properties.symbology.fillOpacity || 0.7;
+                        
+                        console.log('Initialized single symbol properties for layer:', layer.name);
+                    }
+                }
             } else {
-                console.error('Single symbol controls not found - checking for propSingleSymbol element');
+                console.error('❌ Single symbol controls not found - element with ID "propSingleSymbol" missing');
             }
             break;
+            
         case 'graduated':
             if (graduatedControls) {
                 graduatedControls.style.display = 'block';
-                console.log('Showing graduated symbology controls');
+                console.log('✅ Showing graduated symbology controls');
+                
                 // Populate field selectors when switching to graduated
                 if (window.currentPropertiesLayer) {
                     populateFieldSelectors(window.currentPropertiesLayer);
+                    
+                    // Initialize graduated properties
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+                    layer.properties.symbology.type = 'graduated';
                 }
+            } else {
+                console.error('❌ Graduated controls not found');
             }
             break;
+            
         case 'categorized':
             if (categorizedControls) {
                 categorizedControls.style.display = 'block';
-                console.log('Showing categorized symbology controls');
+                console.log('✅ Showing categorized symbology controls');
+                
                 // Populate field selectors when switching to categorized
                 if (window.currentPropertiesLayer) {
                     populateFieldSelectors(window.currentPropertiesLayer);
+                    
+                    // Initialize categorized properties
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+                    layer.properties.symbology.type = 'categorized';
                 }
+            } else {
+                console.error('❌ Categorized controls not found');
             }
             break;
+            
         default:
-            // Default to single symbol if no valid type selected
+            // Default to single symbol if no valid type selected or empty
             if (singleControls) {
                 singleControls.style.display = 'block';
-                console.log('Defaulting to single symbology controls');
+                console.log('⚠️ Defaulting to single symbology controls for type:', symbologyType);
+                
+                // Set default to single if undefined
+                const symbologySelect = document.getElementById('propSymbologyType');
+                if (symbologySelect && (!symbologyType || symbologyType === '')) {
+                    symbologySelect.value = 'single';
+                }
             }
-            console.warn('Unknown symbology type:', symbologyType, '- defaulting to single');
+            console.warn('Unknown or empty symbology type:', symbologyType, '- defaulting to single');
     }
+    
+    // Force a UI update to ensure visibility changes take effect
+    setTimeout(() => {
+        console.log('Final visibility states:', {
+            single: singleControls ? singleControls.style.display : 'not found',
+            graduated: graduatedControls ? graduatedControls.style.display : 'not found',
+            categorized: categorizedControls ? categorizedControls.style.display : 'not found'
+        });
+    }, 100);
 }
 
 function updatePopupFieldSelection(fieldName, isSelected) {
@@ -2812,10 +2905,28 @@ function applyProperties() {
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.symbology) layer.properties.symbology = {};
 
-    layer.properties.symbology.fillColor = document.getElementById('propFillColor').value;
-    layer.properties.symbology.borderColor = document.getElementById('propBorderColor').value;
-    layer.properties.symbology.borderWidth = parseInt(document.getElementById('propBorderWidth').value);
-    layer.properties.symbology.fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
+    // Get current symbology type
+    const symbologyType = document.getElementById('propSymbologyType').value || 'single';
+    layer.properties.symbology.type = symbologyType;
+    
+    // Update common properties
+    const fillColor = document.getElementById('propFillColor').value;
+    const borderColor = document.getElementById('propBorderColor').value;
+    const borderWidth = parseInt(document.getElementById('propBorderWidth').value);
+    const fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
+    
+    if (fillColor) layer.properties.symbology.fillColor = fillColor;
+    if (borderColor) layer.properties.symbology.borderColor = borderColor;
+    if (!isNaN(borderWidth)) layer.properties.symbology.borderWidth = borderWidth;
+    if (!isNaN(fillOpacity)) layer.properties.symbology.fillOpacity = fillOpacity;
+    
+    console.log('Updated symbology properties:', {
+        type: symbologyType,
+        fillColor: fillColor,
+        borderColor: borderColor,
+        borderWidth: borderWidth,
+        fillOpacity: fillOpacity
+    });
 
     // Update labels properties
     if (!layer.properties.labels) layer.properties.labels = {};
@@ -2933,16 +3044,39 @@ function cancelProperties() {
 }
 
 function applyLayerStyling(layer) {
-    if (!layer.features || !layer.properties || !layer.properties.symbology) return;
+    if (!layer.features || !layer.properties) {
+        console.warn('Layer missing features or properties for styling');
+        return;
+    }
+
+    // Ensure symbology exists with defaults
+    if (!layer.properties.symbology) {
+        layer.properties.symbology = {
+            type: 'single',
+            fillColor: '#3498db',
+            borderColor: '#2c3e50',
+            borderWidth: 2,
+            fillOpacity: 0.7
+        };
+        console.log('Created default symbology for layer:', layer.name);
+    }
 
     const symbology = layer.properties.symbology;
+    console.log(`Applying ${symbology.type} symbology to layer "${layer.name}" with ${layer.features.length} features`);
+
+    let styledCount = 0;
 
     layer.features.forEach((feature, index) => {
-        if (!feature.setStyle) return;
+        if (!feature.setStyle) {
+            console.warn(`Feature ${index} does not have setStyle method`);
+            return;
+        }
 
+        // Base style properties
         let style = {
             weight: symbology.borderWidth || 2,
-            fillOpacity: symbology.fillOpacity || 0.7
+            fillOpacity: symbology.fillOpacity || 0.7,
+            opacity: 1
         };
 
         // Apply styling based on symbology type
@@ -2950,55 +3084,76 @@ function applyLayerStyling(layer) {
             case 'single':
                 style.fillColor = symbology.fillColor || '#3498db';
                 style.color = symbology.borderColor || '#2c3e50';
+                console.log(`Applied single color: fill=${style.fillColor}, border=${style.color}`);
                 break;
 
             case 'graduated':
-                const featureValue = parseFloat(feature.recordData[symbology.field]);
-                if (!isNaN(featureValue)) {
-                    // Find which class the value belongs to
-                    let classIndex = 0;
-                    for (let i = 0; i < symbology.breaks.length; i++) {
-                        if (featureValue <= symbology.breaks[i]) {
-                            classIndex = i;
-                            break;
+                if (symbology.field && feature.recordData && feature.recordData[symbology.field] !== undefined) {
+                    const featureValue = parseFloat(feature.recordData[symbology.field]);
+                    if (!isNaN(featureValue) && symbology.breaks && symbology.colors) {
+                        // Find which class the value belongs to
+                        let classIndex = 0;
+                        for (let i = 0; i < symbology.breaks.length; i++) {
+                            if (featureValue <= symbology.breaks[i]) {
+                                classIndex = i;
+                                break;
+                            }
                         }
+                        style.fillColor = symbology.colors[classIndex] || '#3498db';
+                        style.color = symbology.borderColor || '#2c3e50';
+                    } else {
+                        // Use default color for non-numeric values
+                        style.fillColor = '#cccccc';
+                        style.color = '#999999';
                     }
-                    style.fillColor = symbology.colors[classIndex] || '#3498db';
-                    style.color = symbology.borderColor || '#2c3e50';
                 } else {
-                    // Use default color for non-numeric values
-                    style.fillColor = '#cccccc';
-                    style.color = '#999999';
+                    // No field specified or no data - use default
+                    style.fillColor = symbology.fillColor || '#3498db';
+                    style.color = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
             case 'categorized':
-                const featureCategory = String(feature.recordData[symbology.field]);
-                const category = symbology.categories.find(cat => String(cat.value) === featureCategory);
-                if (category) {
-                    style.fillColor = category.color;
-                    style.color = symbology.borderColor || '#2c3e50';
+                if (symbology.field && feature.recordData && feature.recordData[symbology.field] !== undefined) {
+                    const featureCategory = String(feature.recordData[symbology.field]);
+                    const category = symbology.categories && symbology.categories.find(cat => String(cat.value) === featureCategory);
+                    if (category) {
+                        style.fillColor = category.color;
+                        style.color = symbology.borderColor || '#2c3e50';
+                    } else {
+                        // Use default color for uncategorized values
+                        style.fillColor = '#cccccc';
+                        style.color = '#999999';
+                    }
                 } else {
-                    // Use default color for uncategorized values
-                    style.fillColor = '#cccccc';
-                    style.color = '#999999';
+                    // No field specified or no data - use default
+                    style.fillColor = symbology.fillColor || '#3498db';
+                    style.color = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
             default:
+                // Fallback to single symbol styling
                 style.fillColor = symbology.fillColor || '#3498db';
                 style.color = symbology.borderColor || '#2c3e50';
+                console.warn(`Unknown symbology type "${symbology.type}", using single symbol fallback`);
         }
 
-        feature.setStyle(style);
+        // Apply the style to the feature
+        try {
+            feature.setStyle(style);
+            styledCount++;
+        } catch (error) {
+            console.error(`Error applying style to feature ${index}:`, error);
+        }
     });
+
+    console.log(`✅ Successfully styled ${styledCount}/${layer.features.length} features with ${symbology.type} symbology`);
 
     // Apply labels if enabled
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
     }
-
-    console.log(`Applied ${symbology.type} symbology to layer "${layer.name}"`);
 }
 
 function applyLabelsToLayer(layer) {
