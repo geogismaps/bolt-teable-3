@@ -1541,6 +1541,15 @@ function populatePropertiesModal(layer) {
         // Handle template change and popup toggle
         handleTemplateChange();
         handlePopupToggle();
+        
+        // Ensure popup toggle state is correctly reflected in UI
+        const popupEnabled = popup.enabled !== false;
+        const propEnablePopupsCheckbox = document.getElementById('propEnablePopups');
+        if (propEnablePopupsCheckbox) {
+            propEnablePopupsCheckbox.checked = popupEnabled;
+            // Trigger change event to ensure proper visibility
+            propEnablePopupsCheckbox.dispatchEvent(new Event('change'));
+        }
 
         // Update symbology type display - call this after all values are set
         setTimeout(() => {
@@ -2940,6 +2949,11 @@ function applyProperties() {
     // Apply all popup settings
     updateLayerPopupSettings(layer);
     
+    // Ensure popup enabled state is explicitly set
+    const popupEnabled = document.getElementById('propEnablePopups')?.checked;
+    if (!layer.properties.popup) layer.properties.popup = {};
+    layer.properties.popup.enabled = popupEnabled !== false;
+    
     // Collect selected popup fields from checkboxes
     const selectedPopupFields = [];
     const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
@@ -3352,8 +3366,9 @@ function updateLayerPopupSettings(layer) {
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.popup) layer.properties.popup = {};
     
-    // Collect all settings from the form
-    layer.properties.popup.enabled = document.getElementById('propEnablePopups')?.checked !== false;
+    // Collect all settings from the form - check if the checkbox exists and is checked
+    const enablePopupsCheckbox = document.getElementById('propEnablePopups');
+    layer.properties.popup.enabled = enablePopupsCheckbox ? enablePopupsCheckbox.checked : true;
     layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
     layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
     layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
@@ -3414,10 +3429,40 @@ function handleTemplateChange() {
 // Popup enable/disable handler
 function handlePopupToggle() {
     const enabled = document.getElementById('propEnablePopups')?.checked;
-    const configSection = document.getElementById('popupConfigSection');
     
-    if (configSection) {
-        configSection.style.display = enabled ? 'block' : 'none';
+    // Find all popup configuration sections that should be toggled
+    const configSections = [
+        'popupConfigSection',
+        'popupTemplateSection', 
+        'popupFieldsSection',
+        'popupAdvancedSection',
+        'popupControlsSection'
+    ];
+    
+    configSections.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.style.display = enabled ? 'block' : 'none';
+        }
+    });
+    
+    // Also toggle individual popup configuration controls
+    const popupControls = document.querySelectorAll('.popup-config-control');
+    popupControls.forEach(control => {
+        control.style.display = enabled ? 'block' : 'none';
+    });
+    
+    // Update the layer's popup enabled state immediately
+    if (window.currentPropertiesLayer) {
+        if (!window.currentPropertiesLayer.properties) {
+            window.currentPropertiesLayer.properties = {};
+        }
+        if (!window.currentPropertiesLayer.properties.popup) {
+            window.currentPropertiesLayer.properties.popup = {};
+        }
+        window.currentPropertiesLayer.properties.popup.enabled = enabled;
+        
+        console.log(`Popup ${enabled ? 'enabled' : 'disabled'} for layer: ${window.currentPropertiesLayer.name}`);
     }
 }
 
@@ -5182,7 +5227,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // iTool event listeners
     const popupEnableCheckbox = document.getElementById('propEnablePopups');
     if (popupEnableCheckbox) {
-        popupEnableCheckbox.addEventListener('change', handlePopupToggle);
+        popupEnableCheckbox.addEventListener('change', function() {
+            handlePopupToggle();
+            // Mark as having unsaved changes
+            if (window.currentPropertiesLayer) {
+                console.log('Popup toggle changed for layer:', window.currentPropertiesLayer.name);
+            }
+        });
     }
 
     const popupTemplateSelect = document.getElementById('propPopupTemplate');
