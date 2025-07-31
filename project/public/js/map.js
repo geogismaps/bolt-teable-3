@@ -2476,6 +2476,8 @@ function updateSymbologyType() {
             if (singleControls) {
                 singleControls.style.display = 'block';
                 console.log('Showing single symbology controls');
+            } else {
+                console.error('Single symbol controls not found - checking for propSingleSymbol element');
             }
             break;
         case 'graduated':
@@ -2499,7 +2501,12 @@ function updateSymbologyType() {
             }
             break;
         default:
-            console.warn('Unknown symbology type:', symbologyType);
+            // Default to single symbol if no valid type selected
+            if (singleControls) {
+                singleControls.style.display = 'block';
+                console.log('Defaulting to single symbology controls');
+            }
+            console.warn('Unknown symbology type:', symbologyType, '- defaulting to single');
     }
 }
 
@@ -5028,6 +5035,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const popupTemplateSelect = document.getElementById('propPopupTemplate');
     if (popupTemplateSelect) {
         popupTemplateSelect.addEventListener('change', handleTemplateChange);
+    }
+
+    // Symbology type change listener
+    const symbologyTypeSelect = document.getElementById('propSymbologyType');
+    if (symbologyTypeSelect) {
+        symbologyTypeSelect.addEventListener('change', updateSymbologyType);
     }
 
      // Tab switching for layer source
