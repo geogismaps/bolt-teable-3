@@ -434,6 +434,13 @@ async function createLayerFromData(records, layerConfig) {
 
 function createFeaturePopup(fields, layerConfig) {
     const popupSettings = layerConfig.properties?.popup || {};
+    
+    // Check if popups are enabled for this layer
+    if (popupSettings.enabled === false) {
+        console.log(`Popups disabled for layer "${layerConfig.name}" - not creating popup`);
+        return '<div class="popup-disabled"><em>Popups disabled for this layer</em></div>';
+    }
+    
     const template = popupSettings.template || 'default';
     const maxWidth = popupSettings.maxWidth || 300;
     const maxFieldLength = popupSettings.maxFieldLength || 100;
@@ -2946,13 +2953,15 @@ function applyProperties() {
     // Update popup properties with all iTool settings
     if (!layer.properties.popup) layer.properties.popup = {};
     
+    // Get popup enabled state FIRST before applying other settings
+    const popupEnabledCheckbox = document.getElementById('propEnablePopups');
+    const popupEnabled = popupEnabledCheckbox ? popupEnabledCheckbox.checked : true;
+    layer.properties.popup.enabled = popupEnabled;
+    
+    console.log(`Applying popup enabled state: ${popupEnabled} for layer "${layer.name}"`);
+    
     // Apply all popup settings
     updateLayerPopupSettings(layer);
-    
-    // Ensure popup enabled state is explicitly set
-    const popupEnabled = document.getElementById('propEnablePopups')?.checked;
-    if (!layer.properties.popup) layer.properties.popup = {};
-    layer.properties.popup.enabled = popupEnabled !== false;
     
     // Collect selected popup fields from checkboxes
     const selectedPopupFields = [];
@@ -3366,9 +3375,16 @@ function updateLayerPopupSettings(layer) {
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.popup) layer.properties.popup = {};
     
-    // Collect all settings from the form - check if the checkbox exists and is checked
+    // Get popup enabled state - this should already be set but ensure consistency
     const enablePopupsCheckbox = document.getElementById('propEnablePopups');
-    layer.properties.popup.enabled = enablePopupsCheckbox ? enablePopupsCheckbox.checked : true;
+    const popupEnabled = enablePopupsCheckbox ? enablePopupsCheckbox.checked : true;
+    layer.properties.popup.enabled = popupEnabled;
+    
+    // Only update other popup settings if popups are enabled
+    if (!popupEnabled) {
+        console.log(`Popups disabled for layer "${layer.name}" - skipping detailed popup configuration`);
+        return;
+    }
     layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
     layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
     layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
@@ -3428,7 +3444,14 @@ function handleTemplateChange() {
 
 // Popup enable/disable handler
 function handlePopupToggle() {
-    const enabled = document.getElementById('propEnablePopups')?.checked;
+    const enabledCheckbox = document.getElementById('propEnablePopups');
+    if (!enabledCheckbox) {
+        console.error('Enable popups checkbox not found');
+        return;
+    }
+    
+    const enabled = enabledCheckbox.checked;
+    console.log('Popup toggle changed to:', enabled);
     
     // Find all popup configuration sections that should be toggled
     const configSections = [
@@ -3443,6 +3466,7 @@ function handlePopupToggle() {
         const section = document.getElementById(sectionId);
         if (section) {
             section.style.display = enabled ? 'block' : 'none';
+            console.log(`Section ${sectionId} ${enabled ? 'shown' : 'hidden'}`);
         }
     });
     
@@ -3451,6 +3475,12 @@ function handlePopupToggle() {
     popupControls.forEach(control => {
         control.style.display = enabled ? 'block' : 'none';
     });
+    
+    // Toggle the main popup configuration container
+    const mainPopupConfig = document.querySelector('.popup-configuration');
+    if (mainPopupConfig) {
+        mainPopupConfig.style.display = enabled ? 'block' : 'none';
+    }
     
     // Update the layer's popup enabled state immediately
     if (window.currentPropertiesLayer) {
@@ -3462,7 +3492,36 @@ function handlePopupToggle() {
         }
         window.currentPropertiesLayer.properties.popup.enabled = enabled;
         
-        console.log(`Popup ${enabled ? 'enabled' : 'disabled'} for layer: ${window.currentPropertiesLayer.name}`);
+        console.log(`✅ Popup ${enabled ? 'enabled' : 'disabled'} for layer: ${window.currentPropertiesLayer.name}`);
+        
+        // If disabling popups, also update all existing feature popups
+        if (!enabled && window.currentPropertiesLayer.features) {
+            window.currentPropertiesLayer.features.forEach(feature => {
+                if (feature.getPopup && feature.getPopup()) {
+                    feature.unbindPopup();
+                }
+            });
+            console.log('Removed existing popups from all features');
+        }
+        
+        // If enabling popups, rebind popups to all features
+        if (enabled && window.currentPropertiesLayer.features && window.currentPropertiesLayer.records) {
+            window.currentPropertiesLayer.features.forEach((feature, index) => {
+                const recordData = window.currentPropertiesLayer.records[index]?.fields;
+                if (recordData) {
+                    const popupContent = createFeaturePopup(recordData, window.currentPropertiesLayer);
+                    feature.bindPopup(popupContent);
+                }
+            });
+            console.log('Rebound popups to all features');
+        }
+    }
+    
+    // Show user feedback
+    if (enabled) {
+        showSuccess('Popups enabled for this layer');
+    } else {
+        showInfo('Popups disabled for this layer');
     }
 }
 
@@ -5227,11 +5286,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // iTool event listeners
     const popupEnableCheckbox = document.getElementById('propEnablePopups');
     if (popupEnableCheckbox) {
-        popupEnableCheckbox.addEventListener('change', function() {
+        popupEnableCheckbox.addEventListener('change', function(e) {
+            console.log('Popup checkbox changed:', e.target.checked);
             handlePopupToggle();
             // Mark as having unsaved changes
             if (window.currentPropertiesLayer) {
                 console.log('Popup toggle changed for layer:', window.currentPropertiesLayer.name);
+                
+                // Immediately update the layer properties to reflect the change
+                if (!window.currentPropertiesLayer.properties) {
+                    window.currentPropertiesLayer.properties = {};
+                }
+                if (!window.currentPropertiesLayer.properties.popup) {
+                    window.currentPropertiesLayer.properties.popup = {};
+                }
+                window.currentPropertiesLayer.properties.popup.enabled = e.target.checked;
             }
         });
     }
@@ -5754,18 +5823,26 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
         }
         
         if (recordData) {
-            // Create popup content using the current layer configuration (which includes updated popup fields)
-            const popupContent = createFeaturePopup(recordData, currentLayer);
+            // Check if popups are enabled for this layer
+            const popupEnabled = currentLayer.properties?.popup?.enabled !== false;
             
-            // Update the popup with the new content that respects field selection
-            if (feature.getPopup()) {
-                feature.getPopup().setContent(popupContent);
-                feature.openPopup();
+            if (popupEnabled) {
+                // Create popup content using the current layer configuration (which includes updated popup fields)
+                const popupContent = createFeaturePopup(recordData, currentLayer);
+                
+                // Update the popup with the new content that respects field selection
+                if (feature.getPopup()) {
+                    feature.getPopup().setContent(popupContent);
+                    feature.openPopup();
+                } else {
+                    feature.bindPopup(popupContent).openPopup();
+                }
+                
+                console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
             } else {
-                feature.bindPopup(popupContent).openPopup();
+                console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
+                showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
             }
-            
-            console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
         }
     } else {
         // Reset to original style
