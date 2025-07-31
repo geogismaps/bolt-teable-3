@@ -1165,9 +1165,7 @@ async function createDockedAttributeTable(layer) {
                                     <button class="btn btn-sm btn-success" onclick="saveTableEditing('${layer.id}')" id="saveEditingBtn" style="display: none;">
                                         <i class="fas fa-save me-1"></i>Save Editing
                                     </button>
-                                    <button class="btn btn-sm btn-outline-warning" onclick="addNewRecord('${layer.id}')" title="Add New Record">
-                                        <i class="fas fa-plus me-1"></i>Add Record
-                                    </button>
+                                    
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedRecords('${layer.id}')" id="deleteSelectedBtn" disabled>
                                         <i class="fas fa-trash me-1"></i>Delete Selected
                                     </button>
