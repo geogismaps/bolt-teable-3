@@ -286,6 +286,70 @@
             border-radius: 12px;
         }
         
+        /* Enhanced Field Changes Table Styles */
+        .old-value-cell {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .new-value-cell {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .value-preview {
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+        
+        .value-content {
+            word-wrap: break-word;
+            display: inline-block;
+            max-width: 100%;
+        }
+        
+        .history-container {
+            max-width: 300px;
+        }
+        
+        .history-toggle {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+        }
+        
+        .history-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            font-size: 0.85rem;
+        }
+        
+        .history-change {
+            word-wrap: break-word;
+        }
+        
+        .history-change strong {
+            display: inline-block;
+            min-width: 40px;
+        }
+        
         @media (max-width: 768px) {
             .value-comparison {
                 grid-template-columns: 1fr;
@@ -315,6 +379,20 @@
             
             .field-changes-summary {
                 max-width: 200px;
+            }
+            
+            .old-value-cell,
+            .new-value-cell {
+                padding: 6px 8px;
+                font-size: 0.8rem;
+            }
+            
+            .history-container {
+                max-width: 250px;
+            }
+            
+            .value-preview {
+                max-width: 150px;
             }
         }
     </style>
@@ -455,18 +533,10 @@
                 </div>
             </div>
 
-            <!-- View Toggle -->
+            <!-- Field Changes Table Header -->
             <div class="mb-3">
-                <div class="btn-group" role="group">
-                    <input type="radio" class="btn-check" name="viewMode" id="cardView" value="card" checked>
-                    <label class="btn btn-outline-primary" for="cardView">
-                        <i class="fas fa-th-large me-1"></i>Card View
-                    </label>
-                    <input type="radio" class="btn-check" name="viewMode" id="tableView" value="table">
-                    <label class="btn btn-outline-primary" for="tableView">
-                        <i class="fas fa-table me-1"></i>Table View
-                    </label>
-                </div>
+                <h5><i class="fas fa-table me-2"></i>Field Changes History</h5>
+                <p class="text-muted mb-0">Recent changes with complete history tracking</p>
             </div>
 
             <!-- Logs Container -->

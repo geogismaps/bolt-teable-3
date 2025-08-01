@@ -20,12 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Add view mode toggle listeners
-    document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            displayLogs();
-        });
-    });
+    // Remove view mode toggle listeners as we're using table view only
     
     initializeLogs();
 });
@@ -252,7 +247,6 @@ function updateStatistics() {
 
 function displayLogs() {
     const container = document.getElementById('logsContainer');
-    const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
     
     if (filteredLogs.length === 0) {
         showEmptyState('No data changes found matching your filters.');
@@ -265,15 +259,8 @@ function displayLogs() {
     const endIndex = startIndex + pageSize;
     const pageData = filteredLogs.slice(startIndex, endIndex);
     
-    let html = '';
-    
-    if (viewMode === 'table') {
-        html = createTableView(pageData);
-    } else {
-        pageData.forEach(logEntry => {
-            html += createLogEntryHTML(logEntry);
-        });
-    }
+    // Create enhanced table view with field change history
+    const html = createEnhancedFieldChangesTable(pageData);
     
     container.innerHTML = html;
     
@@ -283,6 +270,218 @@ function displayLogs() {
     // Update filter counts
     document.getElementById('filteredCount').textContent = filteredLogs.length;
     document.getElementById('totalCount').textContent = allLogs.length;
+}
+
+function createEnhancedFieldChangesTable(pageData) {
+    // Process data to group field changes by field name and show history
+    const fieldChangesMap = new Map();
+    
+    // Flatten all field changes and group by field name
+    pageData.forEach(logEntry => {
+        if (logEntry.fieldChanges && logEntry.fieldChanges.length > 0) {
+            logEntry.fieldChanges.forEach(change => {
+                const key = `${logEntry.tableName}_${change.fieldName}`;
+                if (!fieldChangesMap.has(key)) {
+                    fieldChangesMap.set(key, {
+                        tableName: logEntry.tableName,
+                        fieldName: change.fieldName,
+                        changes: []
+                    });
+                }
+                
+                fieldChangesMap.get(key).changes.push({
+                    ...change,
+                    timestamp: logEntry.timestamp,
+                    changedBy: logEntry.changedBy,
+                    actionType: logEntry.actionType,
+                    recordId: logEntry.recordId,
+                    userRole: logEntry.userRole
+                });
+            });
+        }
+    });
+    
+    // Sort changes within each field by timestamp (newest first)
+    fieldChangesMap.forEach(fieldData => {
+        fieldData.changes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    });
+    
+    let html = `
+        <div class="logs-table">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">Table</th>
+                            <th style="width: 150px;">Field Name</th>
+                            <th style="width: 200px;">Old Value</th>
+                            <th style="width: 200px;">New Value</th>
+                            <th style="width: 120px;">Changed By</th>
+                            <th style="width: 100px;">Action</th>
+                            <th style="width: 140px;">Last Changed</th>
+                            <th>History</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    if (fieldChangesMap.size === 0) {
+        html += `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No field changes found in the selected data
+                </td>
+            </tr>
+        `;
+    } else {
+        // Convert map to array and sort by most recent change
+        const sortedFields = Array.from(fieldChangesMap.values()).sort((a, b) => 
+            new Date(b.changes[0].timestamp) - new Date(a.changes[0].timestamp)
+        );
+        
+        sortedFields.forEach(fieldData => {
+            const mostRecent = fieldData.changes[0];
+            const history = fieldData.changes.slice(1);
+            const timestamp = new Date(mostRecent.timestamp);
+            
+            html += `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${fieldData.tableName}</div>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="${getFieldIcon(fieldData.fieldName)} me-2 text-primary"></i>
+                            <span class="fw-semibold">${fieldData.fieldName}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="old-value-cell">
+                            ${formatCellValue(mostRecent.oldValue)}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="new-value-cell">
+                            ${formatCellValue(mostRecent.newValue)}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">${mostRecent.changedBy}</div>
+                        <small class="text-muted">${mostRecent.userRole || 'User'}</small>
+                    </td>
+                    <td>
+                        <span class="action-badge ${mostRecent.actionType.toLowerCase()}">${mostRecent.actionType}</span>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">${timestamp.toLocaleDateString()}</div>
+                        <small class="text-muted">${timestamp.toLocaleTimeString()}</small>
+                    </td>
+                    <td>
+                        ${createHistoryCell(history)}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+function formatCellValue(value) {
+    if (value === null || value === undefined) {
+        return '<em class="text-muted">null</em>';
+    }
+    
+    if (value === '') {
+        return '<em class="text-muted">empty</em>';
+    }
+    
+    const stringValue = String(value);
+    
+    // Truncate very long values for cell display
+    if (stringValue.length > 100) {
+        return `
+            <div class="value-preview" title="${stringValue.replace(/"/g, '&quot;')}">
+                ${stringValue.substring(0, 100)}...
+                <small class="text-muted d-block">(${stringValue.length} chars)</small>
+            </div>
+        `;
+    }
+    
+    return `<span class="value-content">${stringValue.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
+}
+
+function createHistoryCell(history) {
+    if (!history || history.length === 0) {
+        return '<em class="text-muted">No previous changes</em>';
+    }
+    
+    let html = `
+        <div class="history-container">
+            <button class="btn btn-sm btn-outline-secondary history-toggle" onclick="toggleHistory(this)">
+                <i class="fas fa-history me-1"></i>
+                ${history.length} previous change${history.length > 1 ? 's' : ''}
+            </button>
+            <div class="history-details" style="display: none;">
+    `;
+    
+    history.forEach((change, index) => {
+        const timestamp = new Date(change.timestamp);
+        html += `
+            <div class="history-item ${index < history.length - 1 ? 'border-bottom' : ''} pb-2 mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="history-change">
+                            <strong>From:</strong> ${formatCellValue(change.oldValue)}<br>
+                            <strong>To:</strong> ${formatCellValue(change.newValue)}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small">
+                            <span class="action-badge ${change.actionType.toLowerCase()}">${change.actionType}</span>
+                        </div>
+                        <div class="small text-muted">
+                            ${timestamp.toLocaleDateString()}<br>
+                            ${timestamp.toLocaleTimeString()}
+                        </div>
+                        <div class="small fw-semibold">${change.changedBy}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+function toggleHistory(button) {
+    const historyDetails = button.nextElementSibling;
+    const icon = button.querySelector('i');
+    
+    if (historyDetails.style.display === 'none') {
+        historyDetails.style.display = 'block';
+        icon.className = 'fas fa-chevron-up me-1';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-secondary');
+    } else {
+        historyDetails.style.display = 'none';
+        icon.className = 'fas fa-history me-1';
+        button.classList.remove('btn-secondary');
+        button.classList.add('btn-outline-secondary');
+    }
 }
 
 function createTableView(pageData) {
@@ -916,3 +1115,4 @@ window.changePage = changePage;
 window.changePageSize = changePageSize;
 window.refreshLogs = refreshLogs;
 window.exportLogs = exportLogs;
+window.toggleHistory = toggleHistory;
