@@ -5692,15 +5692,32 @@ function loadFilterFields() {
         const layer = mapLayers.find(l => l.id === layerId);
         if (!layer || !layer.records || layer.records.length === 0) return;
 
-        const fields = Object.keys(layer.records[0].fields || {});
-        fields.forEach(field => {
-            if (field !== layer.geometryField) {
-                const option = document.createElement('option');
-                option.value = field;
-                option.textContent = field;
-                fieldSelect.appendChild(option);
-            }
+        // Get all fields except geometry field
+        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        console.log(`Loading filter fields for layer "${layer.name}" - all fields:`, allFields);
+        
+        // Filter out hidden fields based on permissions
+        const permittedFields = filterFieldsByPermissions(allFields, layer);
+        console.log(`Permitted fields for filtering:`, permittedFields);
+        
+        permittedFields.forEach(field => {
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = `${permissionIcon} ${field}`;
+            fieldSelect.appendChild(option);
         });
+        
+        if (permittedFields.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No accessible fields for filtering";
+            option.disabled = true;
+            fieldSelect.appendChild(option);
+        }
+        
+        console.log(`Filter field selector populated with ${permittedFields.length} permitted fields`);
     }
 }
 
@@ -5717,6 +5734,18 @@ function loadFilterValues() {
         const layer = mapLayers.find(l => l.id === layerId);
         if (!layer || !layer.records) return;
 
+        // Check if user has permission to access this field
+        const permission = getFieldPermission(fieldName, layer);
+        if (permission === 'hidden') {
+            console.log(`Field "${fieldName}" is hidden - not loading values`);
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "Field not accessible";
+            option.disabled = true;
+            valueSelect.appendChild(option);
+            return;
+        }
+
         // Get unique values for the field
         const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
         uniqueValues.forEach(value => {
@@ -5727,6 +5756,8 @@ function loadFilterValues() {
                 valueSelect.appendChild(option);
             }
         });
+        
+        console.log(`Loaded ${uniqueValues.length} unique values for permitted field "${fieldName}"`);
     }
 }
 
@@ -5739,6 +5770,16 @@ function addFilterRule() {
     if (!layerId || !field || !operator || !value) {
         showWarning('Please fill in all filter fields');
         return;
+    }
+
+    // Validate field permissions before adding filter
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (layer) {
+        const permission = getFieldPermission(field, layer);
+        if (permission === 'hidden') {
+            showError(`Cannot filter on field "${field}" - field is not accessible due to permissions`);
+            return;
+        }
     }
 
     const filter = {
@@ -5760,6 +5801,8 @@ function addFilterRule() {
     if (filterLayer) filterLayer.value = '';
     if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
     if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
+    
+    console.log(`Added filter rule for permitted field "${field}" with ${operator} "${value}"`);
 }
 
 function updateFilterRulesDisplay() {
@@ -5821,6 +5864,7 @@ function applyFilters() {
 
     let filteredCount = 0;
     let totalCount = 0;
+    let skippedFilters = 0;
 
     mapLayers.forEach(layer => {
         if (!layer.visible) return;
@@ -5833,6 +5877,14 @@ function applyFilters() {
 
             // Apply all filters for this layer
             layerFilters.forEach(filter => {
+                // Check if user still has permission to access this field
+                const permission = getFieldPermission(filter.field, layer);
+                if (permission === 'hidden') {
+                    console.warn(`Skipping filter on hidden field "${filter.field}"`);
+                    skippedFilters++;
+                    return; // Skip this filter - don't apply it
+                }
+
                 const fieldValue = feature.recordData[filter.field];
 
                 switch (filter.operator) {
@@ -5844,6 +5896,12 @@ function applyFilters() {
                         break;
                     case 'starts_with':
                         if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'greater_than':
+                        if (!(parseFloat(fieldValue) > parseFloat(filter.value))) showFeature = false;
+                        break;
+                    case 'less_than':
+                        if (!(parseFloat(fieldValue) < parseFloat(filter.value))) showFeature = false;
                         break;
                 }
             });
@@ -5862,7 +5920,11 @@ function applyFilters() {
         });
     });
 
-    showSuccess(`Filters applied: showing ${filteredCount} of ${totalCount} features`);
+    let message = `Filters applied: showing ${filteredCount} of ${totalCount} features`;
+    if (skippedFilters > 0) {
+        message += ` (${skippedFilters} filter(s) skipped due to field permissions)`;
+    }
+    showSuccess(message);
 }
 
 function clearAllFilters() {
