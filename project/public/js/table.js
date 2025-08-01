@@ -1,3 +1,4 @@
+
 /**
  * Professional Table View with Permission-Aware Features
  */
@@ -21,7 +22,7 @@ let currentFormIndex = 0;
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication
     if (!window.teableAuth.requireAuth()) return;
-
+    
     initializeTableView();
 });
 
@@ -38,13 +39,13 @@ async function initializeTableView() {
 
         // Ensure system tables exist
         await window.teableAPI.ensureSystemTables();
-
+        
         // Load available tables
         await loadTableSelector();
-
+        
         // Setup event listeners
         setupEventListeners();
-
+        
     } catch (error) {
         console.error('Table view initialization failed:', error);
         showError('Failed to initialize table view: ' + error.message);
@@ -81,19 +82,19 @@ async function loadTableSelector() {
             !t.name.startsWith('field_') && 
             !t.name.startsWith('system_')
         );
-
+        
         const selector = document.getElementById('tableSelector');
         selector.innerHTML = '<option value="">Choose a table...</option>';
-
+        
         userTables.forEach(table => {
             const option = document.createElement('option');
             option.value = table.id;
             option.textContent = table.name;
             selector.appendChild(option);
         });
-
+        
         console.log('Loaded tables for selector:', userTables.length);
-
+        
     } catch (error) {
         console.error('Error loading table selector:', error);
         showError('Failed to load tables: ' + error.message);
@@ -115,7 +116,7 @@ async function loadTableData() {
         const tablesData = await window.teableAPI.getTables();
         const allTables = tablesData.tables || tablesData || [];
         const currentTable = allTables.find(t => t.id === tableId);
-
+        
         // Update table header
         document.getElementById('tableTitle').textContent = currentTable?.name || 'Unknown Table';
         document.getElementById('tableSubtitle').textContent = `Table ID: ${tableId}`;
@@ -159,13 +160,13 @@ async function loadTableData() {
 
         // Show table container
         document.getElementById('tableContainer').style.display = 'block';
-
+        
         // Render table
         renderTable();
         updateTableStats();
         populateColumnControls();
         populateSortMenu();
-
+        
         // Log activity
         await window.teableAPI.logActivity(
             currentUser.email,
@@ -204,23 +205,23 @@ async function loadUserPermissions(tableId) {
 
         const permissionsData = await window.teableAPI.getRecords(window.teableAPI.systemTables.permissions);
         const permissions = {};
-
+        
         permissionsData.records?.forEach(record => {
             const fields = record.fields;
             if (fields.user_email === currentUser.email && fields.table_id === tableId) {
                 permissions[fields.field_id] = fields.permission_type;
             }
         });
-
+        
         // Set default permissions for fields without explicit permissions
         currentTableFields.forEach(field => {
             if (!permissions[field.id]) {
                 permissions[field.id] = getDefaultPermission(currentUser.role);
             }
         });
-
+        
         return permissions;
-
+        
     } catch (error) {
         console.error('Error loading user permissions:', error);
         // Default to role-based permissions on error
@@ -252,16 +253,16 @@ function filterDataByPermissions(data) {
     // Filter out hidden fields from all records
     return data.map(record => {
         const filteredFields = {};
-
+        
         Object.keys(record.fields).forEach(fieldName => {
             const fieldId = `${document.getElementById('tableSelector').value}_${fieldName}`;
             const permission = currentTablePermissions[fieldId] || getDefaultPermission(currentUser.role);
-
+            
             if (permission !== 'hidden') {
                 filteredFields[fieldName] = record.fields[fieldName];
             }
         });
-
+        
         return {
             ...record,
             fields: filteredFields
@@ -284,7 +285,7 @@ function detectFieldType(value) {
 function renderTable() {
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
-
+    
     // Clear existing content
     tableHead.innerHTML = '';
     tableBody.innerHTML = '';
@@ -310,7 +311,7 @@ function renderTable() {
 
     // Create table header
     const headerRow = document.createElement('tr');
-
+    
     // Row selector column (never frozen)
     const selectorHeader = document.createElement('th');
     selectorHeader.className = 'row-selector';
@@ -333,13 +334,13 @@ function renderTable() {
             th.classList.remove('frozen-shadow');
             th.style.left = '';
         }
-
+        
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         const fieldTypeIcon = getFieldTypeIcon(field.type);
         const permissionIndicator = getPermissionIndicator(permission);
         const sortIcon = currentSort.field === field.name ? 
             (currentSort.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
-
+        
         th.innerHTML = `
             <div class="d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
@@ -375,16 +376,16 @@ function renderTable() {
             </div>
             <div class="resize-handle" onmousedown="startColumnResize(event, '${field.name}')"></div>
         `;
-
+        
         th.onclick = (e) => {
             if (!e.target.closest('.dropdown') && !e.target.closest('.resize-handle')) {
                 toggleSort(field.name);
             }
         };
-
+        
         headerRow.appendChild(th);
     });
-
+    
     tableHead.appendChild(headerRow);
 
     // Create table body with pagination
@@ -395,11 +396,11 @@ function renderTable() {
     pageData.forEach((record, rowIndex) => {
         const row = document.createElement('tr');
         row.dataset.recordId = record.id;
-
+        
         if (selectedRows.has(record.id)) {
             row.classList.add('selected');
         }
-
+        
         // Row selector (never frozen)
         const selectorCell = document.createElement('td');
         selectorCell.className = 'row-selector';
@@ -408,7 +409,7 @@ function renderTable() {
                    onchange="toggleRowSelection('${record.id}', this.checked)">
         `;
         row.appendChild(selectorCell);
-
+        
         // Data cells
         visibleFields.forEach((field, colIndex) => {
             const td = document.createElement('td');
@@ -422,11 +423,11 @@ function renderTable() {
                 td.classList.remove('frozen-shadow');
                 td.style.left = '';
             }
-
+            
             const value = record.fields[field.name];
             const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
             const formattedValue = formatCellValue(value, field.type);
-
+            
             if (permission === 'edit' && (currentUser.role === 'creator' || currentUser.role === 'editor')) {
                 td.className = 'cell-editable';
                 td.onclick = () => editCell(record.id, field.name, td, field.type);
@@ -441,17 +442,17 @@ function renderTable() {
                     td.title = 'Read-only field';
                 }
             }
-
+            
             td.innerHTML = formattedValue;
             row.appendChild(td);
         });
-
+        
         // Row context menu
         row.oncontextmenu = (e) => {
             e.preventDefault();
             showRowContextMenu(e, record.id);
         };
-
+        
         tableBody.appendChild(row);
     });
     updateFrozenColumnOffsets();
@@ -534,9 +535,9 @@ function formatCellValue(value, fieldType) {
     if (value === null || value === undefined || value === '') {
         return '<span class="text-muted">—</span>';
     }
-
+    
     const stringValue = String(value);
-
+    
     switch (fieldType) {
         case 'boolean':
             return value ? 
@@ -568,7 +569,7 @@ function formatCellValue(value, fieldType) {
 // Row Height Management
 function setRowHeight(height) {
     currentRowHeight = height;
-
+    
     // Update check marks
     ['compact', 'comfortable', 'tall'].forEach(h => {
         const check = document.getElementById(`check-${h}`);
@@ -576,7 +577,7 @@ function setRowHeight(height) {
             check.style.visibility = h === height ? 'visible' : 'hidden';
         }
     });
-
+    
     // Apply to table
     const table = document.getElementById('dataTable');
     if (table) {
@@ -588,14 +589,14 @@ function setRowHeight(height) {
 function populateColumnControls() {
     const menu = document.getElementById('columnVisibilityMenu');
     menu.innerHTML = '<li><h6 class="dropdown-header">Show/Hide Columns</h6></li>';
-
+    
     currentTableFields.forEach(field => {
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         if (permission === 'hidden') return;
-
+        
         const isVisible = visibleColumns.has(field.name);
         const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
-
+        
         menu.innerHTML += `
             <li>
                 <a class="dropdown-item" href="#" onclick="toggleColumnVisibility('${field.name}')">
@@ -643,16 +644,16 @@ function freezeColumns() {
 function populateSortMenu() {
     const menu = document.getElementById('sortMenu');
     menu.innerHTML = '<li><h6 class="dropdown-header">Sort by Field</h6></li>';
-
+    
     const visibleFields = currentTableFields.filter(field => {
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         return permission !== 'hidden' && visibleColumns.has(field.name);
     });
-
+    
     visibleFields.forEach(field => {
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
-
+        
         menu.innerHTML += `
             <li><a class="dropdown-item" href="#" onclick="sortColumn('${field.name}', 'asc')">
                 <i class="fas fa-sort-alpha-down me-2"></i>${permissionIcon} ${field.name} (A-Z)
@@ -671,7 +672,7 @@ function toggleSort(fieldName) {
         currentSort.field = fieldName;
         currentSort.direction = 'asc';
     }
-
+    
     applySorting();
     renderTable();
 }
@@ -685,15 +686,15 @@ function sortColumn(fieldName, direction) {
 
 function applySorting() {
     if (!currentSort.field) return;
-
+    
     filteredData.sort((a, b) => {
         const aVal = a.fields[currentSort.field] || '';
         const bVal = b.fields[currentSort.field] || '';
-
+        
         let comparison = 0;
         if (aVal < bVal) comparison = -1;
         if (aVal > bVal) comparison = 1;
-
+        
         return currentSort.direction === 'desc' ? comparison * -1 : comparison;
     });
 }
@@ -718,7 +719,7 @@ function toggleFilterPanel() {
 function addFilterRule() {
     const rulesContainer = document.getElementById('filterRules');
     const ruleId = 'filter_' + Date.now();
-
+    
     const visibleFields = currentTableFields.filter(field => {
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         return permission !== 'hidden' && visibleColumns.has(field.name);
@@ -751,7 +752,7 @@ function addFilterRule() {
             </button>
         </div>
     `;
-
+    
     rulesContainer.insertAdjacentHTML('beforeend', ruleHtml);
 }
 
@@ -762,7 +763,7 @@ function removeFilterRule(ruleId) {
 function applyFilters() {
     const rules = document.querySelectorAll('.filter-rule');
     filteredData = filterDataByPermissions([...currentTableData]);
-
+    
     // Apply quick search first
     const quickSearch = document.getElementById('quickSearch').value.toLowerCase();
     if (quickSearch) {
@@ -772,23 +773,23 @@ function applyFilters() {
             );
         });
     }
-
+    
     // Apply filter rules
     rules.forEach(rule => {
         const fieldSelect = rule.querySelector('select');
         const operatorSelect = rule.querySelector('select:nth-child(2)');
         const valueInput = rule.querySelector('input');
-
+        
         const field = fieldSelect?.value;
         const operator = operatorSelect?.value;
         const value = valueInput?.value;
-
+        
         if (!field || !operator) return;
-
+        
         filteredData = filteredData.filter(record => {
             const fieldValue = String(record.fields[field] || '').toLowerCase();
             const searchValue = (value || '').toLowerCase();
-
+            
             switch (operator) {
                 case 'contains': return fieldValue.includes(searchValue);
                 case 'equals': return fieldValue === searchValue;
@@ -803,7 +804,7 @@ function applyFilters() {
             }
         });
     });
-
+    
     currentPage = 1;
     applySorting();
     renderTable();
@@ -832,13 +833,13 @@ function clearQuickSearch() {
 // Row Selection
 function toggleSelectAll(checkbox) {
     const pageData = filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-
+    
     if (checkbox.checked) {
         pageData.forEach(record => selectedRows.add(record.id));
     } else {
         pageData.forEach(record => selectedRows.delete(record.id));
     }
-
+    
     renderTable();
     updateSelectionInfo();
 }
@@ -849,7 +850,7 @@ function toggleRowSelection(recordId, selected) {
     } else {
         selectedRows.delete(recordId);
     }
-
+    
     updateSelectionInfo();
 }
 
@@ -932,27 +933,26 @@ function updatePagination() {
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const pagination = document.getElementById('pagination');
     const paginationInfo = document.getElementById('paginationInfo');
-
+    
     // Update info
     const startRecord = (currentPage - 1) * rowsPerPage + 1;
-    ```text
     const endRecord = Math.min(currentPage * rowsPerPage, filteredData.length);
     paginationInfo.textContent = `Showing ${startRecord}-${endRecord} of ${filteredData.length} records`;
-
+    
     if (totalPages <= 1) {
         pagination.innerHTML = '';
         return;
     }
-
+    
     let html = '';
-
+    
     // Previous button
     html += `
         <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>
         </li>
     `;
-
+    
     // Page numbers
     for (let i = 1; i <= totalPages; i++) {
         if (i === currentPage || i === 1 || i === totalPages || 
@@ -966,14 +966,14 @@ function updatePagination() {
             html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
     }
-
+    
     // Next button
     html += `
         <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>
         </li>
     `;
-
+    
     pagination.innerHTML = html;
 }
 
@@ -995,18 +995,18 @@ function changeRowsPerPage() {
 async function editCell(recordId, fieldName, cellElement, fieldType) {
     const fieldId = `${document.getElementById('tableSelector').value}_${fieldName}`;
     const permission = currentTablePermissions[fieldId] || getDefaultPermission(currentUser.role);
-
+    
     if (permission !== 'edit' || (currentUser.role !== 'creator' && currentUser.role !== 'editor')) {
         showError('You do not have permission to edit this field');
         return;
     }
-
+    
     const record = currentTableData.find(r => r.id === recordId);
     if (!record) return;
-
+    
     const currentValue = record.fields[fieldName] || '';
     cellElement.classList.add('cell-editing');
-
+    
     let input;
     switch (fieldType) {
         case 'boolean':
@@ -1041,15 +1041,15 @@ async function editCell(recordId, fieldName, cellElement, fieldType) {
             input.className = 'form-control form-control-sm';
             input.value = currentValue;
     }
-
+    
     cellElement.innerHTML = '';
     cellElement.appendChild(input);
     input.focus();
-
+    
     if (input.type === 'text' || input.type === 'number') {
         input.select();
     }
-
+    
     const saveEdit = async () => {
         let newValue;
         if (fieldType === 'boolean') {
@@ -1057,20 +1057,20 @@ async function editCell(recordId, fieldName, cellElement, fieldType) {
         } else {
             newValue = input.value;
         }
-
+        
         if (newValue !== currentValue) {
             await updateFieldValue(recordId, fieldName, newValue);
         }
-
+        
         cellElement.classList.remove('cell-editing');
         cellElement.innerHTML = formatCellValue(newValue, fieldType);
     };
-
+    
     const cancelEdit = () => {
         cellElement.classList.remove('cell-editing');
         cellElement.innerHTML = formatCellValue(currentValue, fieldType);
     };
-
+    
     input.addEventListener('blur', saveEdit);
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && fieldType !== 'longText') {
@@ -1089,18 +1089,18 @@ async function updateFieldValue(recordId, fieldName, newValue) {
         const tableId = document.getElementById('tableSelector').value;
         const updateData = {};
         updateData[fieldName] = newValue;
-
+        
         // Get old value for logging
         const record = currentTableData.find(r => r.id === recordId);
         const oldValue = record ? record.fields[fieldName] : null;
-
+        
         await window.teableAPI.updateRecord(tableId, recordId, updateData);
-
+        
         // Log the field update
         const oldValues = { [fieldName]: oldValue };
         const newValues = { [fieldName]: newValue };
         await logDataChange(tableId, recordId, 'update', oldValues, newValues);
-
+        
         // Update local data
         if (record) {
             record.fields[fieldName] = newValue;
@@ -1109,9 +1109,9 @@ async function updateFieldValue(recordId, fieldName, newValue) {
         if (filteredRecord) {
             filteredRecord.fields[fieldName] = newValue;
         }
-
+        
         showSuccess('Field updated successfully');
-
+        
     } catch (error) {
         console.error('Error updating field:', error);
         showError('Failed to update field: ' + error.message);
@@ -1205,7 +1205,7 @@ async function viewRecord(recordId) {
         const permissionBadge = permission === 'edit' ? 
             '<span class="badge bg-primary ms-2">Editable</span>' : 
             '<span class="badge bg-secondary ms-2">Read-only</span>';
-
+        
         html += `
             <div class="col-md-6 mb-3">
                 <label class="form-label fw-semibold">
@@ -1243,11 +1243,11 @@ async function viewRecord(recordId) {
             </div>
         </div>
     `;
-
+    
     document.body.appendChild(modal);
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
-
+    
     modal.addEventListener('hidden.bs.modal', () => {
         modal.remove();
     });
@@ -1257,17 +1257,17 @@ function showRecordModal(recordId = null) {
     const modal = document.getElementById('recordModal');
     const title = document.getElementById('recordModalTitle');
     const fieldsContainer = document.getElementById('recordFields');
-
+    
     title.innerHTML = recordId ? 
         '<i class="fas fa-edit me-2"></i>Edit Record' : 
         '<i class="fas fa-plus me-2"></i>Add New Record';
-
+    
     // Get editable fields
     const editableFields = currentTableFields.filter(field => {
         const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
         return permission === 'edit';
     });
-
+    
     if (editableFields.length === 0) {
         fieldsContainer.innerHTML = `
             <div class="alert alert-warning">
@@ -1281,7 +1281,7 @@ function showRecordModal(recordId = null) {
         editableFields.forEach(field => {
             const currentValue = recordId ? 
                 (currentTableData.find(r => r.id === recordId)?.fields[field.name] || '') : '';
-
+            
             html += `
                 <div class="col-md-6 mb-3">
                     <label class="form-label">
@@ -1295,19 +1295,19 @@ function showRecordModal(recordId = null) {
         html += '</div>';
         fieldsContainer.innerHTML = html;
     }
-
+    
     // Store record ID for saving
     modal.setAttribute('data-record-id', recordId || '');
-
+    
     // Clear any previous validation states
     const inputs = modal.querySelectorAll('input, select, textarea');
     inputs.forEach(input => {
         input.classList.remove('is-invalid');
     });
-
+    
     const bootstrapModal = new bootstrap.Modal(modal);
     bootstrapModal.show();
-
+    
     // Focus on first input for new records
     if (!recordId) {
         setTimeout(() => {
@@ -1321,7 +1321,7 @@ function showRecordModal(recordId = null) {
 
 function getFieldInput(field, value) {
     const inputId = `field_${field.name}`;
-
+    
     switch (field.type) {
         case 'boolean':
             return `
@@ -1367,23 +1367,23 @@ async function saveRecord() {
         const modal = document.getElementById('recordModal');
         const recordId = modal.getAttribute('data-record-id');
         const tableId = document.getElementById('tableSelector').value;
-
+        
         if (!tableId) {
             showError('No table selected. Please select a table first.');
             return;
         }
-
+        
         // Collect field values with validation
         const recordData = {};
         let hasValidData = false;
-
+        
         currentTableFields.forEach(field => {
             const permission = currentTablePermissions[field.id] || getDefaultPermission(currentUser.role);
             if (permission === 'edit') {
                 const input = document.getElementById(`field_${field.name}`);
                 if (input) {
                     let value = input.value;
-
+                    
                     // Convert value based on field type
                     if (field.type === 'boolean') {
                         value = value === 'true';
@@ -1401,7 +1401,7 @@ async function saveRecord() {
                             return;
                         }
                     }
-
+                    
                     // Only add non-empty values (except for booleans and numbers which can be false/0)
                     if (value !== '' && value !== null && value !== undefined) {
                         recordData[field.name] = value;
@@ -1429,20 +1429,18 @@ async function saveRecord() {
             // Get old values for logging
             const oldRecord = currentTableData.find(r => r.id === recordId);
             const oldValues = oldRecord ? oldRecord.fields : {};
-
+            
             // Update existing record
             result = await window.teableAPI.updateRecord(tableId, recordId, recordData);
             console.log('Update result:', result);
-
+            
             // Log the update operation
             await logDataChange(tableId, recordId, 'update', oldValues, recordData);
         } else {
             // Create new record
-            // Create record in Teable.io (this will trigger logging via teableAPI.createRecord)
-        const newRecord = await window.teableAPI.createRecord(tableId, recordData);
-
-        console.log('✅ New record created with logging:', newRecord);
-
+            result = await window.teableAPI.createRecord(tableId, recordData);
+            console.log('Create result:', result);
+            
             // Log the create operation
             const newRecordId = result.records?.[0]?.id || result.record?.id || 'unknown';
             await logDataChange(tableId, newRecordId, 'create', null, recordData);
@@ -1471,7 +1469,7 @@ async function saveRecord() {
 
         // Reload table data to show the new/updated record
         await loadTableData();
-
+        
         // Verify the record was actually saved
         if (!recordId) {
             // For new records, check if they appear in the data
@@ -1486,12 +1484,12 @@ async function saveRecord() {
                 console.log('✅ Record verified in table data:', savedRecord);
             }
         }
-
+        
         showSuccess(recordId ? 'Record updated successfully!' : 'Record created successfully!');
 
     } catch (error) {
         console.error('Error saving record:', error);
-
+        
         // Provide more specific error messages
         let errorMessage = 'Failed to save record: ';
         if (error.message.includes('API Error: 400')) {
@@ -1507,7 +1505,7 @@ async function saveRecord() {
         } else {
             errorMessage += error.message;
         }
-
+        
         showError(errorMessage);
     }
 }
@@ -1525,27 +1523,27 @@ async function duplicateRecord(recordId) {
         showError('You do not have permission to create records');
         return;
     }
-
+    
     try {
         const record = currentTableData.find(r => r.id === recordId);
         if (!record) return;
 
         const tableId = document.getElementById('tableSelector').value;
         const duplicateData = { ...record.fields };
-
+        
         // Remove any ID fields
         delete duplicateData.id;
         delete duplicateData.created_at;
         delete duplicateData.updated_at;
 
         const result = await window.teableAPI.createRecord(tableId, duplicateData);
-
+        
         // Log the duplicate operation as a create
         const newRecordId = result.records?.[0]?.id || result.record?.id || 'unknown';
         await logDataChange(tableId, newRecordId, 'create', null, duplicateData);
-
+        
         await loadTableData();
-
+        
         showSuccess('Record duplicated successfully!');
 
     } catch (error) {
@@ -1559,32 +1557,32 @@ async function deleteRecord(recordId) {
         showError('You do not have permission to delete records');
         return;
     }
-
+    
     if (!confirm('Are you sure you want to delete this record?')) return;
-
+    
     try {
         const tableId = document.getElementById('tableSelector').value;
-
+        
         // Get old values for logging before deletion
         const oldRecord = currentTableData.find(r => r.id === recordId);
         const oldValues = oldRecord ? oldRecord.fields : {};
-
+        
         await window.teableAPI.deleteRecord(tableId, recordId);
-
+        
         // Log the delete operation
         await logDataChange(tableId, recordId, 'delete', oldValues, null);
-
+        
         // Remove from local data
         currentTableData = currentTableData.filter(r => r.id !== recordId);
         filteredData = filteredData.filter(r => r.id !== recordId);
         selectedRows.delete(recordId);
-
+        
         renderTable();
         updateTableStats();
         updateSelectionInfo();
-
+        
         showSuccess('Record deleted successfully!');
-
+        
     } catch (error) {
         console.error('Error deleting record:', error);
         showError('Failed to delete record: ' + error.message);
@@ -1596,7 +1594,7 @@ function updateTableStats() {
     const count = filteredData.length;
     const total = currentTableData.length;
     const countText = total === count ? `${count} records` : `${count} of ${total} records`;
-
+    
     document.getElementById('recordCount').textContent = countText;
 }
 
@@ -1626,7 +1624,7 @@ function handleKeyboardShortcuts(event) {
             toggleSelectAll(selectAllCheckbox);
         }
     }
-
+    
     // Delete key - Delete selected records
     if (event.key === 'Delete' && selectedRows.size > 0 && hasEditPermissions()) {
         if (confirm(`Delete ${selectedRows.size} selected record(s)?`)) {
@@ -1711,9 +1709,9 @@ function showAlert(type, message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-
+    
     document.body.appendChild(alertDiv);
-
+    
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -1804,7 +1802,7 @@ async function debugTableData() {
         console.log('No table selected');
         return;
     }
-
+    
     console.log('=== DEBUG TABLE DATA ===');
     console.log('Table ID:', tableId);
     console.log('Current user:', currentUser);
@@ -1813,43 +1811,39 @@ async function debugTableData() {
     console.log('Current table data count:', currentTableData.length);
     console.log('Filtered data count:', filteredData.length);
     console.log('Sample record:', currentTableData[0]);
-
+    
     try {
         // Test API connection
         console.log('Testing API connection...');
         const tables = await window.teableAPI.getTables();
         console.log('Available tables:', tables);
-
+        
         // Test getting records
         console.log('Testing record retrieval...');
         const records = await window.teableAPI.getRecords(tableId, { limit: 5 });
         console.log('Recent records:', records);
-
+        
     } catch (error) {
         console.error('API test failed:', error);
     }
-
+    
     console.log('=== END DEBUG ===');
 }
 
 // Data change logging helper function
 async function logDataChange(tableId, recordId, actionType, oldValues, newValues) {
     try {
-        console.log('🔄 Attempting to log data change:', { tableId, recordId, actionType });
-        
         // Skip logging if data logs system not available
         if (!window.teableAPI || !window.teableAPI.systemTables || !window.teableAPI.systemTables.dataLogs) {
-            console.log('⚠️ Data logging system not available, skipping log entry');
+            console.log('Data logging system not available, skipping log entry');
             return;
         }
-
+        
         const session = window.teableAuth?.getCurrentSession();
         if (!session) {
-            console.log('⚠️ No user session available for logging');
+            console.log('No user session available for logging');
             return;
         }
-
-        console.log('✅ Found session for logging:', session.email);
 
         // Get table name
         let tableName = 'Unknown';
@@ -1857,9 +1851,8 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
             const tables = await window.teableAPI.getTables();
             const table = (tables.tables || tables || []).find(t => t.id === tableId);
             tableName = table?.name || tableName;
-            console.log('✅ Found table name:', tableName);
         } catch (error) {
-            console.log('⚠️ Could not get table name for logging:', error.message);
+            console.log('Could not get table name for logging:', error.message);
         }
 
         const timestamp = new Date().toISOString();
@@ -1883,7 +1876,7 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                     changed_at: changedAt,
                     timestamp: timestamp,
                     user_role: session.role,
-                    ip_address: 'web_interface',
+                    ip_address: 'unknown',
                     session_id: session.loginTime || 'unknown'
                 });
             });
@@ -1902,7 +1895,7 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                     changed_at: changedAt,
                     timestamp: timestamp,
                     user_role: session.role,
-                    ip_address: 'web_interface',
+                    ip_address: 'unknown',
                     session_id: session.loginTime || 'unknown'
                 });
             });
@@ -1926,33 +1919,139 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                         changed_at: changedAt,
                         timestamp: timestamp,
                         user_role: session.role,
-                        ip_address: 'web_interface',
+                        ip_address: 'unknown',
                         session_id: session.loginTime || 'unknown'
                     });
                 }
             });
         }
 
-        console.log(`📝 Creating ${logEntries.length} log entries for ${actionType} action`);
-
         // Create log entries in batch
-        let successCount = 0;
         for (const logEntry of logEntries) {
             try {
-                console.log('📤 Creating log entry:', logEntry);
-                const result = await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
-                console.log('✅ Log entry created successfully:', result);
-                successCount++;
+                await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
             } catch (logError) {
-                console.error('❌ Failed to create data log entry:', logError);
-                console.error('Failed log entry data:', logEntry);
+                console.error('Failed to create data log entry:', logError);
             }
         }
 
-        console.log(`✅ Successfully logged ${successCount}/${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
+        console.log(`Logged ${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
 
     } catch (error) {
-        console.error('❌ Error logging data change:', error);
+        console.error('Error logging data change:', error);
+        // Don't throw error to avoid breaking the main operation
+    }
+}
+
+// Data change logging helper function
+async function logDataChange(tableId, recordId, actionType, oldValues, newValues) {
+    try {
+        // Skip logging if data logs system not available
+        if (!window.teableAPI || !window.teableAPI.systemTables || !window.teableAPI.systemTables.dataLogs) {
+            console.log('Data logging system not available, skipping log entry');
+            return;
+        }
+        
+        const session = window.teableAuth?.getCurrentSession();
+        if (!session) {
+            console.log('No user session available for logging');
+            return;
+        }
+
+        // Get table name
+        let tableName = 'Unknown';
+        try {
+            const tables = await window.teableAPI.getTables();
+            const table = (tables.tables || tables || []).find(t => t.id === tableId);
+            tableName = table?.name || tableName;
+        } catch (error) {
+            console.log('Could not get table name for logging:', error.message);
+        }
+
+        const timestamp = new Date().toISOString();
+        const changedAt = timestamp.split('T')[0];
+
+        // Create log entries for each field change
+        const logEntries = [];
+
+        if (actionType === 'create' && newValues) {
+            // Log all new fields
+            Object.keys(newValues).forEach(fieldName => {
+                logEntries.push({
+                    record_id: recordId,
+                    table_id: tableId,
+                    table_name: tableName,
+                    action_type: actionType,
+                    field_name: fieldName,
+                    old_value: null,
+                    new_value: String(newValues[fieldName] || ''),
+                    changed_by: session.email,
+                    changed_at: changedAt,
+                    timestamp: timestamp,
+                    user_role: session.role,
+                    ip_address: 'unknown',
+                    session_id: session.loginTime || 'unknown'
+                });
+            });
+        } else if (actionType === 'delete' && oldValues) {
+            // Log all deleted fields
+            Object.keys(oldValues).forEach(fieldName => {
+                logEntries.push({
+                    record_id: recordId,
+                    table_id: tableId,
+                    table_name: tableName,
+                    action_type: actionType,
+                    field_name: fieldName,
+                    old_value: String(oldValues[fieldName] || ''),
+                    new_value: null,
+                    changed_by: session.email,
+                    changed_at: changedAt,
+                    timestamp: timestamp,
+                    user_role: session.role,
+                    ip_address: 'unknown',
+                    session_id: session.loginTime || 'unknown'
+                });
+            });
+        } else if (actionType === 'update' && oldValues && newValues) {
+            // Log only changed fields
+            Object.keys(newValues).forEach(fieldName => {
+                const oldValue = oldValues[fieldName];
+                const newValue = newValues[fieldName];
+
+                // Only log if value actually changed
+                if (String(oldValue) !== String(newValue)) {
+                    logEntries.push({
+                        record_id: recordId,
+                        table_id: tableId,
+                        table_name: tableName,
+                        action_type: actionType,
+                        field_name: fieldName,
+                        old_value: String(oldValue || ''),
+                        new_value: String(newValue || ''),
+                        changed_by: session.email,
+                        changed_at: changedAt,
+                        timestamp: timestamp,
+                        user_role: session.role,
+                        ip_address: 'unknown',
+                        session_id: session.loginTime || 'unknown'
+                    });
+                }
+            });
+        }
+
+        // Create log entries in batch
+        for (const logEntry of logEntries) {
+            try {
+                await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
+            } catch (logError) {
+                console.error('Failed to create data log entry:', logError);
+            }
+        }
+
+        console.log(`Logged ${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
+
+    } catch (error) {
+        console.error('Error logging data change:', error);
         // Don't throw error to avoid breaking the main operation
     }
 }
