@@ -272,6 +272,9 @@ async function addLayerFromTable() {
             }
         }
 
+        // Load field permissions for this table
+        const fieldPermissions = await loadFieldPermissionsForTable(tableId);
+        
         // Create layer
         const layer = await createLayerFromData(records, {
             id: Date.now().toString(),
@@ -280,7 +283,8 @@ async function addLayerFromTable() {
             geometryField: detectedGeometryField,
             color: layerColor,
             visible: true,
-            type: 'table'
+            type: 'table',
+            fieldPermissions: fieldPermissions
         });
 
         if (layer) {
@@ -490,7 +494,10 @@ function createFeaturePopup(fields, layerConfig) {
 
     // Get fields to display - filter by permissions first
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
+    console.log(`Creating popup for layer "${layerConfig.name}" - all fields:`, allFields);
+    
     const permittedFields = filterFieldsByPermissions(allFields, layerConfig);
+    console.log(`Permitted fields after filtering:`, permittedFields);
     
     const selectedFields = layerConfig.properties?.popup?.fields;
     let fieldsToShow = [];
@@ -508,6 +515,10 @@ function createFeaturePopup(fields, layerConfig) {
         // If popup fields haven't been configured yet, show all permitted fields
         fieldsToShow = permittedFields;
         console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} permitted fields`);
+    }
+    
+    if (fieldsToShow.length !== allFields.length) {
+        console.log(`🔒 Field permissions active: ${allFields.length - fieldsToShow.length} field(s) hidden from ${fieldsToShow.length} visible`);
     }
 
     // Apply template
@@ -1283,16 +1294,11 @@ async function loadFieldPermissionsForTable(tableId) {
             return fieldPermissionsCache[tableId];
         }
 
-        // Wait for system tables to be initialized
-        let retries = 0;
-        while ((!window.teableAPI.systemTables || !window.teableAPI.systemTables.permissions) && retries < 10) {
-            console.log('Waiting for system tables to initialize...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            retries++;
-        }
-
-        if (!window.teableAPI.systemTables || !window.teableAPI.systemTables.permissions) {
-            console.log('Permissions system not initialized after waiting, using default permissions');
+        // Ensure system tables exist
+        try {
+            await window.teableAPI.ensureSystemTables();
+        } catch (systemError) {
+            console.log('System tables not available, using role-based defaults');
             return {};
         }
 
@@ -1311,7 +1317,7 @@ async function loadFieldPermissionsForTable(tableId) {
         // Cache the permissions
         fieldPermissionsCache[tableId] = fieldPermissions;
 
-        console.log(`Loaded field permissions for table ${tableId}:`, fieldPermissions);
+        console.log(`Loaded field permissions for table ${tableId}:`, Object.keys(fieldPermissions).length, 'permissions found');
         return fieldPermissions;
     } catch (error) {
         console.error('Error loading field permissions:', error);
@@ -1392,14 +1398,22 @@ function getFieldPermissionIndicator(permission) {
 }
 
 function filterFieldsByPermissions(fields, layer) {
-    if (!layer.fieldPermissions) {
+    if (!layer || !layer.fieldPermissions) {
+        console.log('No field permissions configured, showing all fields');
         return fields; // Return all fields if no permissions configured
     }
     
-    return fields.filter(fieldName => {
+    const filteredFields = fields.filter(fieldName => {
         const permission = getFieldPermission(fieldName, layer);
-        return permission !== 'hidden';
+        const isVisible = permission !== 'hidden';
+        if (!isVisible) {
+            console.log(`Filtering out hidden field: ${fieldName}`);
+        }
+        return isVisible;
     });
+    
+    console.log(`Filtered ${fields.length} fields to ${filteredFields.length} visible fields`);
+    return filteredFields;
 }
 
 function getFieldPermission(fieldName, layer) {
@@ -1474,8 +1488,13 @@ async function createEnhancedTableHeader(layer) {
     // Add selection checkbox column
     headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
 
-    // Add field columns with permission indicators - filter out hidden fields
-    const permittedFields = filterFieldsByPermissions(fields.filter(f => f !== layer.geometryField), layer);
+    // Get all fields except geometry field
+    const allFields = fields.filter(f => f !== layer.geometryField);
+    console.log('All fields before permission filtering:', allFields);
+    
+    // Filter out hidden fields based on permissions
+    const permittedFields = filterFieldsByPermissions(allFields, layer);
+    console.log('Permitted fields after filtering:', permittedFields);
     
     permittedFields.forEach(field => {
         const permission = getFieldPermission(field, layer);
@@ -1502,8 +1521,12 @@ async function createEnhancedTableHeader(layer) {
 async function createEnhancedTableBody(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
-    const fields = Object.keys(layer.records[0].fields || {});
-    const permittedFields = filterFieldsByPermissions(fields.filter(f => f !== layer.geometryField), layer);
+    const allFields = Object.keys(layer.records[0].fields || {});
+    const nonGeometryFields = allFields.filter(f => f !== layer.geometryField);
+    console.log('All non-geometry fields:', nonGeometryFields);
+    
+    const permittedFields = filterFieldsByPermissions(nonGeometryFields, layer);
+    console.log('Permitted fields for table body:', permittedFields);
     let bodyHTML = '';
 
     layer.records.forEach((record, index) => {
