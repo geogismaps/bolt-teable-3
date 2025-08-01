@@ -1186,7 +1186,7 @@ function getGeometryIcon(layer) {
             case 'audio': return 'fas fa-music text-purple';
             case 'image': return 'fas fa-camera text-info';
             case 'pdf': return 'fas fa-file-pdf text-danger';
-            case '360_images': return 'fas fa-globe text-primary';
+            case '360': return 'fas fa-globe text-primary';
         }
     }
     
@@ -5457,6 +5457,88 @@ window.testCustomTiles = async function() {
     }
 };
 
+// Media modal utility functions
+window.downloadCurrentMedia = function() {
+    // Get the currently active modal
+    const activeModal = document.querySelector('.modal.show');
+    if (!activeModal) {
+        showError('No active media to download');
+        return;
+    }
+    
+    let mediaUrl = null;
+    
+    // Extract media URL based on modal type
+    if (activeModal.id === 'videoModal') {
+        const videoElement = activeModal.querySelector('#videoPlayer source');
+        mediaUrl = videoElement ? videoElement.src : null;
+    } else if (activeModal.id === 'audioModal') {
+        const audioElement = activeModal.querySelector('audio source');
+        mediaUrl = audioElement ? audioElement.src : null;
+    } else if (activeModal.id === 'imageModal') {
+        const imageElement = activeModal.querySelector('img');
+        mediaUrl = imageElement ? imageElement.src : null;
+    } else if (activeModal.id === 'pdfModal') {
+        const iframeElement = activeModal.querySelector('iframe');
+        mediaUrl = iframeElement ? iframeElement.src : null;
+    }
+    
+    if (mediaUrl) {
+        const link = document.createElement('a');
+        link.href = mediaUrl;
+        link.download = '';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showSuccess('Download started');
+    } else {
+        showError('Could not find media URL for download');
+    }
+};
+
+window.fullscreenVideo = function() {
+    const videoElement = document.getElementById('videoPlayer');
+    if (videoElement) {
+        if (videoElement.requestFullscreen) {
+            videoElement.requestFullscreen();
+        } else if (videoElement.webkitRequestFullscreen) {
+            videoElement.webkitRequestFullscreen();
+        } else if (videoElement.msRequestFullscreen) {
+            videoElement.msRequestFullscreen();
+        }
+        showSuccess('Video entered fullscreen mode');
+    }
+};
+
+window.fullscreenImage = function() {
+    const activeModal = document.querySelector('.modal.show');
+    const imageElement = activeModal ? activeModal.querySelector('img') : null;
+    
+    if (imageElement) {
+        if (imageElement.requestFullscreen) {
+            imageElement.requestFullscreen();
+        } else if (imageElement.webkitRequestFullscreen) {
+            imageElement.webkitRequestFullscreen();
+        } else if (imageElement.msRequestFullscreen) {
+            imageElement.msRequestFullscreen();
+        }
+        showSuccess('Image entered fullscreen mode');
+    }
+};
+
+window.adjustPlaybackRate = function(adjustment) {
+    const audioElement = document.querySelector('#audioModal audio');
+    if (audioElement) {
+        if (adjustment === 0) {
+            audioElement.playbackRate = 1.0;
+        } else {
+            audioElement.playbackRate = Math.max(0.25, Math.min(2.0, audioElement.playbackRate + adjustment));
+        }
+        showSuccess(`Playback rate: ${audioElement.playbackRate}x`);
+    }
+};
+
 // Make functions globally available
 window.toggleSection = toggleSection;
 window.showAddLayerModal = showAddLayerModal;
@@ -6365,8 +6447,8 @@ function handleFullscreenChange() {
 function detectMediaLayerType(layerName, records) {
     const name = layerName.toLowerCase();
     
-    // Check layer name first
-    if (name.includes('360') || name.includes('panorama')) return '360_images';
+    // Check layer name first - prioritize 360 detection
+    if (name.includes('360') || name.includes('panorama') || name.includes('streetview')) return '360';
     if (name.includes('video')) return 'video';
     if (name.includes('audio')) return 'audio';
     if (name.includes('image') || name.includes('photo')) return 'image';
@@ -6374,8 +6456,6 @@ function detectMediaLayerType(layerName, records) {
     
     // If name doesn't match, analyze URL patterns from data
     if (records && records.length > 0) {
-        const urlFields = ['url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url'];
-        
         for (const record of records.slice(0, 5)) { // Check first 5 records
             const fields = record.fields || {};
             
@@ -6384,6 +6464,11 @@ function detectMediaLayerType(layerName, records) {
                 
                 if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
                     const url = fieldValue.toLowerCase();
+                    
+                    // 360 detection (check first for priority)
+                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        return '360';
+                    }
                     
                     // Video detection
                     if (url.includes('youtube.com') || url.includes('youtu.be') || 
@@ -6408,11 +6493,6 @@ function detectMediaLayerType(layerName, records) {
                     if (url.includes('.pdf') || url.includes('document')) {
                         return 'pdf';
                     }
-                    
-                    // 360 detection
-                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
-                        return '360_images';
-                    }
                 }
             }
         }
@@ -6423,7 +6503,7 @@ function detectMediaLayerType(layerName, records) {
 
 // Function to find URL field in record data
 function findUrlField(recordData) {
-    const urlFieldNames = ['url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url', 'src', 'source'];
+    const urlFieldNames = ['360_url', 'url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url', 'src', 'source', 'panorama_url'];
     
     for (const fieldName of urlFieldNames) {
         if (recordData[fieldName] && typeof recordData[fieldName] === 'string' && recordData[fieldName].startsWith('http')) {
@@ -6431,7 +6511,17 @@ function findUrlField(recordData) {
         }
     }
     
-    // Check all fields for URL-like values
+    // Check all fields for URL-like values (prioritize 360-related fields)
+    for (const [fieldName, value] of Object.entries(recordData)) {
+        if (typeof value === 'string' && value.startsWith('http')) {
+            // Prioritize 360-related URLs
+            if (fieldName.toLowerCase().includes('360') || fieldName.toLowerCase().includes('panorama')) {
+                return value;
+            }
+        }
+    }
+    
+    // Fallback to any HTTP URL
     for (const [fieldName, value] of Object.entries(recordData)) {
         if (typeof value === 'string' && value.startsWith('http')) {
             return value;
@@ -6443,235 +6533,196 @@ function findUrlField(recordData) {
 
 // Video player modal
 function openVideoModal(url, title = 'Video Player') {
-    // Remove existing modal
-    const existingModal = document.getElementById('videoPlayerModal');
-    if (existingModal) {
-        existingModal.remove();
+    const modal = document.getElementById('videoModal');
+    const videoElement = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const videoInfo = document.getElementById('videoInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-play-circle me-2"></i>${title}`;
     }
     
-    let embedUrl = url;
-    
-    // Convert YouTube URLs to embed format
-    if (url.includes('youtube.com/watch?v=')) {
-        const videoId = url.split('v=')[1].split('&')[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-    } else if (url.includes('youtu.be/')) {
-        const videoId = url.split('youtu.be/')[1].split('?')[0];
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-    } else if (url.includes('vimeo.com/')) {
-        const videoId = url.split('vimeo.com/')[1];
-        embedUrl = `https://player.vimeo.com/video/${videoId}`;
+    if (videoSource && videoElement) {
+        // Handle different video URL types
+        let finalUrl = url;
+        
+        // Convert YouTube URLs to embed format
+        if (url.includes('youtube.com/watch?v=')) {
+            const videoId = url.split('v=')[1].split('&')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+            
+            // For YouTube, we'll use an iframe instead
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else if (url.includes('youtu.be/')) {
+            const videoId = url.split('youtu.be/')[1].split('?')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+            
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else {
+            // Regular video file
+            videoSource.src = finalUrl;
+            videoElement.load();
+            videoElement.style.display = 'block';
+        }
+        
+        if (videoInfo) {
+            videoInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+        }
     }
     
-    const modalHTML = `
-        <div class="modal fade" id="videoPlayerModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-play-circle me-2"></i>${title}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                        <div class="video-container" style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
-                            ${embedUrl !== url ? 
-                                `<iframe src="${embedUrl}" 
-                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
-                                    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
-                                </iframe>` :
-                                `<video controls style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                                    <source src="${url}" type="video/mp4">
-                                    Your browser does not support the video tag.
-                                </video>`
-                            }
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Original
-                        </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
     
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = new bootstrap.Modal(document.getElementById('videoPlayerModal'));
-    modal.show();
+    console.log(`Opened video modal for: ${title}`);
 }
 
 // Audio player modal
 function openAudioModal(url, title = 'Audio Player') {
-    const existingModal = document.getElementById('audioPlayerModal');
-    if (existingModal) {
-        existingModal.remove();
+    const modal = document.getElementById('audioModal');
+    const audioElements = modal.querySelectorAll('audio source');
+    const audioInfo = document.getElementById('audioInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-music me-2"></i>${title}`;
     }
     
-    const modalHTML = `
-        <div class="modal fade" id="audioPlayerModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-music me-2"></i>${title}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <audio controls style="width: 100%; max-width: 500px;">
-                            <source src="${url}" type="audio/mpeg">
-                            <source src="${url}" type="audio/wav">
-                            <source src="${url}" type="audio/ogg">
-                            Your browser does not support the audio element.
-                        </audio>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Original
-                        </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    // Update all audio source elements
+    audioElements.forEach(source => {
+        source.src = url;
+    });
     
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = new bootstrap.Modal(document.getElementById('audioPlayerModal'));
-    modal.show();
+    // Load the audio
+    const audioElement = modal.querySelector('audio');
+    if (audioElement) {
+        audioElement.load();
+    }
+    
+    if (audioInfo) {
+        audioInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+    }
+    
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    console.log(`Opened audio modal for: ${title}`);
 }
 
 // Image viewer modal
 function openImageModal(url, title = 'Image Viewer') {
-    const existingModal = document.getElementById('imageViewerModal');
-    if (existingModal) {
-        existingModal.remove();
+    const modal = document.getElementById('imageModal');
+    const imageElement = modal.querySelector('img');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-image me-2"></i>${title}`;
     }
     
-    const modalHTML = `
-        <div class="modal fade" id="imageViewerModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-image me-2"></i>${title}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <img src="${url}" class="img-fluid" style="max-height: 70vh;" alt="Image">
-                    </div>
-                    <div class="modal-footer">
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Original
-                        </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    if (imageElement) {
+        imageElement.src = url;
+        imageElement.alt = title;
+    }
     
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
-    modal.show();
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    console.log(`Opened image modal for: ${title}`);
 }
 
 // PDF viewer modal
 function openPdfModal(url, title = 'PDF Viewer') {
-    const existingModal = document.getElementById('pdfViewerModal');
-    if (existingModal) {
-        existingModal.remove();
+    const modal = document.getElementById('pdfModal');
+    const iframeElement = modal.querySelector('iframe');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${title}`;
     }
     
-    const modalHTML = `
-        <div class="modal fade" id="pdfViewerModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-file-pdf me-2"></i>${title}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                        <iframe src="${url}" style="width: 100%; height: 70vh;" frameborder="0">
-                            <p>Your browser does not support PDFs. 
-                            <a href="${url}" target="_blank">Download the PDF</a>.</p>
-                        </iframe>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Original
-                        </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    if (iframeElement) {
+        iframeElement.src = url;
+    }
     
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = new bootstrap.Modal(document.getElementById('pdfViewerModal'));
-    modal.show();
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+    
+    console.log(`Opened PDF modal for: ${title}`);
 }
 
 // 360° viewer modal (using Pannellum)
 function open360Modal(url, title = '360° Viewer') {
-    const existingModal = document.getElementById('pannellumModal');
-    if (existingModal) {
-        existingModal.remove();
+    const modal = document.getElementById('panoramaModal');
+    const pannellumContainer = document.getElementById('pannellum');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
     }
     
-    const modalHTML = `
-        <div class="modal fade" id="pannellumModal" tabindex="-1">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-globe me-2"></i>${title}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-0">
-                        <div id="pannellum-container" style="width: 100%; height: 70vh;"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+    const bootstrapModal = new bootstrap.Modal(modal);
+    
+    // Initialize 360 viewer when modal is shown
+    modal.addEventListener('shown.bs.modal', function() {
+        if (typeof pannellum !== 'undefined' && pannellumContainer) {
+            try {
+                pannellum.viewer('pannellum', {
+                    type: 'equirectangular',
+                    panorama: url,
+                    autoLoad: true,
+                    showControls: true,
+                    showZoomCtrl: true,
+                    showFullscreenCtrl: true,
+                    mouseZoom: true,
+                    compass: true,
+                    northOffset: 0
+                });
+                console.log('Pannellum 360 viewer initialized');
+            } catch (error) {
+                console.error('Error initializing Pannellum:', error);
+                pannellumContainer.innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        360° viewer could not be initialized.
+                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View image directly
                         </a>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const modal = new bootstrap.Modal(document.getElementById('pannellumModal'));
-    
-    modal._element.addEventListener('shown.bs.modal', function() {
-        if (typeof pannellum !== 'undefined') {
-            pannellum.viewer('pannellum-container', {
-                type: 'equirectangular',
-                panorama: url,
-                autoLoad: true,
-                showControls: true
-            });
+                `;
+            }
         } else {
-            document.getElementById('pannellum-container').innerHTML = `
-                <div class="alert alert-warning">
-                    360° viewer not available. 
-                    <a href="${url}" target="_blank">View image directly</a>
+            // Fallback to regular image display
+            pannellumContainer.innerHTML = `
+                <div class="text-center">
+                    <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        360° viewer library not loaded. Displaying as regular image.
+                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View original
+                        </a>
+                    </div>
                 </div>
             `;
         }
     });
     
-    modal.show();
+    bootstrapModal.show();
+    console.log(`Opened 360° modal for: ${title}`);
 }
 
 function handleFeatureClick(feature, featureIndex, layerConfig) {
@@ -6725,7 +6776,7 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
                     case 'pdf':
                         openPdfModal(mediaUrl, title);
                         break;
-                    case '360_images':
+                    case '360':
                         open360Modal(mediaUrl, title);
                         break;
                     default:
