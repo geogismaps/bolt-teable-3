@@ -21,8 +21,8 @@ const ROLE_HIERARCHY = {
     'editor': {
         level: 3,
         name: 'Editor',
-        description: 'Can edit data and view all fields',
-        allowedPermissions: ['view', 'edit'],
+        description: 'Can edit data, view all fields, and hide fields',
+        allowedPermissions: ['view', 'edit', 'hidden'],
         defaultPermission: 'edit'
     },
     'commenter': {
@@ -580,7 +580,8 @@ function clearPermissionsMatrix() {
                         <div class="border rounded p-3 bg-white">
                             <h6 class="text-start">Role-Based Permissions:</h6>
                             <ul class="text-start">
-                                <li><strong>Creator/Editor:</strong> Can set View or Edit permissions</li>
+                                <li><strong>Creator:</strong> Can set View or Edit permissions</li>
+                                <li><strong>Editor:</strong> Can set View, Edit, or Hidden permissions</li>
                                 <li><strong>Commenter/Viewer:</strong> Can set View or Hidden permissions</li>
                                 <li><strong>Permissions are limited by user role</strong> - higher permissions cannot be granted to lower-level roles</li>
                             </ul>
