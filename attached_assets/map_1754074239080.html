@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Integrated GIS Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/pannellum/build/pannellum.css" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial;
+      overflow: hidden;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100%;
+      position: relative;
+      transition: margin-right 0.3s;
+    }
+
+    #attributeTable {
+      position: fixed;
+      bottom: -40vh;
+      left: 0;
+      right: 0;
+      height: 40vh;
+      background: #ffffff;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      border: 1px solid #ccc;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #attributeTable.visible {
+      transform: translateY(-100%);
+    }
+
+    .table-handle {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 140px;
+      height: 40px;
+      background: #fff;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      text-align: center;
+      line-height: 40px;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 14px;
+    }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      border: 1px solid #e0e0e0;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f8f9fb;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-weight: 600;
+    }
+
+    #dataTable tbody tr:hover {
+      background-color: #f8f9fa;
+    }
+
+    #dataTable tbody tr.highlight {
+      background-color: #fff9c4 !important;
+    }
+
+    .table-container::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+
+    #sidebar {
+      position: fixed;
+      top: 20px;
+      right: -320px;
+      width: 300px;
+      background: rgba(255, 255, 255, 0.98);
+      padding: 20px;
+      border-radius: 12px 0 0 12px;
+      box-shadow: -4px 4px 20px rgba(0,0,0,0.1);
+      z-index: 999;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      backdrop-filter: blur(2px);
+    }
+
+    #sidebar.visible {
+      transform: translateX(-100%);
+    }
+
+    .sidebar-handle {
+      position: absolute;
+      left: -40px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 80px;
+      background: #fff;
+      border-radius: 8px 0 0 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: -2px 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .sidebar-handle span {
+      transform: rotate(90deg);
+      font-weight: 600;
+      color: #2c3e50;
+      white-space: nowrap;
+    }
+
+    #legendBox {
+      margin-top: 15px;
+      border: 1px solid #e0e0e0;
+      padding: 15px;
+      border-radius: 8px;
+      background: white;
+    }
+
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #2c3e50;
+      font-size: 15px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .legend-color {
+      width: 22px;
+      height: 22px;
+      margin-right: 10px;
+      border: 1px solid #666;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .leaflet-control-scale {
+      right: 20px !important;
+      left: auto !important;
+      bottom: 20px !important;
+      background: rgba(255,255,255,0.8);
+      padding: 5px;
+      border-radius: 4px;
+    }
+
+    .thumbnail {
+      max-width: 50px;
+      max-height: 50px;
+      object-fit: cover;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      border: 1px solid #ddd;
+    }
+
+    .thumbnail:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .file-preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px;
+      cursor: pointer;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+
+    .file-preview:hover {
+      background: #e9ecef;
+    }
+
+    .file-icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    #dataTable a {
+      color: #3498db;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    #dataTable a:hover {
+      text-decoration: underline;
+    }
+
+    .preview-container {
+      text-align: center;
+      padding: 10px;
+    }
+
+    .preview-container a {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .zoom-button {
+      width: 100%;
+      padding: 10px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-weight: 600;
+    }
+
+    .zoom-button:hover {
+      background: #2980b9;
+    }
+
+    .filter-section {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .filter-row {
+      margin: 10px 0;
+      display: flex;
+      gap: 8px;
+    }
+    .filter-control {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .filter-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    datalist {
+      display: none;
+    }
+
+    /* 360 Viewer Styles */
+    #imageModal { 
+      display: none;
+      position: fixed;
+      top: 10%;
+      left: 10%;
+      width: 80%;
+      height: 80%;
+      background: white;
+      z-index: 2000;
+      border: 2px solid black;
+      padding: 10px;
+      overflow: hidden;
+    }
+    #pano {
+      width: 100%;
+      height: 100%;
+    }
+    #imageModal button {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      z-index: 1000;
+      padding: 5px 10px;
+      background: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  
+    /* Improved Popup Styles */
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      max-width: 300px;
+    }
+    .leaflet-popup-content {
+      margin: 15px;
+      font-size: 14px;
+    }
+    .popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .popup-title {
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    .popup-edit-buttons {
+      display: flex;
+      gap: 5px;
+    }
+    .edit-button, .save-button {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: opacity 0.2s;
+    }
+    .edit-button {
+      background: #3498db;
+      color: white;
+    }
+    .save-button {
+      background: #2ecc71;
+      color: white;
+      display: none;
+    }
+    .popup-field {
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .popup-label {
+      font-weight: 500;
+      color: #7f8c8d;
+    }
+    .popup-value {
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f8f9fa;
+    }
+    .popup-input {
+      display: none;
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #3498db;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .editing .popup-value {
+      display: none;
+    }
+    .editing .popup-input {
+      display: block;
+    }
+    .editing .save-button {
+      display: block;
+    }
+    .editing .edit-button {
+      display: none;
+    }
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background-color: #2ecc71;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 5px;
+      font-size: 14px;
+      display: none;
+      z-index: 9999;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+</style>
+</head>
+<body>
+  <div id="map">
+    <div class="table-handle" onclick="toggleAttributeTable()">▼ Show Table</div>
+    
+    <div id="sidebar">
+      <div class="sidebar-handle" onclick="toggleSidebar()">
+        <span id="sidebarHandleText">◀ Controls</span>
+      </div>
+
+      <div class="filter-section">
+        <h4>Filter Features</h4>
+        <div class="filter-row">
+          <select id="filterField" class="filter-control" onchange="updateConditions()">
+            <option value="">Select Field</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <select id="filterCondition" class="filter-control">
+            <option value="">Select Condition</option>
+          </select>
+        </div>
+        <div class="filter-row">
+          <input type="text" id="filterValue" class="filter-control" placeholder="Enter value" list="valueSuggestions">
+          <datalist id="valueSuggestions"></datalist>
+        </div>
+        <div class="filter-buttons">
+          <button class="zoom-button" onclick="applyFilter()">Apply</button>
+          <button class="zoom-button" style="background:#95a5a6" onclick="resetFilter()">Reset</button>
+        </div>
+      </div>
+
+      <div>
+        <label><b>Base Map:</b>
+          <select id="baseMapSelector" onchange="switchBaseMap(this.value)">
+            <option value="custom">Custom Tiles</option>
+            <option value="osm">OpenStreetMap</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label><b>Label Field:</b>
+          <select id="labelField" onchange="applyLabels()"></select>
+        </label>
+      </div>
+      <div>
+        <label><b>Color by Field:</b>
+          <select id="colorField" onchange="applyCategorizedStyle()"></select>
+        </label>
+      </div>
+      <div id="legendBox">
+        <div class="legend-title">Legend</div>
+        <div id="legendContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="attributeTable">
+    <div class="table-handle" onclick="toggleAttributeTable()">▲ Hide Table</div>
+    <div class="table-container"></div>
+  </div>
+
+  <!-- 360 Image Viewer Modal -->
+  <div id="imageModal">
+    <button onclick="closePano()">Close</button>
+    <div id="pano"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/wellknown/wellknown.js"></script>
+  <script src="https://unpkg.com/pannellum/build/pannellum.js"></script>
+
+  <script>
+    // State management
+    let lastHighlightedLayer = null;
+    let currentFeatures = [];
+    let currentLabelField = '';
+    let currentColorField = '';
+    let currentLegendColors = {};
+    const featureCache = new Map();
+    const tableId360 = localStorage.getItem("table_id_360");
+
+    // Configuration
+    const config = {
+      baseUrl: localStorage.getItem("nocodb_url"),
+      tableId: localStorage.getItem("table_id"),
+      token: localStorage.getItem("auth_token"),
+      userEmail: localStorage.getItem("current_user"),
+      permissions: JSON.parse(localStorage.getItem("user_permissions") || "{}")
+    };
+
+    // Map initialization
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 21,
+      attribution: '© OpenStreetMap'
+    });
+    const customTiles = L.tileLayer('tiles/{z}/{x}/{y}.png', { minZoom: 18, maxZoom: 21 });
+    const map = L.map('map', { center: [12.97, 77.59], zoom: 19, layers: [customTiles] });
+    const baseLayers = { custom: customTiles, osm: osmLayer };
+
+    // Feature layers
+    const layerGroup = L.geoJSON(null, {
+      onEachFeature: (feature, layer) => {
+        featureCache.set(feature.properties.Id, layer);
+        layer.on('click', () => {
+          showPopupInfo(feature.properties, layer);
+          map.fitBounds(layer.getBounds());
+          highlightRowById(feature.properties.Id);
+          highlightFeature(layer);
+        });
+      }
+    }).addTo(map);
+
+    // 360 Image layer
+    const imageLayerGroup = L.geoJSON(null, {
+      onEachFeature: (feature, layer) => {
+        layer.bindTooltip(feature.properties.Remarks || "360 View", { permanent: true });
+        layer.on('click', () => {
+          let imageUrl = "";
+          const photoField = feature.properties.Photo;
+          if (typeof photoField === 'string') {
+            imageUrl = photoField;
+          } else if (Array.isArray(photoField) && photoField.length > 0 && photoField[0].url) {
+            imageUrl = photoField[0].url;
+          }
+
+          if (imageUrl) {
+            document.getElementById("imageModal").style.display = "block";
+            document.getElementById("pano").innerHTML = "";
+            pannellum.viewer('pano', {
+              type: "equirectangular",
+              panorama: imageUrl,
+              autoLoad: true,
+              compass: true,
+              showZoomCtrl: true,
+              showFullscreenCtrl: true
+            });
+          } else {
+            alert("No 360 image available for this point.");
+          }
+        });
+      },
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 6,
+          fillColor: "#0077cc",
+          color: "#fff",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        });
+      }
+    }).addTo(map);
+
+    L.control.scale({ position: 'bottomright' }).addTo(map);
+
+    // Core functions
+    async function loadData() {
+      try {
+        const res = await fetch(`${config.baseUrl}/api/v2/tables/${config.tableId}/records?limit=1000`, {
+          headers: { 'xc-token': config.token }
+        });
+        const { list } = await res.json();
+        
+        currentFeatures = list
+          .filter(rec => rec.geometry)
+          .map(rec => ({
+            type: "Feature",
+            geometry: wellknown(rec.geometry),
+            properties: Object.keys(rec)
+              .filter(key => key !== "geometry" && config.permissions[config.userEmail]?.[key] !== "hidden")
+              .reduce((obj, key) => (obj[key] = rec[key], obj), { Id: rec.Id })
+          }))
+          .filter(Boolean);
+
+        layerGroup.clearLayers().addData(currentFeatures);
+        if(currentFeatures.length) {
+          map.fitBounds(layerGroup.getBounds());
+          buildAttributeTable(currentFeatures);
+          populateFilterFields();
+          populateStyleOptions(Object.keys(currentFeatures[0].properties));
+        }
+        await load360Points();
+      } catch (error) {
+        console.error('Data loading failed:', error);
+      }
+    }
+
+    async function load360Points() {
+      if (!tableId360) return;
+      try {
+        const res = await fetch(`${config.baseUrl}/api/v2/tables/${tableId360}/records?limit=1000`, {
+          headers: { 'xc-token': config.token }
+        });
+        const { list } = await res.json();
+        const features = list
+          .filter(rec => rec.geometry)
+          .map(rec => ({
+            type: "Feature",
+            geometry: wellknown(rec.geometry),
+            properties: {
+              Remarks: rec.Remarks || "",
+              Photo: rec.Photo || ""
+            }
+          }));
+        imageLayerGroup.clearLayers().addData(features);
+      } catch (error) {
+        console.error('360 points loading failed:', error);
+      }
+    }
+
+    // Table functions
+    function buildAttributeTable(features) {
+      const container = document.querySelector(".table-container");
+      const fields = Object.keys(features[0].properties);
+      
+      const tableHTML = `
+        <table id="dataTable">
+          <thead><tr>${fields.map(f => `<th>${f}<br><input oninput="filterTable('${f}', this.value)"></th>`).join('')}</tr></thead>
+          <tbody>
+            ${features.map((f, idx) => `
+              <tr data-id="${f.properties.Id}" onclick="zoomToFeature(${idx})">
+                ${fields.map(field => `
+                  <td ${config.permissions[config.userEmail]?.[field] === 'edit' ? 
+                    'contenteditable class="editable" onblur="updateRecord(\''+f.properties.Id+'\',\''+field+'\',this.innerText)"' : ''}>
+                    ${formatCellContent(f.properties[field], f.properties.Id)}
+                  </td>
+                `).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+      
+      container.innerHTML = tableHTML;
+    }
+
+    function formatCellContent(value, featureId) {
+      if (!value || typeof value !== 'string') return value;
+      const isUrl = /^(https?:\/\/)/i.test(value);
+      if (!isUrl) return value;
+      
+      const isImage = /\.(jpe?g|gif|png|webp|bmp)$/i.test(value);
+      const isPDF = /\.pdf$/i.test(value);
+      
+      if (isImage) {
+        return `<img src="${value}" class="thumbnail" 
+                 onclick="event.stopPropagation();showAttachment('${value}', '${featureId}', 'image')" />`;
+      } else if (isPDF) {
+        return `<div class="file-preview" onclick="event.stopPropagation();showAttachment('${value}', '${featureId}', 'pdf')">
+                  <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" class="file-icon" />
+                  <span>PDF File</span>
+                </div>`;
+      }
+      return `<a href="${value}" target="_blank" 
+               onclick="event.stopPropagation();showAttachmentPreview('${value}', '${featureId}')">
+               ${value}
+             </a>`;
+    }
+
+    // Highlight functions
+    function highlightRowById(id) {
+      document.querySelectorAll('#dataTable tr').forEach(row => {
+        row.classList.toggle('highlight', row.dataset.id === id.toString());
+        if(row.dataset.id === id.toString()) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+
+    function highlightFeature(layer) {
+      if(lastHighlightedLayer) layerGroup.resetStyle(lastHighlightedLayer);
+      layer.setStyle({ 
+        color: '#2980b9', 
+        weight: 4,
+        fillOpacity: 0.7 
+      });
+      lastHighlightedLayer = layer;
+    }
+
+    // Feature interaction
+    function zoomToFeature(index) {
+      const layer = layerGroup.getLayers()[index];
+      if(layer) {
+        map.fitBounds(layer.getBounds());
+        showPopupInfo(layer.feature.properties, layer);
+        highlightRowById(layer.feature.properties.Id);
+        highlightFeature(layer);
+      }
+    }
+
+    // Data filtering
+    function filterTable(field, query) {
+      const rows = document.querySelectorAll("#dataTable tbody tr");
+      const index = Array.from(document.querySelectorAll("#dataTable th"))
+        .findIndex(th => th.textContent.includes(field));
+      
+      rows.forEach(row => {
+        const cell = row.cells[index];
+        row.style.display = cell?.textContent.toLowerCase().includes(query.toLowerCase()) ? '' : 'none';
+      });
+    }
+
+    // Data updates
+    function updateRecord(recordId, field, value) {
+      fetch(`${config.baseUrl}/api/v2/tables/${config.tableId}/records`, {
+        method: "PATCH",
+        headers: {
+          "xc-token": config.token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ Id: recordId, [field]: value })
+      }).catch(err => alert(`Update failed: ${err.message}`));
+    }
+
+    // Filter functions
+    function populateFilterFields() {
+      const filterField = document.getElementById('filterField');
+      filterField.innerHTML = '<option value="">Select Field</option>';
+      Object.keys(config.permissions[config.userEmail] || {}).forEach(field => {
+        if (config.permissions[config.userEmail][field] !== 'hidden') {
+          const option = document.createElement('option');
+          option.value = field;
+          option.textContent = field;
+          filterField.appendChild(option);
+        }
+      });
+    }
+
+    function updateConditions() {
+      const field = document.getElementById('filterField').value;
+      const conditionSelect = document.getElementById('filterCondition');
+      const valueInput = document.getElementById('filterValue');
+      const dataList = document.getElementById('valueSuggestions');
+
+      conditionSelect.innerHTML = '<option value="">Select Condition</option>';
+      dataList.innerHTML = '';
+      valueInput.value = '';
+
+      if (!field) return;
+
+      const uniqueValues = [...new Set(currentFeatures
+        .map(f => f.properties[field])
+        .filter(v => v !== null && v !== undefined)
+      )].sort();
+
+      uniqueValues.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        dataList.appendChild(option);
+      });
+
+      const isNumeric = uniqueValues.some(v => !isNaN(v));
+      const conditions = isNumeric ? 
+        ['Equals', 'Not Equal', 'Greater Than', 'Less Than', 'Between'] : 
+        ['Contains', 'Exact Match', 'Starts With', 'Ends With'];
+
+      conditions.forEach(cond => {
+        const option = document.createElement('option');
+        option.value = cond;
+        option.textContent = cond;
+        conditionSelect.appendChild(option);
+      });
+    }
+
+    function applyFilter() {
+      const field = document.getElementById('filterField').value;
+      const condition = document.getElementById('filterCondition').value;
+      const value = document.getElementById('filterValue').value.trim();
+
+      if (!field || !condition || !value) {
+        alert('Please complete all filter fields');
+        return;
+      }
+
+      const filtered = currentFeatures.filter(feature => {
+        const propValue = feature.properties[field];
+        if (propValue === null || propValue === undefined) return false;
+
+        if (condition === 'Between') {
+          const [min, max] = value.split('-').map(Number);
+          return propValue >= min && propValue <= max;
+        }
+
+        const numericComparison = !isNaN(propValue) && !isNaN(value);
+        const strValue = String(propValue).toLowerCase();
+        const filterValue = value.toLowerCase();
+
+        switch(condition) {
+          case 'Equals': return numericComparison ? 
+            Number(propValue) === Number(value) : strValue === filterValue;
+          case 'Not Equal': return numericComparison ? 
+            Number(propValue) !== Number(value) : strValue !== filterValue;
+          case 'Greater Than': return Number(propValue) > Number(value);
+          case 'Less Than': return Number(propValue) < Number(value);
+          case 'Contains': return strValue.includes(filterValue);
+          case 'Exact Match': return strValue === filterValue;
+          case 'Starts With': return strValue.startsWith(filterValue);
+          case 'Ends With': return strValue.endsWith(filterValue);
+          default: return true;
+        }
+      });
+
+      layerGroup.clearLayers().addData(filtered);
+      if(currentLabelField) applyLabels(currentLabelField);
+      if(currentColorField) applyCategorizedStyle(currentColorField);
+      buildAttributeTable(filtered);
+      if (filtered.length) map.fitBounds(layerGroup.getBounds());
+    }
+
+    function resetFilter() {
+      document.getElementById('filterField').value = '';
+      document.getElementById('filterCondition').value = '';
+      document.getElementById('filterValue').value = '';
+      layerGroup.clearLayers().addData(currentFeatures);
+      buildAttributeTable(currentFeatures);
+      map.fitBounds(layerGroup.getBounds());
+      if(currentLabelField) applyLabels(currentLabelField);
+      if(currentColorField) applyCategorizedStyle(currentColorField);
+    }
+
+    // Style functions
+    function populateStyleOptions(fields) {
+      const populate = (el, options) => {
+        el.innerHTML = '<option value="">Null</option>' + 
+          fields.map(f => `<option value="${f}">${f}</option>`).join('');
+      };
+      populate(document.getElementById('labelField'), fields);
+      populate(document.getElementById('colorField'), fields);
+    }
+
+    function applyLabels(field = document.getElementById('labelField').value) {
+      currentLabelField = field;
+      layerGroup.eachLayer(layer => {
+        layer.unbindTooltip();
+        if(field && layer.feature.properties[field]) {
+          layer.bindTooltip(layer.feature.properties[field].toString(), {
+            permanent: true,
+            direction: 'right',
+            className: 'leaflet-tooltip-own'
+          }).openTooltip();
+        }
+      });
+    }
+
+    function applyCategorizedStyle(field = document.getElementById('colorField').value) {
+      currentColorField = field;
+      const legendContent = document.getElementById('legendContent');
+      
+      if(!field) {
+        layerGroup.eachLayer(l => l.setStyle({ color: "#3498db" }));
+        legendContent.innerHTML = '';
+        return;
+      }
+
+      currentLegendColors = generateCategoryColors(field);
+      layerGroup.eachLayer(layer => {
+        const val = layer.feature.properties[field];
+        layer.setStyle({ color: currentLegendColors[val] || "#95a5a6" });
+      });
+
+      const uniqueValues = [...new Set(currentFeatures.map(f => f.properties[field]))];
+      legendContent.innerHTML = uniqueValues.map(val => `
+        <div class="legend-item">
+          <div class="legend-color" style="background:${currentLegendColors[val] || '#95a5a6'}"></div>
+          <span>${val}</span>
+        </div>
+      `).join('');
+    }
+
+    function generateCategoryColors(field) {
+      const palette = ["#e74c3c", "#2ecc71", "#f1c40f", "#3498db", "#9b59b6"];
+      return Object.fromEntries([...new Set(currentFeatures.map(f => f.properties[field]))]
+        .map((val, i) => [val, palette[i % palette.length]]));
+    }
+
+    // UI functions
+    function toggleAttributeTable() {
+      const table = document.getElementById('attributeTable');
+      const handles = document.querySelectorAll('.table-handle');
+      table.classList.toggle('visible');
+      handles.forEach(h => h.textContent = table.classList.contains('visible') ? '▲ Hide Table' : '▼ Show Table');
+      setTimeout(() => map.invalidateSize(), 300);
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const handleText = document.getElementById('sidebarHandleText');
+      sidebar.classList.toggle('visible');
+      handleText.textContent = sidebar.classList.contains('visible') ? '▶ Hide' : '◀ Controls';
+      setTimeout(() => map.invalidateSize(), 300);
+    }
+
+    function switchBaseMap(val) {
+      Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+      map.addLayer(baseLayers[val]);
+    }
+
+    // Popup functions
+    // Custom Popup Handler
+
+    function showPopupInfo(props, layer) {
+      const popupContent = document.createElement('div');
+      popupContent.className = 'popup-container';
+      
+      const header = document.createElement('div');
+      header.className = 'popup-header';
+      header.innerHTML = `
+        <div class="popup-title">Feature Details</div>
+        <div class="popup-edit-buttons">
+          <button class="edit-button" onclick="toggleEditMode(this)">Edit</button>
+          <button class="save-button" onclick="saveChanges(this)">Save</button>
+        </div>
+      `;
+      
+      const fieldsContainer = document.createElement('div');
+      fieldsContainer.className = 'popup-fields';
+      
+      Object.entries(props).forEach(([key, value]) => {
+        if(key === 'Id') return;
+        
+        const permission = config.permissions[config.userEmail]?.[key];
+        if(permission === 'hidden') return;
+        const isEditable = permission === 'edit';
+        
+        const field = document.createElement('div');
+        field.className = 'popup-field';
+        field.innerHTML = `
+          <div class="popup-label">${key}</div>
+          <div class="popup-value">${formatCellContent(value, props.Id)}</div>
+          <input class="popup-input" 
+                 data-field="${key}" 
+                 value="${value}" 
+                 ${isEditable ? '' : 'disabled'}>
+        `;
+        fieldsContainer.appendChild(field);
+      });
+
+      popupContent.appendChild(header);
+      popupContent.appendChild(fieldsContainer);
+      
+      layer.bindPopup(popupContent).openPopup();
+    }
+
+    function toggleEditMode(button) {
+      const popup = button.closest('.leaflet-popup-content-wrapper');
+      popup.classList.add('editing');
+    }
+
+    function showToast(message, isSuccess = true) {
+      const toast = document.getElementById('toast') || document.createElement('div');
+      toast.id = 'toast';
+      toast.textContent = message;
+      toast.style.backgroundColor = isSuccess ? '#2ecc71' : '#e74c3c';
+      document.body.appendChild(toast);
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 3000);
+    }
+
+    function saveChanges(button) {
+      const popup = button.closest('.leaflet-popup-content-wrapper');
+      const layer = popup._source;
+      const props = layer.feature.properties;
+      const changes = {};
+
+      popup.querySelectorAll('.popup-input').forEach(input => {
+        const field = input.dataset.field;
+        const newValue = input.value;
+        if(newValue !== props[field]) {
+          changes[field] = newValue;
+          props[field] = newValue;
+          const valueDiv = input.previousElementSibling;
+          valueDiv.innerHTML = formatCellContent(newValue, props.Id);
+        }
+      });
+
+      if(Object.keys(changes).length > 0) {
+        updateRecord(props.Id, changes)
+          .then(() => {
+            if(window.allFeatures) {
+              const feature = window.allFeatures.find(f => f.properties.Id === props.Id);
+              if(feature) {
+                Object.assign(feature.properties, props);
+                buildAttributeTable(window.allFeatures);
+              }
+            }
+            showToast('Changes saved successfully.');
+          })
+          .catch(err => showToast('Save failed: ' + err.message, false));
+      }
+
+      popup.classList.remove('editing');
+    }
+
+    function updateRecord(recordId, changes) {
+      return fetch(`${config.baseUrl}/api/v2/tables/${config.tableId}/records`, {
+        method: "PATCH",
+        headers: {
+          "xc-token": config.token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ Id: recordId, ...changes })
+      }).then(res => {
+        if (!res.ok) throw new Error("Update failed");
+        return res.json();
+      });
+    }
+
+// END Custom Popup Handler
+function UNUSED_showPopupInfo(props, layer) {
+      const content = Object.entries(props)
+        .filter(([key]) => key !== 'Id')
+        .map(([key, val]) => {
+          const formatted = formatCellContent(val, props.Id)
+            .replace(/onclick=".*?"/g, '')
+            .replace(/class="thumbnail"/g, 'style="max-width: 100px; max-height: 100px"');
+          return `<b>${key}:</b> ${formatted}`;
+        })
+        .join('<br>');
+      
+      layer.bindPopup(content).openPopup();
+    }
+
+    // Attachment handling
+    function showAttachment(url, featureId, type) {
+      const layer = featureCache.get(parseInt(featureId));
+      if (!layer) return;
+
+      const content = type === 'image' 
+        ? `<img src="${url}" style="max-width: 300px; max-height: 300px;"/>`
+        : `<iframe src="${url}" style="width: 300px; height: 400px;"></iframe>`;
+      
+      layer.bindPopup(content).openPopup();
+      map.fitBounds(layer.getBounds());
+    }
+
+    function showAttachmentPreview(url, featureId) {
+      const layer = featureCache.get(parseInt(featureId));
+      if (layer) {
+        layer.bindPopup(`
+          <div class="preview-container">
+            <a href="${url}" target="_blank">Open in new tab</a>
+            ${url.includes('youtube.com') ? `
+              <iframe width="240" height="135" src="${url.replace('watch?v=', 'embed/')}" 
+                frameborder="0" allowfullscreen></iframe>
+            ` : ''}
+          </div>
+        `).openPopup();
+        map.fitBounds(layer.getBounds());
+      }
+    }
+
+    // 360 Viewer functions
+    function closePano() {
+      document.getElementById("imageModal").style.display = "none";
+      document.getElementById("pano").innerHTML = "";
+    }
+
+    // Initialization
+    loadData();
+  </script>
+<div id="toast"></div>
+</body>
+</html>
