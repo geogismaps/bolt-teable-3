@@ -391,6 +391,70 @@
             font-size: 0.75rem;
             line-height: 1.2;
         }
+
+        /* Permission Indicators */
+        .permission-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .permission-view {
+            background-color: #17a2b8;
+        }
+
+        .permission-edit {
+            background-color: #28a745;
+        }
+
+        .permission-hidden {
+            background-color: #dc3545;
+        }
+
+        .field-editable {
+            border-left: 3px solid #28a745 !important;
+        }
+
+        .field-viewonly {
+            border-left: 3px solid #17a2b8 !important;
+        }
+
+        .field-hidden {
+            border-left: 3px solid #dc3545 !important;
+        }
+
+        /* Enhanced table styling for permissions */
+        .editable-cell {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .editable-cell:hover {
+            background-color: #f8f9fa;
+        }
+
+        .readonly-cell {
+            background-color: #f8f9fa;
+        }
+
+        /* Permission tooltips */
+        .permission-indicator[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>

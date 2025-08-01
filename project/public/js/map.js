@@ -11,6 +11,7 @@ let measurementPoints = [];
 let selectedFeatures = [];
 let currentUser = null;
 let geoJSONData = null;
+let fieldPermissionsCache = {};
 
 // Base map configurations
 const baseMaps = {
@@ -452,9 +453,9 @@ function createFeaturePopup(fields, layerConfig) {
 
     let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
     
-    // Popup header
+    // Popup header with user role indicator
     content += `<div class="popup-header d-flex justify-content-between align-items-center mb-2">`;
-    content += `<h6 class="popup-title mb-0">${layerConfig.name}</h6>`;
+    content += `<h6 class="popup-title mb-0">${layerConfig.name} ${getUserRoleBadge()}</h6>`;
     
     // Add search if enabled
     if (enableSearch) {
@@ -463,37 +464,37 @@ function createFeaturePopup(fields, layerConfig) {
     }
     content += `</div>`;
 
-    // Get fields to display - only show selected fields if configured
+    // Get fields to display - filter by permissions first
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
-    const selectedFields = layerConfig.properties?.popup?.fields;
-    const isPopupConfigured = layerConfig.properties?.popup?.configured === true;
+    const permittedFields = filterFieldsByPermissions(allFields, layerConfig);
     
+    const selectedFields = layerConfig.properties?.popup?.fields;
     let fieldsToShow = [];
     
     // Check if popup fields have been specifically configured
     if (selectedFields && Array.isArray(selectedFields)) {
-        // Only show the specifically selected fields, even if the array is empty
+        // Only show the specifically selected fields that user has permission to see
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
-            allFields.includes(field) &&
+            permittedFields.includes(field) &&
             fields.hasOwnProperty(field)
         );
-        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} selected fields:`, fieldsToShow);
+        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} permitted selected fields:`, fieldsToShow);
     } else {
-        // If popup fields haven't been configured yet, show all fields
-        fieldsToShow = allFields;
-        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} fields`);
+        // If popup fields haven't been configured yet, show all permitted fields
+        fieldsToShow = permittedFields;
+        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} permitted fields`);
     }
 
     // Apply template
     if (template === 'custom' && popupSettings.customTemplate) {
         content += renderCustomTemplate(popupSettings.customTemplate, fields, fieldsToShow);
     } else if (template === 'table') {
-        content += renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+        content += renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig);
     } else if (template === 'card') {
-        content += renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+        content += renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig);
     } else {
-        content += renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength);
+        content += renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig);
     }
 
     // Add controls if enabled
@@ -507,7 +508,7 @@ function createFeaturePopup(fields, layerConfig) {
     return content;
 }
 
-function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-fields">';
     
     fieldsToShow.forEach(key => {
@@ -518,13 +519,17 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
             return;
         }
         
+        // Get field permission for styling
+        const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
+        const permissionIndicator = getFieldPermissionIndicator(permission);
+        
         // Format value
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
         content += `<div class="popup-field d-flex align-items-start mb-2" data-field="${key}">`;
-        content += `<div class="field-label flex-shrink-0 me-2"><strong>${fieldIcon}${key}:</strong></div>`;
+        content += `<div class="field-label flex-shrink-0 me-2"><strong>${permissionIndicator}${fieldIcon}${key}:</strong></div>`;
         content += `<div class="field-value flex-grow-1">${formattedValue}</div>`;
         
         if (showCopyButtons) {
@@ -535,14 +540,14 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
     });
     
     if (fieldsToShow.length === 0) {
-        content += `<div class="text-muted text-center py-2"><em>No fields selected for display</em></div>`;
+        content += `<div class="text-muted text-center py-2"><em>No accessible fields to display</em></div>`;
     }
     
     content += '</div>';
     return content;
 }
 
-function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-table-wrapper" style="max-height: 300px; overflow-y: auto;">';
     content += '<table class="table table-sm table-bordered mb-0">';
     
@@ -553,12 +558,16 @@ function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIco
             return;
         }
         
+        // Get field permission for styling
+        const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
+        const permissionIndicator = getFieldPermissionIndicator(permission);
+        
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
         
         content += `<tr data-field="${key}">`;
-        content += `<td class="fw-bold" style="width: 40%;">${fieldIcon}${key}</td>`;
+        content += `<td class="fw-bold" style="width: 40%;">${permissionIndicator}${fieldIcon}${key}</td>`;
         content += `<td>${formattedValue}`;
         
         if (showCopyButtons) {
@@ -572,7 +581,7 @@ function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIco
     return content;
 }
 
-function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength) {
+function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-cards">';
     
     fieldsToShow.forEach(key => {
@@ -582,13 +591,17 @@ function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcon
             return;
         }
         
+        // Get field permission for styling
+        const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
+        const permissionIndicator = getFieldPermissionIndicator(permission);
+        
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
         content += `<div class="card mb-2" data-field="${key}">`;
         content += `<div class="card-body p-2">`;
-        content += `<h6 class="card-title mb-1">${fieldIcon}${key}</h6>`;
+        content += `<h6 class="card-title mb-1">${permissionIndicator}${fieldIcon}${key}</h6>`;
         content += `<div class="card-text">${formattedValue}`;
         
         if (showCopyButtons) {
@@ -1219,6 +1232,12 @@ async function createDockedAttributeTable(layer) {
 
 async function loadFieldPermissionsForTable(tableId) {
     try {
+        // Check cache first
+        if (fieldPermissionsCache[tableId]) {
+            console.log(`Using cached field permissions for table ${tableId}`);
+            return fieldPermissionsCache[tableId];
+        }
+
         if (!window.teableAPI.systemTables.permissions) {
             console.log('Permissions system not initialized, using default permissions');
             return {};
@@ -1241,12 +1260,98 @@ async function loadFieldPermissionsForTable(tableId) {
             }
         });
 
+        // Cache the permissions
+        fieldPermissionsCache[tableId] = fieldPermissions;
+
         console.log(`Loaded field permissions for table ${tableId}:`, fieldPermissions);
         return fieldPermissions;
     } catch (error) {
         console.error('Error loading field permissions:', error);
         return {};
     }
+}
+
+function getFieldPermission(fieldName, layer) {
+    if (!layer.fieldPermissions) {
+        return getDefaultPermissionByRole();
+    }
+    
+    return layer.fieldPermissions[fieldName] || getDefaultPermissionByRole();
+}
+
+function getDefaultPermissionByRole() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return 'view';
+    
+    const role = currentUser.role?.toLowerCase() || 'viewer';
+    
+    // Map roles to permissions - matches table.js logic
+    const rolePermissions = {
+        'creator': 'edit',
+        'owner': 'edit', 
+        'editor': 'edit',
+        'commenter': 'view',
+        'viewer': 'view'
+    };
+    
+    return rolePermissions[role] || 'view';
+}
+
+function canEditRecords() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return false;
+    
+    const role = currentUser.role?.toLowerCase() || 'viewer';
+    return role === 'creator' || role === 'owner' || role === 'editor';
+}
+
+function getUserRoleBadge() {
+    const currentUser = window.teableAuth.getCurrentSession();
+    if (!currentUser) return 'Unknown';
+    
+    const role = currentUser.role || 'Viewer';
+    const roleColors = {
+        'creator': 'danger',
+        'owner': 'danger',
+        'editor': 'success', 
+        'commenter': 'warning',
+        'viewer': 'secondary'
+    };
+    
+    const colorClass = roleColors[role.toLowerCase()] || 'secondary';
+    return `<span class="badge bg-${colorClass}">${role}</span>`;
+}
+
+function getPermissionIndicator() {
+    const editCount = document.querySelectorAll('.field-editable').length;
+    const viewCount = document.querySelectorAll('.field-viewonly').length;
+    const hiddenCount = document.querySelectorAll('.field-hidden').length;
+    
+    return `
+        <span class="text-success" title="Editable fields"><i class="fas fa-edit"></i> ${editCount}</span>
+        <span class="text-info ms-2" title="View-only fields"><i class="fas fa-eye"></i> ${viewCount}</span>
+        ${hiddenCount > 0 ? `<span class="text-danger ms-2" title="Hidden fields"><i class="fas fa-eye-slash"></i> ${hiddenCount}</span>` : ''}
+    `;
+}
+
+function getFieldPermissionIndicator(permission) {
+    const indicators = {
+        'view': '<span class="permission-indicator permission-view" title="View only"></span>',
+        'edit': '<span class="permission-indicator permission-edit" title="Can edit"></span>',
+        'hidden': '<span class="permission-indicator permission-hidden" title="Hidden"></span>'
+    };
+    return indicators[permission] || indicators['view'];
+}
+
+function filterFieldsByPermissions(fields, layer) {
+    if (!layer.fieldPermissions) {
+        return fields; // Return all fields if no permissions configured
+    }
+    
+    return fields.filter(fieldName => {
+        const permission = getFieldPermission(fieldName, layer);
+        return permission !== 'hidden';
+    });
 }
 
 function getFieldPermission(fieldName, layer) {
@@ -1321,21 +1426,22 @@ async function createEnhancedTableHeader(layer) {
     // Add selection checkbox column
     headerHTML += '<th style="width: 40px;"><input type="checkbox" onchange="toggleAllRows(this, \'' + layer.id + '\')"></th>';
 
-    // Add field columns with permission indicators
-    fields.forEach(field => {
-        if (field !== layer.geometryField) {
-            const permission = getFieldPermission(field, layer);
-            
-            if (permission !== 'hidden') {
-                const permissionClass = permission === 'edit' ? 'field-editable' : 'field-viewonly';
-                
-                headerHTML += `
-                    <th class="${permissionClass}">
-                        <span>${field}</span>
-                    </th>
-                `;
-            }
-        }
+    // Add field columns with permission indicators - filter out hidden fields
+    const permittedFields = filterFieldsByPermissions(fields.filter(f => f !== layer.geometryField), layer);
+    
+    permittedFields.forEach(field => {
+        const permission = getFieldPermission(field, layer);
+        const permissionClass = permission === 'edit' ? 'field-editable' : 'field-viewonly';
+        const permissionIndicator = getFieldPermissionIndicator(permission);
+        
+        headerHTML += `
+            <th class="${permissionClass}">
+                <div class="d-flex align-items-center">
+                    ${permissionIndicator}
+                    <span class="ms-1">${field}</span>
+                </div>
+            </th>
+        `;
     });
 
     // Add actions column
@@ -1349,6 +1455,7 @@ async function createEnhancedTableBody(layer) {
     if (!layer.records || layer.records.length === 0) return '';
 
     const fields = Object.keys(layer.records[0].fields || {});
+    const permittedFields = filterFieldsByPermissions(fields.filter(f => f !== layer.geometryField), layer);
     let bodyHTML = '';
 
     layer.records.forEach((record, index) => {
@@ -1357,38 +1464,34 @@ async function createEnhancedTableBody(layer) {
         // Add selection checkbox
         bodyHTML += `<td><input type="checkbox" class="row-selector" onchange="toggleRowSelection('${layer.id}', ${index}, this.checked)"></td>`;
 
-        // Add field data with permission-based editing
-        fields.forEach(field => {
-            if (field !== layer.geometryField) {
-                const permission = getFieldPermission(field, layer);
-                
-                if (permission !== 'hidden') {
-                    let value = record.fields[field];
-                    const originalValue = value;
-                    
-                    if (value === null || value === undefined) {
-                        value = '';
-                    }
-                    
-                    const displayValue = typeof value === 'string' && value.length > 50 ? 
-                        value.substring(0, 50) + '...' : value;
-                    
-                    const cellClass = permission === 'edit' ? 'editable-cell' : 'readonly-cell';
-                    const borderColor = permission === 'edit' ? 'border-success' : 'border-info';
-                    
-                    bodyHTML += `
-                        <td class="${cellClass} ${borderColor}" 
-                            data-field="${field}" 
-                            data-record-id="${record.id}"
-                            data-original-value="${escapeHtml(originalValue || '')}"
-                            title="${permission === 'edit' ? 'Editable field' : 'View only'}: ${originalValue || ''}">
-                            <div class="${permission === 'edit' ? 'editable-content' : 'readonly-content'}">
-                                ${escapeHtml(displayValue)}
-                            </div>
-                        </td>
-                    `;
-                }
+        // Add field data with permission-based editing - only show permitted fields
+        permittedFields.forEach(field => {
+            const permission = getFieldPermission(field, layer);
+            
+            let value = record.fields[field];
+            const originalValue = value;
+            
+            if (value === null || value === undefined) {
+                value = '';
             }
+            
+            const displayValue = typeof value === 'string' && value.length > 50 ? 
+                value.substring(0, 50) + '...' : value;
+            
+            const cellClass = permission === 'edit' ? 'editable-cell' : 'readonly-cell';
+            const borderColor = permission === 'edit' ? 'border-success' : 'border-info';
+            
+            bodyHTML += `
+                <td class="${cellClass} ${borderColor}" 
+                    data-field="${field}" 
+                    data-record-id="${record.id}"
+                    data-original-value="${escapeHtml(originalValue || '')}"
+                    title="${permission === 'edit' ? 'Editable field' : 'View only'}: ${originalValue || ''}">
+                    <div class="${permission === 'edit' ? 'editable-content' : 'readonly-content'}">
+                        ${escapeHtml(displayValue)}
+                    </div>
+                </td>
+            `;
         });
 
         // Add actions with permission-based controls
@@ -1572,29 +1675,32 @@ function populatePropertiesModal(layer) {
 function populateFieldSelectors(layer) {
     if (!layer.records || layer.records.length === 0) return;
 
-    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const permittedFields = filterFieldsByPermissions(allFields, layer);
 
-    // Populate label field selector
+    // Populate label field selector - only show permitted fields
     const labelFieldSelect = document.getElementById('propLabelField');
     if (labelFieldSelect) {
         const currentValue = labelFieldSelect.value;
         labelFieldSelect.innerHTML = '<option value="">Select field...</option>';
-        fields.forEach(field => {
+        permittedFields.forEach(field => {
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
             const option = document.createElement('option');
             option.value = field;
-            option.textContent = field;
+            option.textContent = `${permissionIcon} ${field}`;
             labelFieldSelect.appendChild(option);
         });
         if (currentValue) labelFieldSelect.value = currentValue;
     }
 
-    // Populate graduated field selector with proper numeric detection
+    // Populate graduated field selector with proper numeric detection - only show permitted fields
     const graduatedFieldSelect = document.getElementById('propGraduatedField');
     if (graduatedFieldSelect) {
         const currentValue = graduatedFieldSelect.value;
         graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
         
-        fields.forEach(field => {
+        permittedFields.forEach(field => {
             // Check if field contains numeric values
             let numericCount = 0;
             let totalCount = 0;
@@ -1614,9 +1720,11 @@ function populateFieldSelectors(layer) {
             const isNumeric = totalCount > 0 && (numericCount / totalCount) >= 0.8;
             
             if (isNumeric) {
+                const permission = getFieldPermission(field, layer);
+                const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
                 const option = document.createElement('option');
                 option.value = field;
-                option.textContent = `${field} (${numericCount}/${totalCount} numeric)`;
+                option.textContent = `${permissionIcon} ${field} (${numericCount}/${totalCount} numeric)`;
                 graduatedFieldSelect.appendChild(option);
             }
         });
@@ -1624,12 +1732,12 @@ function populateFieldSelectors(layer) {
         if (currentValue) graduatedFieldSelect.value = currentValue;
     }
 
-    // Populate categorized field selector
+    // Populate categorized field selector - only show permitted fields
     const categorizedFieldSelect = document.getElementById('propCategorizedField');
     if (categorizedFieldSelect) {
         const currentValue = categorizedFieldSelect.value;
         categorizedFieldSelect.innerHTML = '<option value="">Select field...</option>';
-        fields.forEach(field => {
+        permittedFields.forEach(field => {
             // Count unique values for categorization
             const uniqueValues = new Set();
             layer.records.forEach(record => {
@@ -1639,9 +1747,11 @@ function populateFieldSelectors(layer) {
                 }
             });
             
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
             const option = document.createElement('option');
             option.value = field;
-            option.textContent = `${field} (${uniqueValues.size} unique values)`;
+            option.textContent = `${permissionIcon} ${field} (${uniqueValues.size} unique values)`;
             categorizedFieldSelect.appendChild(option);
         });
         if (currentValue) categorizedFieldSelect.value = currentValue;
@@ -1652,32 +1762,47 @@ function populatePopupFieldsSelector(layer) {
     const container = document.getElementById('propPopupFields');
     if (!container || !layer.records || layer.records.length === 0) return;
 
-    const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+    const permittedFields = filterFieldsByPermissions(allFields, layer);
     const selectedFields = layer.properties?.popup?.fields || [];
 
     let html = '';
-    fields.forEach(field => {
-        const isSelected = selectedFields.includes(field);
-        const fieldType = getFieldType(layer.records[0].fields[field]);
-        const fieldIcon = getFieldIcon(fieldType);
-        
-        html += `
-            <div class="field-checkbox d-flex align-items-center mb-2">
-                <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
-                       ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
-                <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
-                <label class="form-check-label flex-grow-1" for="popup_field_${field}">
-                    ${field}
-                </label>
-                <small class="text-muted">(${fieldType})</small>
+    
+    if (permittedFields.length === 0) {
+        html = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                No fields available for popup display based on your permissions.
             </div>
         `;
-    });
+    } else {
+        permittedFields.forEach(field => {
+            const isSelected = selectedFields.includes(field);
+            const fieldType = getFieldType(layer.records[0].fields[field]);
+            const fieldIcon = getFieldIcon(fieldType);
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
+            const permissionIndicator = getFieldPermissionIndicator(permission);
+            
+            html += `
+                <div class="field-checkbox d-flex align-items-center mb-2">
+                    <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
+                           ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
+                    ${permissionIndicator}
+                    <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
+                    <label class="form-check-label flex-grow-1" for="popup_field_${field}">
+                        ${permissionIcon} ${field}
+                    </label>
+                    <small class="text-muted">(${fieldType})</small>
+                </div>
+            `;
+        });
+    }
 
     container.innerHTML = html;
     
-    // Update available fields for custom template
-    updateAvailableFieldsHelp(fields);
+    // Update available fields for custom template - only permitted fields
+    updateAvailableFieldsHelp(permittedFields);
 }
 
 function getFieldType(value) {
@@ -2084,15 +2209,21 @@ function exportTableData(layerId) {
     }
 
     try {
-        // Prepare CSV data
-        const fields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        // Prepare CSV data - only export permitted fields
+        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        const permittedFields = filterFieldsByPermissions(allFields, layer);
+
+        if (permittedFields.length === 0) {
+            showError('No fields available for export based on your permissions');
+            return;
+        }
 
         // Create CSV header
-        let csvContent = fields.join(',') + '\n';
+        let csvContent = permittedFields.join(',') + '\n';
 
         // Add data rows
         layer.records.forEach(record => {
-            const row = fields.map(field => {
+            const row = permittedFields.map(field => {
                 let value = record.fields[field] || '';
                 // Escape commas and quotes
                 if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
@@ -2114,7 +2245,7 @@ function exportTableData(layerId) {
         link.click();
         document.body.removeChild(link);
 
-        showSuccess('Data exported successfully');
+        showSuccess(`Data exported successfully (${permittedFields.length} permitted fields)`);
     } catch (error) {
         console.error('Export error:', error);
         showError('Failed to export data: ' + error.message);
