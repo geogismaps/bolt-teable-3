@@ -144,8 +144,9 @@ class TeableAuth {
             
             console.log('Stored hash exists:', !!storedHash);
             console.log('Stored hash length:', storedHash ? storedHash.length : 0);
+            console.log('Stored hash starts with:', storedHash ? storedHash.substring(0, 10) : 'null');
             
-            // Method 1: Current API hashing
+            // Method 1: Current API hashing (with salt)
             try {
                 const apiHash = await window.teableAPI.hashPassword(password);
                 console.log('API hash generated:', apiHash ? apiHash.substring(0, 10) + '...' : 'null');
@@ -157,7 +158,7 @@ class TeableAuth {
                 console.log('API hash method failed:', hashError.message);
             }
             
-            // Method 2: Simple SHA-256 (fallback for older stored passwords)
+            // Method 2: Simple SHA-256 (no salt)
             if (!passwordMatches) {
                 try {
                     const encoder = new TextEncoder();
@@ -189,7 +190,52 @@ class TeableAuth {
                 }
             }
             
-            // Method 3: Direct comparison (for plain text - should be avoided but for compatibility)
+            // Method 3: Alternative salt variations
+            if (!passwordMatches) {
+                const saltVariations = [
+                    'admin_salt_2024',
+                    'teable_admin_salt',
+                    'system_salt',
+                    'admin_password_salt',
+                    password + '_salt',
+                    'salt_' + password
+                ];
+                
+                for (const salt of saltVariations) {
+                    try {
+                        const encoder = new TextEncoder();
+                        const data = encoder.encode(password + salt);
+                        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                        const hashArray = Array.from(new Uint8Array(hashBuffer));
+                        const saltedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                        
+                        console.log(`Trying salt "${salt}":`, saltedHash ? saltedHash.substring(0, 10) + '...' : 'null');
+                        
+                        if (storedHash === saltedHash) {
+                            passwordMatches = true;
+                            console.log(`✅ Password verified with salt: ${salt}`);
+                            
+                            // Update to new hashing method
+                            try {
+                                const newHash = await window.teableAPI.hashPassword(password);
+                                await window.teableAPI.updateRecord(
+                                    window.teableAPI.systemTables.users,
+                                    localUser.id,
+                                    { admin_password_hash: newHash }
+                                );
+                                console.log('🔄 Updated password hash to new method');
+                            } catch (updateError) {
+                                console.log('Failed to update password hash:', updateError.message);
+                            }
+                            break;
+                        }
+                    } catch (saltError) {
+                        console.log(`Salt method failed for "${salt}":`, saltError.message);
+                    }
+                }
+            }
+            
+            // Method 4: Direct comparison (for plain text - should be avoided but for compatibility)
             if (!passwordMatches) {
                 if (storedHash === password) {
                     passwordMatches = true;
@@ -208,6 +254,28 @@ class TeableAuth {
                         console.log('Failed to update plain text password:', updateError.message);
                     }
                 }
+            }
+            
+            // Method 5: If still no match, offer to reset password
+            if (!passwordMatches) {
+                console.log('🔄 All password verification methods failed. Checking if we should allow reset...');
+                
+                // If this is a critical admin password that needs to be reset, you can uncomment this:
+                // const shouldReset = confirm('Password verification failed. Reset admin password to entered password?');
+                // if (shouldReset) {
+                //     try {
+                //         const newHash = await window.teableAPI.hashPassword(password);
+                //         await window.teableAPI.updateRecord(
+                //             window.teableAPI.systemTables.users,
+                //             localUser.id,
+                //             { admin_password_hash: newHash }
+                //         );
+                //         passwordMatches = true;
+                //         console.log('🔄 Password reset and verified');
+                //     } catch (resetError) {
+                //         console.log('Failed to reset password:', resetError.message);
+                //     }
+                // }
             }
 
             if (!passwordMatches) {
