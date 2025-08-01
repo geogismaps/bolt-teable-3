@@ -177,7 +177,7 @@ class TeableAPI {
             console.log('✅ Create record succeeded:', result);
 
             // Log the data change
-            await this.logDataChange(tableId, result.records?.[0]?.id, 'create', fields, null, fields);
+            await this.logDataChange(tableId, result.records?.[0]?.id, 'create', null, fields);
 
             // Return the first record from the response
             if (result.records && result.records.length > 0) {
