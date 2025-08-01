@@ -266,8 +266,9 @@ function displayLogs() {
 }
 
 function createLogEntryHTML(logEntry) {
-    const actionClass = logEntry.actionType.toLowerCase();
-    const actionIcon = getActionIcon(logEntry.actionType);
+    const actionType = logEntry.actionType || 'unknown';
+    const actionClass = actionType.toLowerCase();
+    const actionIcon = getActionIcon(actionType);
     const timestamp = new Date(logEntry.timestamp);
     const timeAgo = getTimeAgo(timestamp);
     
@@ -277,11 +278,11 @@ function createLogEntryHTML(logEntry) {
                 <div class="log-meta">
                     <div class="d-flex align-items-center gap-2">
                         <span class="log-action ${actionClass}">
-                            <i class="${actionIcon} me-1"></i>${logEntry.actionType}
+                            <i class="${actionIcon} me-1"></i>${actionType}
                         </span>
-                        <span class="log-table">${logEntry.tableName}</span>
+                        <span class="log-table">${logEntry.tableName || 'Unknown Table'}</span>
                         <span class="log-user">
-                            <i class="fas fa-user me-1"></i>${logEntry.changedBy}
+                            <i class="fas fa-user me-1"></i>${logEntry.changedBy || 'Unknown User'}
                         </span>
                     </div>
                     <div class="log-timestamp">
@@ -292,34 +293,34 @@ function createLogEntryHTML(logEntry) {
             </div>
             <div class="log-body">
                 <div class="mb-3">
-                    <strong>Record ID:</strong> ${logEntry.recordId}
+                    <strong>Record ID:</strong> ${logEntry.recordId || 'Unknown'}
                     ${logEntry.userRole ? `<span class="ms-3"><strong>User Role:</strong> ${logEntry.userRole}</span>` : ''}
                     ${logEntry.ipAddress ? `<span class="ms-3"><strong>IP:</strong> ${logEntry.ipAddress}</span>` : ''}
                 </div>
     `;
     
-    if (logEntry.actionType === 'create') {
+    if (actionType === 'create') {
         html += `
             <div class="alert alert-success">
                 <i class="fas fa-plus-circle me-2"></i>
-                New record created with ${logEntry.fieldChanges.length} field(s)
+                New record created with ${logEntry.fieldChanges ? logEntry.fieldChanges.length : 0} field(s)
             </div>
         `;
-    } else if (logEntry.actionType === 'delete') {
+    } else if (actionType === 'delete') {
         html += `
             <div class="alert alert-danger">
                 <i class="fas fa-trash me-2"></i>
-                Record deleted (${logEntry.fieldChanges.length} field(s) were lost)
+                Record deleted (${logEntry.fieldChanges ? logEntry.fieldChanges.length : 0} field(s) were lost)
             </div>
         `;
     }
     
     // Show field changes
-    if (logEntry.fieldChanges.length > 0) {
+    if (logEntry.fieldChanges && logEntry.fieldChanges.length > 0) {
         html += '<div class="field-changes">';
         
         logEntry.fieldChanges.forEach(change => {
-            html += createFieldChangeHTML(change, logEntry.actionType);
+            html += createFieldChangeHTML(change, actionType);
         });
         
         html += '</div>';
@@ -402,7 +403,8 @@ function getActionIcon(actionType) {
     const icons = {
         'create': 'fas fa-plus-circle',
         'update': 'fas fa-edit',
-        'delete': 'fas fa-trash'
+        'delete': 'fas fa-trash',
+        'unknown': 'fas fa-question-circle'
     };
     return icons[actionType] || 'fas fa-question-circle';
 }
