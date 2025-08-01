@@ -189,31 +189,39 @@ function groupLogsByChange(logs) {
     const grouped = {};
     
     logs.forEach(log => {
+        if (!log || !log.fields) {
+            console.warn('Invalid log entry:', log);
+            return;
+        }
+        
         const fields = log.fields;
-        const key = `${fields.record_id}_${fields.timestamp}_${fields.action_type}`;
+        const key = `${fields.record_id || 'unknown'}_${fields.timestamp || Date.now()}_${fields.action_type || 'unknown'}`;
         
         if (!grouped[key]) {
             grouped[key] = {
                 id: key,
-                recordId: fields.record_id,
-                tableId: fields.table_id,
-                tableName: fields.table_name,
-                actionType: fields.action_type,
-                changedBy: fields.changed_by,
-                changedAt: fields.changed_at,
-                timestamp: fields.timestamp,
-                userRole: fields.user_role,
-                ipAddress: fields.ip_address,
-                sessionId: fields.session_id,
+                recordId: fields.record_id || 'Unknown',
+                tableId: fields.table_id || 'Unknown',
+                tableName: fields.table_name || 'Unknown Table',
+                actionType: fields.action_type || 'unknown',
+                changedBy: fields.changed_by || 'Unknown User',
+                changedAt: fields.changed_at || new Date().toISOString().split('T')[0],
+                timestamp: fields.timestamp || new Date().toISOString(),
+                userRole: fields.user_role || 'Unknown',
+                ipAddress: fields.ip_address || 'Unknown',
+                sessionId: fields.session_id || 'Unknown',
                 fieldChanges: []
             };
         }
         
-        grouped[key].fieldChanges.push({
-            fieldName: fields.field_name,
-            oldValue: fields.old_value,
-            newValue: fields.new_value
-        });
+        // Only add field change if field_name exists
+        if (fields.field_name) {
+            grouped[key].fieldChanges.push({
+                fieldName: fields.field_name,
+                oldValue: fields.old_value,
+                newValue: fields.new_value
+            });
+        }
     });
     
     // Convert to array and sort by timestamp
@@ -316,11 +324,13 @@ function createLogEntryHTML(logEntry) {
     }
     
     // Show field changes
-    if (logEntry.fieldChanges && logEntry.fieldChanges.length > 0) {
+    if (logEntry.fieldChanges && Array.isArray(logEntry.fieldChanges) && logEntry.fieldChanges.length > 0) {
         html += '<div class="field-changes">';
         
         logEntry.fieldChanges.forEach(change => {
-            html += createFieldChangeHTML(change, actionType);
+            if (change && typeof change === 'object') {
+                html += createFieldChangeHTML(change, actionType);
+            }
         });
         
         html += '</div>';
@@ -335,6 +345,10 @@ function createLogEntryHTML(logEntry) {
 }
 
 function createFieldChangeHTML(change, actionType) {
+    if (!change || !change.fieldName) {
+        return '<div class="field-change"><div class="text-muted">Invalid field change data</div></div>';
+    }
+    
     const fieldIcon = getFieldIcon(change.fieldName);
     
     let html = `
@@ -412,6 +426,10 @@ function getActionIcon(actionType) {
 }
 
 function getFieldIcon(fieldName) {
+    if (!fieldName || typeof fieldName !== 'string') {
+        return 'fas fa-question-circle';
+    }
+    
     const name = fieldName.toLowerCase();
     if (name.includes('email')) return 'fas fa-envelope';
     if (name.includes('phone')) return 'fas fa-phone';
