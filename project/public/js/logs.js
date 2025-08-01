@@ -20,6 +20,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // Add view mode toggle listeners
+    document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            displayLogs();
+        });
+    });
+    
     initializeLogs();
 });
 
@@ -245,6 +252,7 @@ function updateStatistics() {
 
 function displayLogs() {
     const container = document.getElementById('logsContainer');
+    const viewMode = document.querySelector('input[name="viewMode"]:checked').value;
     
     if (filteredLogs.length === 0) {
         showEmptyState('No data changes found matching your filters.');
@@ -259,9 +267,13 @@ function displayLogs() {
     
     let html = '';
     
-    pageData.forEach(logEntry => {
-        html += createLogEntryHTML(logEntry);
-    });
+    if (viewMode === 'table') {
+        html = createTableView(pageData);
+    } else {
+        pageData.forEach(logEntry => {
+            html += createLogEntryHTML(logEntry);
+        });
+    }
     
     container.innerHTML = html;
     
@@ -271,6 +283,145 @@ function displayLogs() {
     // Update filter counts
     document.getElementById('filteredCount').textContent = filteredLogs.length;
     document.getElementById('totalCount').textContent = allLogs.length;
+}
+
+function createTableView(pageData) {
+    let html = `
+        <div class="logs-table">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 140px;">Timestamp</th>
+                            <th style="width: 80px;">Action</th>
+                            <th style="width: 120px;">Table</th>
+                            <th style="width: 100px;">Record ID</th>
+                            <th style="width: 120px;">User</th>
+                            <th style="width: 80px;">Role</th>
+                            <th>Field Changes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    // Flatten logs to show individual field changes
+    const flattenedLogs = [];
+    pageData.forEach(logEntry => {
+        if (logEntry.fieldChanges && logEntry.fieldChanges.length > 0) {
+            logEntry.fieldChanges.forEach((change, index) => {
+                flattenedLogs.push({
+                    ...logEntry,
+                    fieldChange: change,
+                    isFirstChange: index === 0,
+                    totalChanges: logEntry.fieldChanges.length
+                });
+            });
+        } else {
+            // For entries without field changes (like pure create/delete)
+            flattenedLogs.push({
+                ...logEntry,
+                fieldChange: null,
+                isFirstChange: true,
+                totalChanges: 0
+            });
+        }
+    });
+    
+    flattenedLogs.forEach(entry => {
+        const timestamp = new Date(entry.timestamp || new Date());
+        const actionType = entry.actionType || 'unknown';
+        const timeAgo = getTimeAgo(timestamp);
+        
+        html += `
+            <tr>
+                ${entry.isFirstChange ? `
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}" class="text-nowrap">
+                        <div class="fw-bold">${timestamp.toLocaleString()}</div>
+                        <small class="text-muted">${timeAgo}</small>
+                    </td>
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}">
+                        <span class="action-badge ${actionType.toLowerCase()}">${actionType}</span>
+                    </td>
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}" class="text-nowrap">
+                        <div class="fw-semibold">${entry.tableName || 'Unknown'}</div>
+                        <small class="text-muted">${entry.tableId || 'N/A'}</small>
+                    </td>
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}" class="text-nowrap">
+                        <code class="small">${entry.recordId || 'Unknown'}</code>
+                    </td>
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}" class="text-nowrap">
+                        <div class="fw-semibold">${entry.changedBy || 'Unknown'}</div>
+                    </td>
+                    <td rowspan="${Math.max(entry.totalChanges, 1)}">
+                        <span class="badge bg-secondary">${entry.userRole || 'Unknown'}</span>
+                    </td>
+                ` : ''}
+                <td>
+                    ${entry.fieldChange ? createFieldChangeTableCell(entry.fieldChange, actionType) : 
+                      `<em class="text-muted">${actionType === 'create' ? 'Record created' : 
+                        actionType === 'delete' ? 'Record deleted' : 'No field changes recorded'}</em>`}
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+function createFieldChangeTableCell(change, actionType) {
+    if (!change || !change.fieldName) {
+        return '<em class="text-muted">Invalid field data</em>';
+    }
+    
+    const fieldIcon = getFieldIcon(change.fieldName);
+    
+    let html = `
+        <div class="field-change-item">
+            <i class="${fieldIcon} me-1"></i>
+            <strong>${change.fieldName}</strong>
+    `;
+    
+    if (actionType === 'create') {
+        html += `<br><span class="new-value-inline">${formatValueInline(change.newValue)}</span>`;
+    } else if (actionType === 'delete') {
+        html += `<br><span class="old-value-inline">${formatValueInline(change.oldValue)}</span>`;
+    } else {
+        html += `
+            <br>
+            <span class="old-value-inline">${formatValueInline(change.oldValue)}</span>
+            <i class="fas fa-arrow-right mx-1 text-muted"></i>
+            <span class="new-value-inline">${formatValueInline(change.newValue)}</span>
+        `;
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function formatValueInline(value) {
+    if (value === null || value === undefined) {
+        return 'null';
+    }
+    
+    if (value === '') {
+        return 'empty';
+    }
+    
+    const stringValue = String(value);
+    
+    // Truncate very long values for inline display
+    if (stringValue.length > 50) {
+        return stringValue.substring(0, 50) + '...';
+    }
+    
+    return stringValue;
 }
 
 function createLogEntryHTML(logEntry) {

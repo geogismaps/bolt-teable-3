@@ -207,6 +207,85 @@
             align-items: center;
         }
         
+        /* Table View Styles */
+        .logs-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .logs-table table {
+            margin-bottom: 0;
+        }
+        
+        .logs-table th {
+            background: #f8f9fa;
+            border-top: none;
+            font-weight: 600;
+            color: #495057;
+            padding: 15px 12px;
+            vertical-align: middle;
+        }
+        
+        .logs-table td {
+            padding: 12px;
+            vertical-align: middle;
+            border-color: #e9ecef;
+        }
+        
+        .action-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .action-badge.create {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .action-badge.update {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .action-badge.delete {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .field-changes-summary {
+            max-width: 300px;
+            overflow: hidden;
+        }
+        
+        .field-change-item {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+            padding: 2px 4px;
+            background: #f8f9fa;
+            border-radius: 3px;
+        }
+        
+        .old-value-inline {
+            color: #dc3545;
+            text-decoration: line-through;
+            font-family: monospace;
+        }
+        
+        .new-value-inline {
+            color: #28a745;
+            font-family: monospace;
+        }
+        
+        .table-responsive {
+            border-radius: 12px;
+        }
+        
         @media (max-width: 768px) {
             .value-comparison {
                 grid-template-columns: 1fr;
@@ -226,6 +305,16 @@
             .export-options {
                 flex-direction: column;
                 align-items: stretch;
+            }
+            
+            .logs-table th,
+            .logs-table td {
+                padding: 8px 6px;
+                font-size: 0.85rem;
+            }
+            
+            .field-changes-summary {
+                max-width: 200px;
             }
         }
     </style>
@@ -363,6 +452,20 @@
                     <div class="text-muted small">
                         Showing <span id="filteredCount">0</span> of <span id="totalCount">0</span> log entries
                     </div>
+                </div>
+            </div>
+
+            <!-- View Toggle -->
+            <div class="mb-3">
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="viewMode" id="cardView" value="card" checked>
+                    <label class="btn btn-outline-primary" for="cardView">
+                        <i class="fas fa-th-large me-1"></i>Card View
+                    </label>
+                    <input type="radio" class="btn-check" name="viewMode" id="tableView" value="table">
+                    <label class="btn btn-outline-primary" for="tableView">
+                        <i class="fas fa-table me-1"></i>Table View
+                    </label>
                 </div>
             </div>
 
