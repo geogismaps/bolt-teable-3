@@ -596,6 +596,44 @@ class TeableAPI {
             const tables = await this.getTables();
             const allTables = tables.tables || tables || [];
 
+            // Define expected fields for data_change_logs table
+            const dataLogsFields = [
+                { name: 'record_id', type: 'singleLineText' },
+                { name: 'table_id', type: 'singleLineText' },
+                { name: 'table_name', type: 'singleLineText' },
+                { name: 'action_type', type: 'singleSelect', options: {
+                    choices: [
+                        { name: 'create', color: 'green' },
+                        { name: 'update', color: 'yellow' },
+                        { name: 'delete', color: 'red' }
+                    ]
+                }},
+                { name: 'field_name', type: 'singleLineText' },
+                { name: 'old_value', type: 'longText' },
+                { name: 'new_value', type: 'longText' },
+                { name: 'changed_by', type: 'singleLineText' },
+                { name: 'changed_at', type: 'date' },
+                { name: 'timestamp', type: 'singleLineText' },
+                { name: 'user_role', type: 'singleLineText' },
+                { name: 'ip_address', type: 'singleLineText' },
+                { name: 'session_id', type: 'singleLineText' }
+            ];
+
+            // Check for data_change_logs table
+            let dataLogsTable = allTables.find(t => t.name === 'data_change_logs');
+            if (!dataLogsTable) {
+                console.log('Creating data_change_logs table...');
+                dataLogsTable = await this.createTable({
+                    name: 'data_change_logs',
+                    description: 'Comprehensive audit trail of all data changes',
+                    fields: dataLogsFields
+                });
+            } else {
+                console.log('data_change_logs table exists, ensuring all fields...');
+                await this.ensureTableFields(dataLogsTable.id, dataLogsFields);
+            }
+            this.systemTables.dataLogs = dataLogsTable.id;
+
             // Define expected fields for app_users table
             const appUsersFields = [
                 { name: 'email', type: 'singleLineText' },

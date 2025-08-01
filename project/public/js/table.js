@@ -1090,10 +1090,18 @@ async function updateFieldValue(recordId, fieldName, newValue) {
         const updateData = {};
         updateData[fieldName] = newValue;
         
+        // Get old value for logging
+        const record = currentTableData.find(r => r.id === recordId);
+        const oldValue = record ? record.fields[fieldName] : null;
+        
         await window.teableAPI.updateRecord(tableId, recordId, updateData);
         
+        // Log the field update
+        const oldValues = { [fieldName]: oldValue };
+        const newValues = { [fieldName]: newValue };
+        await logDataChange(tableId, recordId, 'update', oldValues, newValues);
+        
         // Update local data
-        const record = currentTableData.find(r => r.id === recordId);
         if (record) {
             record.fields[fieldName] = newValue;
         }
@@ -1418,13 +1426,24 @@ async function saveRecord() {
 
         let result;
         if (recordId) {
+            // Get old values for logging
+            const oldRecord = currentTableData.find(r => r.id === recordId);
+            const oldValues = oldRecord ? oldRecord.fields : {};
+            
             // Update existing record
             result = await window.teableAPI.updateRecord(tableId, recordId, recordData);
             console.log('Update result:', result);
+            
+            // Log the update operation
+            await logDataChange(tableId, recordId, 'update', oldValues, recordData);
         } else {
             // Create new record
             result = await window.teableAPI.createRecord(tableId, recordData);
             console.log('Create result:', result);
+            
+            // Log the create operation
+            const newRecordId = result.records?.[0]?.id || result.record?.id || 'unknown';
+            await logDataChange(tableId, newRecordId, 'create', null, recordData);
         }
 
         // Validate the API response
@@ -1517,7 +1536,12 @@ async function duplicateRecord(recordId) {
         delete duplicateData.created_at;
         delete duplicateData.updated_at;
 
-        await window.teableAPI.createRecord(tableId, duplicateData);
+        const result = await window.teableAPI.createRecord(tableId, duplicateData);
+        
+        // Log the duplicate operation as a create
+        const newRecordId = result.records?.[0]?.id || result.record?.id || 'unknown';
+        await logDataChange(tableId, newRecordId, 'create', null, duplicateData);
+        
         await loadTableData();
         
         showSuccess('Record duplicated successfully!');
@@ -1538,7 +1562,15 @@ async function deleteRecord(recordId) {
     
     try {
         const tableId = document.getElementById('tableSelector').value;
+        
+        // Get old values for logging before deletion
+        const oldRecord = currentTableData.find(r => r.id === recordId);
+        const oldValues = oldRecord ? oldRecord.fields : {};
+        
         await window.teableAPI.deleteRecord(tableId, recordId);
+        
+        // Log the delete operation
+        await logDataChange(tableId, recordId, 'delete', oldValues, null);
         
         // Remove from local data
         currentTableData = currentTableData.filter(r => r.id !== recordId);
@@ -1796,6 +1828,119 @@ async function debugTableData() {
     }
     
     console.log('=== END DEBUG ===');
+}
+
+// Data change logging helper function
+async function logDataChange(tableId, recordId, actionType, oldValues, newValues) {
+    try {
+        // Skip logging if data logs system not available
+        if (!window.teableAPI || !window.teableAPI.systemTables || !window.teableAPI.systemTables.dataLogs) {
+            console.log('Data logging system not available, skipping log entry');
+            return;
+        }
+        
+        const session = window.teableAuth?.getCurrentSession();
+        if (!session) {
+            console.log('No user session available for logging');
+            return;
+        }
+
+        // Get table name
+        let tableName = 'Unknown';
+        try {
+            const tables = await window.teableAPI.getTables();
+            const table = (tables.tables || tables || []).find(t => t.id === tableId);
+            tableName = table?.name || tableName;
+        } catch (error) {
+            console.log('Could not get table name for logging:', error.message);
+        }
+
+        const timestamp = new Date().toISOString();
+        const changedAt = timestamp.split('T')[0];
+
+        // Create log entries for each field change
+        const logEntries = [];
+
+        if (actionType === 'create' && newValues) {
+            // Log all new fields
+            Object.keys(newValues).forEach(fieldName => {
+                logEntries.push({
+                    record_id: recordId,
+                    table_id: tableId,
+                    table_name: tableName,
+                    action_type: actionType,
+                    field_name: fieldName,
+                    old_value: null,
+                    new_value: String(newValues[fieldName] || ''),
+                    changed_by: session.email,
+                    changed_at: changedAt,
+                    timestamp: timestamp,
+                    user_role: session.role,
+                    ip_address: 'unknown',
+                    session_id: session.loginTime || 'unknown'
+                });
+            });
+        } else if (actionType === 'delete' && oldValues) {
+            // Log all deleted fields
+            Object.keys(oldValues).forEach(fieldName => {
+                logEntries.push({
+                    record_id: recordId,
+                    table_id: tableId,
+                    table_name: tableName,
+                    action_type: actionType,
+                    field_name: fieldName,
+                    old_value: String(oldValues[fieldName] || ''),
+                    new_value: null,
+                    changed_by: session.email,
+                    changed_at: changedAt,
+                    timestamp: timestamp,
+                    user_role: session.role,
+                    ip_address: 'unknown',
+                    session_id: session.loginTime || 'unknown'
+                });
+            });
+        } else if (actionType === 'update' && oldValues && newValues) {
+            // Log only changed fields
+            Object.keys(newValues).forEach(fieldName => {
+                const oldValue = oldValues[fieldName];
+                const newValue = newValues[fieldName];
+
+                // Only log if value actually changed
+                if (String(oldValue) !== String(newValue)) {
+                    logEntries.push({
+                        record_id: recordId,
+                        table_id: tableId,
+                        table_name: tableName,
+                        action_type: actionType,
+                        field_name: fieldName,
+                        old_value: String(oldValue || ''),
+                        new_value: String(newValue || ''),
+                        changed_by: session.email,
+                        changed_at: changedAt,
+                        timestamp: timestamp,
+                        user_role: session.role,
+                        ip_address: 'unknown',
+                        session_id: session.loginTime || 'unknown'
+                    });
+                }
+            });
+        }
+
+        // Create log entries in batch
+        for (const logEntry of logEntries) {
+            try {
+                await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
+            } catch (logError) {
+                console.error('Failed to create data log entry:', logError);
+            }
+        }
+
+        console.log(`Logged ${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
+
+    } catch (error) {
+        console.error('Error logging data change:', error);
+        // Don't throw error to avoid breaking the main operation
+    }
 }
 
 // Add debug function to window for console access
