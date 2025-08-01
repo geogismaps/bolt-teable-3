@@ -1,0 +1,58 @@
+Teable API initialized: Object
+auth.js:97 Starting space owner authentication for: venugis8@gmail.com
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/base/bselmJtOz4q7qmCLG4z/table Object
+teable-api.js:56 API Response: Array(7)
+teable-api.js:632 data_change_logs table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgOsWKcHaNkMr8AMB...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgOsWKcHaNkMr8AMB/field Object
+teable-api.js:56 API Response: Array(13)
+teable-api.js:559 📋 Current fields in table: Array(13)
+teable-api.js:560 📋 Expected fields: Array(13)
+teable-api.js:582 ✅ All required fields exist in table tblgOsWKcHaNkMr8AMB
+teable-api.js:675 app_users table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblIJ4f94QjRM6k1GbW...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblIJ4f94QjRM6k1GbW/field Object
+teable-api.js:56 API Response: Array(12)
+teable-api.js:559 📋 Current fields in table: Array(12)
+teable-api.js:560 📋 Expected fields: Array(12)
+teable-api.js:582 ✅ All required fields exist in table tblIJ4f94QjRM6k1GbW
+teable-api.js:712 field_permissions table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblmWJ0T39MW4lSliKM...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblmWJ0T39MW4lSliKM/field Object
+teable-api.js:56 API Response: Array(8)
+teable-api.js:559 📋 Current fields in table: Array(8)
+teable-api.js:560 📋 Expected fields: Array(8)
+teable-api.js:582 ✅ All required fields exist in table tblmWJ0T39MW4lSliKM
+teable-api.js:737 system_activity table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgTeftsts5dc0nG3I...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgTeftsts5dc0nG3I/field Object
+teable-api.js:56 API Response: Array(6)
+teable-api.js:559 📋 Current fields in table: Array(6)
+teable-api.js:560 📋 Expected fields: Array(6)
+teable-api.js:582 ✅ All required fields exist in table tblgTeftsts5dc0nG3I
+teable-api.js:742 System tables ensured: Object
+auth.js:103 Checking local app_users table...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblIJ4f94QjRM6k1GbW/record Object
+teable-api.js:56 API Response: Object
+auth.js:112 Found 36 users in system table
+auth.js:120 Local user found: true
+auth.js:122 User role: Owner
+auth.js:123 Has admin password hash: true
+auth.js:135 Verifying admin password...
+auth.js:145 Stored hash exists: true
+auth.js:146 Stored hash length: 64
+auth.js:151 API hash generated: 0479a6997c...
+auth.js:169 Simple hash generated: 17dafeb039...
+auth.js:214 ❌ Password verification failed with all methods
+auth.js:215 Expected hash starts with: b6c6728729
+auth.js:49 Space owner auth failed: Space owner authentication failed: Invalid admin password for space owner
+auth.js:87 Login failed: Error: Space owner authentication failed: Invalid admin password for space owner
+    at TeableAuth.authenticateSpaceOwner (auth.js:299:19)
+    at async TeableAuth.login (auth.js:44:31)
+    at async HTMLFormElement.handleLogin (login.js:100:29)
+login @ auth.js:87Understand this error
+login.js:114 Login failed: Error: Space owner authentication failed: Invalid admin password for space owner
+    at TeableAuth.authenticateSpaceOwner (auth.js:299:19)
+    at async TeableAuth.login (auth.js:44:31)
+    at async HTMLFormElement.handleLogin (login.js:100:29)
+handleLogin @ login.js:114Understand this error
