@@ -455,6 +455,79 @@
             white-space: nowrap;
             z-index: 1000;
         }
+
+        /* Drone imagery and custom tiles styling */
+        .zoom-display {
+            background: rgba(255, 255, 255, 0.9) !important;
+            padding: 5px 10px !important;
+            border-radius: 5px !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+            border: 1px solid #ddd !important;
+        }
+
+        /* Customer context indicator */
+        .customer-context-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            z-index: 1000;
+        }
+
+        /* Drone imagery availability indicator */
+        .drone-available {
+            background: #28a745 !important;
+        }
+        
+        .drone-unavailable {
+            background: #6c757d !important;
+        }
+
+        /* High zoom level notification */
+        .zoom-notification {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(40, 167, 69, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            20%, 80% { opacity: 1; }
+        }
+
+        /* Basemap selector drone imagery option styling */
+        option[value="drone_imagery"] {
+            background: #e7f3ff;
+            color: #0066cc;
+            font-weight: bold;
+        }
+
+        /* Tile loading error styling */
+        .leaflet-tile-loaded {
+            opacity: 1;
+        }
+        
+        .leaflet-tile-fade-in {
+            animation: tileLoading 0.2s;
+        }
+
+        @keyframes tileLoading {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -513,7 +586,9 @@
                                     <option value="satellite">Satellite</option>
                                     <option value="terrain">Terrain</option>
                                     <option value="dark">Dark Mode</option>
+                                    <!-- Drone imagery option will be dynamically added if available -->
                                 </select>
+                                <small class="text-muted mt-1">Drone imagery auto-detected for customer context</small>
                             </div>
                         </div>
 
@@ -631,6 +706,21 @@
                                         <button class="btn btn-outline-warning btn-sm w-100" onclick="zoomToAllLayers()">
                                             <i class="fas fa-expand me-1"></i>Fit All Layers
                                         </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-success btn-sm w-100" onclick="zoomToDroneImageryLevel()">
+                                            <i class="fas fa-helicopter me-1"></i>Drone View
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">HIGH-DETAIL IMAGERY</h6>
+                                    <div class="alert alert-info p-2">
+                                        <small>
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            <strong>Drone Imagery:</strong> Available at zoom levels 18-25 for enhanced detail viewing.
+                                        </small>
                                     </div>
                                 </div>
                             </div>

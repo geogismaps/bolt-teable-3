@@ -17,21 +17,140 @@ let fieldPermissionsCache = {};
 const baseMaps = {
     openstreetmap: {
         url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 21
     },
     satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attribution: '© Esri'
+        attribution: '© Esri',
+        maxZoom: 21
     },
     terrain: {
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        attribution: '© OpenTopoMap contributors'
+        attribution: '© OpenTopoMap contributors',
+        maxZoom: 21
     },
     dark: {
         url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        attribution: '© CartoDB'
+        attribution: '© CartoDB',
+        maxZoom: 21
+    },
+    drone_imagery: {
+        url: 'tiles/{z}/{x}/{y}.png',
+        attribution: '© Custom Drone Imagery',
+        minZoom: 18,
+        maxZoom: 25,
+        customTiles: true
     }
 };
+
+// Customer context detection
+function getCustomerContext() {
+    // Detect customer context from current URL or configuration
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
+    
+    // Try to extract customer ID from various sources
+    let customerId = null;
+    
+    // Method 1: Check for customer subdirectory in path
+    const pathMatch = pathname.match(/\/customer(\d+)\//);
+    if (pathMatch) {
+        customerId = pathMatch[1];
+    }
+    
+    // Method 2: Check for customer subdomain
+    const subdomainMatch = hostname.match(/^customer(\d+)\./);
+    if (subdomainMatch) {
+        customerId = subdomainMatch[1];
+    }
+    
+    // Method 3: Check localStorage or configuration
+    if (!customerId) {
+        customerId = localStorage.getItem('customer_id') || 
+                    window.teableAuth?.getCurrentSession()?.customerId ||
+                    'default';
+    }
+    
+    return customerId;
+}
+
+// Generate customer-specific tile URL
+function getCustomerTileUrl(customerId) {
+    // For deployment on Linode, each customer will have their own folder
+    if (customerId && customerId !== 'default') {
+        return `customer${customerId}/tiles/{z}/{x}/{y}.png`;
+    } else {
+        return 'tiles/{z}/{x}/{y}.png';
+    }
+}
+
+// Check if custom tiles exist for current customer
+async function checkCustomTilesAvailability(customerId) {
+    try {
+        const testTileUrl = getCustomerTileUrl(customerId).replace('{z}', '18').replace('{x}', '0').replace('{y}', '0');
+        const response = await fetch(testTileUrl, { method: 'HEAD' });
+        return response.ok;
+    } catch (error) {
+        console.log('Custom tiles not available for customer:', customerId);
+        return false;
+    }
+}
+
+// Initialize basemaps with customer context
+async function initializeCustomerBaseMaps() {
+    const customerId = getCustomerContext();
+    console.log('Detected customer context:', customerId);
+    
+    // Check if customer has custom drone imagery tiles
+    const hasCustomTiles = await checkCustomTilesAvailability(customerId);
+    
+    if (hasCustomTiles) {
+        // Update drone imagery basemap with customer-specific URL
+        baseMaps.drone_imagery.url = getCustomerTileUrl(customerId);
+        baseMaps.drone_imagery.attribution = `© Customer ${customerId} Drone Imagery`;
+        
+        console.log(`Custom drone imagery tiles enabled for customer ${customerId}`);
+        
+        // Update basemap selector to show drone imagery option
+        updateBasemapSelector(true);
+    } else {
+        console.log('No custom drone imagery tiles found for customer:', customerId);
+        // Remove drone imagery option if not available
+        updateBasemapSelector(false);
+    }
+}
+
+// Update basemap selector based on tile availability
+function updateBasemapSelector(showDroneImagery) {
+    const basemapSelector = document.getElementById('basemapSelector');
+    if (!basemapSelector) return;
+    
+    // Check if drone imagery option already exists
+    const droneOption = basemapSelector.querySelector('option[value="drone_imagery"]');
+    
+    if (showDroneImagery && !droneOption) {
+        // Add drone imagery option
+        const option = document.createElement('option');
+        option.value = 'drone_imagery';
+        option.textContent = 'Drone Imagery (High Detail)';
+        basemapSelector.appendChild(option);
+        
+        // Add zoom level indicator
+        const zoomInfo = document.createElement('small');
+        zoomInfo.className = 'text-muted d-block';
+        zoomInfo.textContent = 'Available at zoom levels 18-25';
+        basemapSelector.parentNode.appendChild(zoomInfo);
+        
+    } else if (!showDroneImagery && droneOption) {
+        // Remove drone imagery option if it exists
+        droneOption.remove();
+        
+        // Remove zoom info if it exists
+        const zoomInfo = basemapSelector.parentNode.querySelector('small');
+        if (zoomInfo) zoomInfo.remove();
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication first
@@ -69,20 +188,31 @@ async function initializeMap() {
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
+        // Initialize customer-specific basemaps
+        await initializeCustomerBaseMaps();
+
         // Initialize Leaflet map with maximum zoom level 25
         map = L.map('map', {
             maxZoom: 25,
-            zoomControl: true
+            zoomControl: true,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5
         }).setView([20.5937, 78.9629], 5);
 
         // Add default base layer with maximum zoom level 25
         L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution,
-            maxZoom: 25
+            maxZoom: baseMaps.openstreetmap.maxZoom || 25
         }).addTo(map);
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
+
+        // Add zoom level display
+        addZoomLevelDisplay();
+
+        // Add zoom event listener to show appropriate basemap recommendations
+        map.on('zoomend', handleZoomChange);
 
         // Load available tables
         await loadAvailableTables();
@@ -90,11 +220,60 @@ async function initializeMap() {
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('Map initialized successfully');
+        console.log('Map initialized successfully with customer context');
 
     } catch (error) {
         console.error('Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
+    }
+}
+
+// Add zoom level display to map
+function addZoomLevelDisplay() {
+    const zoomDisplay = L.control({ position: 'bottomleft' });
+    
+    zoomDisplay.onAdd = function(map) {
+        const div = L.DomUtil.create('div', 'zoom-display');
+        div.style.cssText = `
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        `;
+        div.innerHTML = `Zoom: ${map.getZoom()}`;
+        return div;
+    };
+    
+    zoomDisplay.addTo(map);
+    
+    // Update zoom display on zoom change
+    map.on('zoomend', function() {
+        const zoomElements = document.querySelectorAll('.zoom-display');
+        zoomElements.forEach(element => {
+            element.innerHTML = `Zoom: ${map.getZoom()}`;
+        });
+    });
+}
+
+// Handle zoom level changes and show basemap recommendations
+function handleZoomChange() {
+    const currentZoom = map.getZoom();
+    const basemapSelector = document.getElementById('basemapSelector');
+    const droneOption = basemapSelector?.querySelector('option[value="drone_imagery"]');
+    
+    // Show recommendation for drone imagery at high zoom levels
+    if (currentZoom >= 18 && droneOption) {
+        // Highlight drone imagery option if available and not selected
+        if (basemapSelector.value !== 'drone_imagery') {
+            showInfo(`🚁 High-detail drone imagery is available at this zoom level! Switch to "Drone Imagery" for maximum detail.`);
+        }
+    }
+    
+    // Show warning if zoomed beyond standard basemap capabilities
+    if (currentZoom > 21 && basemapSelector?.value !== 'drone_imagery') {
+        showWarning(`⚠️ Current zoom level (${currentZoom}) exceeds standard basemap detail. Consider switching to Drone Imagery for better resolution.`);
     }
 }
 
@@ -2354,13 +2533,56 @@ function changeBasemap() {
         }
     });
 
-    // Add new base layer with maximum zoom level 25
+    // Add new base layer with appropriate zoom constraints
     const basemap = baseMaps[basemapType];
     if (basemap) {
-        L.tileLayer(basemap.url, {
+        const tileLayerOptions = {
             attribution: basemap.attribution,
-            maxZoom: 25
-        }).addTo(map);
+            maxZoom: basemap.maxZoom || 25
+        };
+        
+        // Add minZoom for custom tiles like drone imagery
+        if (basemap.minZoom) {
+            tileLayerOptions.minZoom = basemap.minZoom;
+        }
+        
+        // Special handling for drone imagery
+        if (basemapType === 'drone_imagery') {
+            tileLayerOptions.errorTileUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='; // Transparent 1x1 pixel
+            
+            const currentZoom = map.getZoom();
+            
+            // Show info about zoom requirements for drone imagery
+            if (currentZoom < basemap.minZoom) {
+                showInfo(`🚁 Drone imagery is available at zoom level ${basemap.minZoom} and above. Current zoom: ${currentZoom}`);
+            } else {
+                showSuccess(`🚁 High-resolution drone imagery activated! Zoom levels ${basemap.minZoom}-${basemap.maxZoom} available.`);
+            }
+        }
+        
+        // Create and add the tile layer
+        const tileLayer = L.tileLayer(basemap.url, tileLayerOptions);
+        
+        // Add error handling for missing tiles
+        tileLayer.on('tileerror', function(error) {
+            console.warn('Tile loading error:', error);
+            if (basemapType === 'drone_imagery') {
+                // Only show error once per session to avoid spam
+                if (!window.droneImageryErrorShown) {
+                    showWarning('Some drone imagery tiles may not be available at this location/zoom level.');
+                    window.droneImageryErrorShown = true;
+                }
+            }
+        });
+        
+        tileLayer.addTo(map);
+        
+        // Update map's max zoom if necessary
+        if (basemap.maxZoom) {
+            map.options.maxZoom = Math.max(map.options.maxZoom, basemap.maxZoom);
+        }
+        
+        console.log(`Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
     }
 }
 
@@ -5152,6 +5374,65 @@ function exitTableEditing() {
     
     showInfo('Editing mode disabled. All changes have been processed.');
 }
+
+// Drone imagery utility functions
+window.zoomToDroneImageryLevel = function() {
+    const currentBasemap = document.getElementById('basemapSelector').value;
+    const droneOption = document.querySelector('option[value="drone_imagery"]');
+    
+    if (!droneOption) {
+        showWarning('Drone imagery is not available for this customer context.');
+        return;
+    }
+    
+    // Switch to drone imagery if not already selected
+    if (currentBasemap !== 'drone_imagery') {
+        document.getElementById('basemapSelector').value = 'drone_imagery';
+        changeBasemap();
+    }
+    
+    // Zoom to minimum drone imagery level
+    const currentZoom = map.getZoom();
+    const minDroneZoom = baseMaps.drone_imagery.minZoom;
+    
+    if (currentZoom < minDroneZoom) {
+        map.setZoom(minDroneZoom);
+        showSuccess(`Zoomed to drone imagery level (${minDroneZoom}). Use +/- to explore higher detail levels up to ${baseMaps.drone_imagery.maxZoom}.`);
+    } else {
+        showInfo(`Already at drone imagery zoom level ${currentZoom}. Maximum detail available at level ${baseMaps.drone_imagery.maxZoom}.`);
+    }
+};
+
+// Customer context management
+window.getCustomerInfo = function() {
+    const customerId = getCustomerContext();
+    const hasCustomTiles = document.querySelector('option[value="drone_imagery"]') !== null;
+    
+    console.log('Customer Context Information:');
+    console.log('Customer ID:', customerId);
+    console.log('Has Custom Drone Tiles:', hasCustomTiles);
+    console.log('Tile URL Pattern:', hasCustomTiles ? baseMaps.drone_imagery.url : 'Not available');
+    
+    if (hasCustomTiles) {
+        showInfo(`Customer ${customerId} context active with drone imagery support (zoom levels ${baseMaps.drone_imagery.minZoom}-${baseMaps.drone_imagery.maxZoom})`);
+    } else {
+        showInfo(`Customer ${customerId} context active (no custom drone imagery available)`);
+    }
+};
+
+// Debug function to test tile availability
+window.testCustomTiles = async function() {
+    const customerId = getCustomerContext();
+    const available = await checkCustomTilesAvailability(customerId);
+    
+    console.log('Tile availability test for customer', customerId, ':', available);
+    
+    if (available) {
+        showSuccess('Custom drone imagery tiles are accessible for this customer.');
+    } else {
+        showWarning('Custom drone imagery tiles are not available or accessible for this customer.');
+    }
+};
 
 // Make functions globally available
 window.toggleSection = toggleSection;
