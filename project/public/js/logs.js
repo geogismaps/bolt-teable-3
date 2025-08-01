@@ -267,9 +267,9 @@ function displayLogs() {
 
 function createLogEntryHTML(logEntry) {
     const actionType = logEntry.actionType || 'unknown';
-    const actionClass = actionType.toLowerCase();
+    const actionClass = actionType ? actionType.toLowerCase() : 'unknown';
     const actionIcon = getActionIcon(actionType);
-    const timestamp = new Date(logEntry.timestamp);
+    const timestamp = new Date(logEntry.timestamp || new Date());
     const timeAgo = getTimeAgo(timestamp);
     
     let html = `
@@ -278,7 +278,7 @@ function createLogEntryHTML(logEntry) {
                 <div class="log-meta">
                     <div class="d-flex align-items-center gap-2">
                         <span class="log-action ${actionClass}">
-                            <i class="${actionIcon} me-1"></i>${actionType}
+                            <i class="${actionIcon} me-1"></i>${actionType || 'Unknown'}
                         </span>
                         <span class="log-table">${logEntry.tableName || 'Unknown Table'}</span>
                         <span class="log-user">
@@ -400,13 +400,15 @@ function formatValue(value) {
 }
 
 function getActionIcon(actionType) {
+    if (!actionType) return 'fas fa-question-circle';
+    
     const icons = {
         'create': 'fas fa-plus-circle',
         'update': 'fas fa-edit',
         'delete': 'fas fa-trash',
         'unknown': 'fas fa-question-circle'
     };
-    return icons[actionType] || 'fas fa-question-circle';
+    return icons[actionType.toLowerCase()] || 'fas fa-question-circle';
 }
 
 function getFieldIcon(fieldName) {
@@ -424,6 +426,10 @@ function getFieldIcon(fieldName) {
 }
 
 function getTimeAgo(date) {
+    if (!date || isNaN(new Date(date).getTime())) {
+        return 'Unknown time';
+    }
+    
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
