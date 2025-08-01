@@ -11,7 +11,7 @@ let currentUser = null;
 document.addEventListener('DOMContentLoaded', function() {
     // Check authentication and admin privileges
     if (!window.teableAuth.requireAuth()) return;
-    
+
     // Check if user is admin or creator
     const session = window.teableAuth.getCurrentSession();
     if (!session.isAdmin && session.role !== 'creator') {
@@ -19,9 +19,9 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = 'dashboard.html';
         return;
     }
-    
+
     // Remove view mode toggle listeners as we're using table view only
-    
+
     initializeLogs();
 });
 
@@ -38,18 +38,18 @@ async function initializeLogs() {
 
         // Ensure system tables exist
         await window.teableAPI.ensureSystemTables();
-        
+
         // Create data change log table if it doesn't exist
         await ensureDataLogTable();
-        
+
         // Load filter options
         await loadFilterOptions();
-        
+
         // Load logs
         await loadDataLogs();
-        
+
         console.log('Data logs initialized');
-        
+
     } catch (error) {
         console.error('Logs initialization failed:', error);
         showError('Failed to initialize logs: ' + error.message);
@@ -61,9 +61,9 @@ async function ensureDataLogTable() {
         // Check if data_change_logs table exists
         const tables = await window.teableAPI.getTables();
         const allTables = tables.tables || tables || [];
-        
+
         let dataLogTable = allTables.find(t => t.name === 'data_change_logs');
-        
+
         if (!dataLogTable) {
             console.log('Creating data_change_logs table...');
             dataLogTable = await window.teableAPI.createTable({
@@ -92,12 +92,12 @@ async function ensureDataLogTable() {
                 ]
             });
         }
-        
+
         // Store table ID for future use
         window.teableAPI.systemTables.dataLogs = dataLogTable.id;
-        
+
         console.log('Data change logs table ensured');
-        
+
     } catch (error) {
         console.error('Error ensuring data log table:', error);
         throw error;
@@ -114,39 +114,39 @@ async function loadFilterOptions() {
             !t.name.startsWith('system_') &&
             t.name !== 'data_change_logs'
         );
-        
+
         const tableFilter = document.getElementById('tableFilter');
         tableFilter.innerHTML = '<option value="">All Tables</option>';
-        
+
         allTables.forEach(table => {
             const option = document.createElement('option');
             option.value = table.id;
             option.textContent = table.name;
             tableFilter.appendChild(option);
         });
-        
+
         // Load users for filter
         if (window.teableAPI.systemTables.users) {
             const usersData = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
             const users = usersData.records || [];
-            
+
             const userFilter = document.getElementById('userFilter');
             userFilter.innerHTML = '<option value="">All Users</option>';
-            
+
             users.forEach(user => {
                 const fields = user.fields;
                 const name = `${fields.first_name || ''} ${fields.last_name || ''}`.trim();
                 const displayName = name ? `${name} (${fields.email})` : fields.email;
-                
+
                 const option = document.createElement('option');
                 option.value = fields.email;
                 option.textContent = displayName;
                 userFilter.appendChild(option);
             });
         }
-        
+
         console.log('Filter options loaded');
-        
+
     } catch (error) {
         console.error('Error loading filter options:', error);
     }
@@ -158,28 +158,28 @@ async function loadDataLogs() {
             showEmptyState('Data change logging is not yet configured.');
             return;
         }
-        
+
         // Load all data change logs
         const logsData = await window.teableAPI.getRecords(
             window.teableAPI.systemTables.dataLogs, 
             { limit: 5000, sort: 'timestamp:desc' }
         );
-        
+
         allLogs = logsData.records || [];
-        
+
         // Group logs by record and timestamp for better display
         allLogs = groupLogsByChange(allLogs);
-        
+
         filteredLogs = [...allLogs];
-        
+
         // Update statistics
         updateStatistics();
-        
+
         // Display logs
         displayLogs();
-        
+
         console.log('Loaded data logs:', allLogs.length);
-        
+
     } catch (error) {
         console.error('Error loading data logs:', error);
         showError('Failed to load data logs: ' + error.message);
@@ -189,16 +189,16 @@ async function loadDataLogs() {
 function groupLogsByChange(logs) {
     // Group logs by record_id, timestamp, and action_type to show related field changes together
     const grouped = {};
-    
+
     logs.forEach(log => {
         if (!log || !log.fields) {
             console.warn('Invalid log entry:', log);
             return;
         }
-        
+
         const fields = log.fields;
         const key = `${fields.record_id || 'unknown'}_${fields.timestamp || Date.now()}_${fields.action_type || 'unknown'}`;
-        
+
         if (!grouped[key]) {
             grouped[key] = {
                 id: key,
@@ -215,7 +215,7 @@ function groupLogsByChange(logs) {
                 fieldChanges: []
             };
         }
-        
+
         // Only add field change if field_name exists
         if (fields.field_name) {
             grouped[key].fieldChanges.push({
@@ -225,7 +225,7 @@ function groupLogsByChange(logs) {
             });
         }
     });
-    
+
     // Convert to array and sort by timestamp
     return Object.values(grouped).sort((a, b) => 
         new Date(b.timestamp) - new Date(a.timestamp)
@@ -235,10 +235,10 @@ function groupLogsByChange(logs) {
 function updateStatistics() {
     const today = new Date().toISOString().split('T')[0];
     const todayLogs = allLogs.filter(log => log.changedAt === today);
-    
+
     const uniqueUsers = new Set(allLogs.map(log => log.changedBy));
     const uniqueTables = new Set(allLogs.map(log => log.tableId));
-    
+
     document.getElementById('totalChanges').textContent = allLogs.length;
     document.getElementById('todayChanges').textContent = todayLogs.length;
     document.getElementById('activeUsers').textContent = uniqueUsers.size;
@@ -247,26 +247,26 @@ function updateStatistics() {
 
 function displayLogs() {
     const container = document.getElementById('logsContainer');
-    
+
     if (filteredLogs.length === 0) {
         showEmptyState('No data changes found matching your filters.');
         return;
     }
-    
+
     // Calculate pagination
     const totalPages = Math.ceil(filteredLogs.length / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     const pageData = filteredLogs.slice(startIndex, endIndex);
-    
+
     // Create enhanced table view with field change history
     const html = createEnhancedFieldChangesTable(pageData);
-    
+
     container.innerHTML = html;
-    
+
     // Update pagination
     updatePagination();
-    
+
     // Update filter counts
     document.getElementById('filteredCount').textContent = filteredLogs.length;
     document.getElementById('totalCount').textContent = allLogs.length;
@@ -275,7 +275,7 @@ function displayLogs() {
 function createEnhancedFieldChangesTable(pageData) {
     // Process data to group field changes by field name and show history
     const fieldChangesMap = new Map();
-    
+
     // Flatten all field changes and group by field name
     pageData.forEach(logEntry => {
         if (logEntry.fieldChanges && logEntry.fieldChanges.length > 0) {
@@ -288,7 +288,7 @@ function createEnhancedFieldChangesTable(pageData) {
                         changes: []
                     });
                 }
-                
+
                 fieldChangesMap.get(key).changes.push({
                     ...change,
                     timestamp: logEntry.timestamp,
@@ -300,12 +300,12 @@ function createEnhancedFieldChangesTable(pageData) {
             });
         }
     });
-    
+
     // Sort changes within each field by timestamp (newest first)
     fieldChangesMap.forEach(fieldData => {
         fieldData.changes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     });
-    
+
     let html = `
         <div class="logs-table">
             <div class="table-responsive">
@@ -324,7 +324,7 @@ function createEnhancedFieldChangesTable(pageData) {
                     </thead>
                     <tbody>
     `;
-    
+
     if (fieldChangesMap.size === 0) {
         html += `
             <tr>
@@ -339,12 +339,12 @@ function createEnhancedFieldChangesTable(pageData) {
         const sortedFields = Array.from(fieldChangesMap.values()).sort((a, b) => 
             new Date(b.changes[0].timestamp) - new Date(a.changes[0].timestamp)
         );
-        
+
         sortedFields.forEach(fieldData => {
             const mostRecent = fieldData.changes[0];
             const history = fieldData.changes.slice(1);
             const timestamp = new Date(mostRecent.timestamp);
-            
+
             html += `
                 <tr>
                     <td>
@@ -384,14 +384,14 @@ function createEnhancedFieldChangesTable(pageData) {
             `;
         });
     }
-    
+
     html += `
                     </tbody>
                 </table>
             </div>
         </div>
     `;
-    
+
     return html;
 }
 
@@ -399,13 +399,13 @@ function formatCellValue(value) {
     if (value === null || value === undefined) {
         return '<em class="text-muted">null</em>';
     }
-    
+
     if (value === '') {
         return '<em class="text-muted">empty</em>';
     }
-    
+
     const stringValue = String(value);
-    
+
     // Truncate very long values for cell display
     if (stringValue.length > 100) {
         return `
@@ -415,7 +415,7 @@ function formatCellValue(value) {
             </div>
         `;
     }
-    
+
     return `<span class="value-content">${stringValue.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
 }
 
@@ -423,7 +423,7 @@ function createHistoryCell(history) {
     if (!history || history.length === 0) {
         return '<em class="text-muted">No previous changes</em>';
     }
-    
+
     let html = `
         <div class="history-container">
             <button class="btn btn-sm btn-outline-secondary history-toggle" onclick="toggleHistory(this)">
@@ -432,7 +432,7 @@ function createHistoryCell(history) {
             </button>
             <div class="history-details" style="display: none;">
     `;
-    
+
     history.forEach((change, index) => {
         const timestamp = new Date(change.timestamp);
         html += `
@@ -458,19 +458,19 @@ function createHistoryCell(history) {
             </div>
         `;
     });
-    
+
     html += `
             </div>
         </div>
     `;
-    
+
     return html;
 }
 
 function toggleHistory(button) {
     const historyDetails = button.nextElementSibling;
     const icon = button.querySelector('i');
-    
+
     if (historyDetails.style.display === 'none') {
         historyDetails.style.display = 'block';
         icon.className = 'fas fa-chevron-up me-1';
@@ -502,7 +502,7 @@ function createTableView(pageData) {
                     </thead>
                     <tbody>
     `;
-    
+
     // Flatten logs to show individual field changes
     const flattenedLogs = [];
     pageData.forEach(logEntry => {
@@ -525,12 +525,12 @@ function createTableView(pageData) {
             });
         }
     });
-    
+
     flattenedLogs.forEach(entry => {
         const timestamp = new Date(entry.timestamp || new Date());
         const actionType = entry.actionType || 'unknown';
         const timeAgo = getTimeAgo(timestamp);
-        
+
         html += `
             <tr>
                 ${entry.isFirstChange ? `
@@ -563,14 +563,14 @@ function createTableView(pageData) {
             </tr>
         `;
     });
-    
+
     html += `
                     </tbody>
                 </table>
             </div>
         </div>
     `;
-    
+
     return html;
 }
 
@@ -578,15 +578,15 @@ function createFieldChangeTableCell(change, actionType) {
     if (!change || !change.fieldName) {
         return '<em class="text-muted">Invalid field data</em>';
     }
-    
+
     const fieldIcon = getFieldIcon(change.fieldName);
-    
+
     let html = `
         <div class="field-change-item">
             <i class="${fieldIcon} me-1"></i>
             <strong>${change.fieldName}</strong>
     `;
-    
+
     if (actionType === 'create') {
         html += `<br><span class="new-value-inline">${formatValueInline(change.newValue)}</span>`;
     } else if (actionType === 'delete') {
@@ -599,7 +599,7 @@ function createFieldChangeTableCell(change, actionType) {
             <span class="new-value-inline">${formatValueInline(change.newValue)}</span>
         `;
     }
-    
+
     html += '</div>';
     return html;
 }
@@ -608,18 +608,18 @@ function formatValueInline(value) {
     if (value === null || value === undefined) {
         return 'null';
     }
-    
+
     if (value === '') {
         return 'empty';
     }
-    
+
     const stringValue = String(value);
-    
+
     // Truncate very long values for inline display
     if (stringValue.length > 50) {
         return stringValue.substring(0, 50) + '...';
     }
-    
+
     return stringValue;
 }
 
@@ -629,7 +629,7 @@ function createLogEntryHTML(logEntry) {
     const actionIcon = getActionIcon(actionType);
     const timestamp = new Date(logEntry.timestamp || new Date());
     const timeAgo = getTimeAgo(timestamp);
-    
+
     let html = `
         <div class="log-entry ${actionClass}">
             <div class="log-header">
@@ -656,7 +656,7 @@ function createLogEntryHTML(logEntry) {
                     ${logEntry.ipAddress ? `<span class="ms-3"><strong>IP:</strong> ${logEntry.ipAddress}</span>` : ''}
                 </div>
     `;
-    
+
     if (actionType === 'create') {
         html += `
             <div class="alert alert-success">
@@ -672,25 +672,25 @@ function createLogEntryHTML(logEntry) {
             </div>
         `;
     }
-    
+
     // Show field changes
     if (logEntry.fieldChanges && Array.isArray(logEntry.fieldChanges) && logEntry.fieldChanges.length > 0) {
         html += '<div class="field-changes">';
-        
+
         logEntry.fieldChanges.forEach(change => {
             if (change && typeof change === 'object') {
                 html += createFieldChangeHTML(change, actionType);
             }
         });
-        
+
         html += '</div>';
     }
-    
+
     html += `
             </div>
         </div>
     `;
-    
+
     return html;
 }
 
@@ -698,9 +698,9 @@ function createFieldChangeHTML(change, actionType) {
     if (!change || !change.fieldName) {
         return '<div class="field-change"><div class="text-muted">Invalid field change data</div></div>';
     }
-    
+
     const fieldIcon = getFieldIcon(change.fieldName);
-    
+
     let html = `
         <div class="field-change">
             <div class="field-name">
@@ -708,7 +708,7 @@ function createFieldChangeHTML(change, actionType) {
                 ${change.fieldName}
             </div>
     `;
-    
+
     if (actionType === 'create') {
         html += `
             <div class="new-value">
@@ -738,7 +738,7 @@ function createFieldChangeHTML(change, actionType) {
             </div>
         `;
     }
-    
+
     html += '</div>';
     return html;
 }
@@ -747,25 +747,25 @@ function formatValue(value) {
     if (value === null || value === undefined) {
         return '<em class="text-muted">null</em>';
     }
-    
+
     if (value === '') {
         return '<em class="text-muted">empty</em>';
     }
-    
+
     const stringValue = String(value);
-    
+
     // Truncate very long values
     if (stringValue.length > 200) {
         return stringValue.substring(0, 200) + '... <em class="text-muted">(truncated)</em>';
     }
-    
+
     // Escape HTML
     return stringValue.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function getActionIcon(actionType) {
     if (!actionType) return 'fas fa-question-circle';
-    
+
     const icons = {
         'create': 'fas fa-plus-circle',
         'update': 'fas fa-edit',
@@ -779,7 +779,7 @@ function getFieldIcon(fieldName) {
     if (!fieldName || typeof fieldName !== 'string') {
         return 'fas fa-question-circle';
     }
-    
+
     const name = fieldName.toLowerCase();
     if (name.includes('email')) return 'fas fa-envelope';
     if (name.includes('phone')) return 'fas fa-phone';
@@ -797,18 +797,18 @@ function getTimeAgo(date) {
     if (!date || isNaN(new Date(date).getTime())) {
         return 'Unknown time';
     }
-    
+
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-    
+
     return date.toLocaleDateString();
 }
 
@@ -818,7 +818,7 @@ function applyFilters() {
     const userFilter = document.getElementById('userFilter').value;
     const actionFilter = document.getElementById('actionFilter').value;
     const searchText = document.getElementById('searchText').value.toLowerCase();
-    
+
     // Show/hide custom date range
     const customDateRange = document.getElementById('customDateRange');
     if (dateRange === 'custom') {
@@ -826,13 +826,13 @@ function applyFilters() {
     } else {
         customDateRange.style.display = 'none';
     }
-    
+
     filteredLogs = allLogs.filter(log => {
         // Date filter
         if (dateRange !== 'all') {
             const logDate = new Date(log.changedAt);
             const today = new Date();
-            
+
             switch (dateRange) {
                 case 'today':
                     if (logDate.toDateString() !== today.toDateString()) return false;
@@ -853,16 +853,16 @@ function applyFilters() {
                     break;
             }
         }
-        
+
         // Table filter
         if (tableFilter && log.tableId !== tableFilter) return false;
-        
+
         // User filter
         if (userFilter && log.changedBy !== userFilter) return false;
-        
+
         // Action filter
         if (actionFilter && log.actionType !== actionFilter) return false;
-        
+
         // Search filter
         if (searchText) {
             const searchableText = [
@@ -873,13 +873,13 @@ function applyFilters() {
                 ...log.fieldChanges.map(fc => fc.oldValue),
                 ...log.fieldChanges.map(fc => fc.newValue)
             ].join(' ').toLowerCase();
-            
+
             if (!searchableText.includes(searchText)) return false;
         }
-        
+
         return true;
     });
-    
+
     currentPage = 1;
     displayLogs();
 }
@@ -893,7 +893,7 @@ function clearFilters() {
     document.getElementById('fromDate').value = '';
     document.getElementById('toDate').value = '';
     document.getElementById('customDateRange').style.display = 'none';
-    
+
     filteredLogs = [...allLogs];
     currentPage = 1;
     displayLogs();
@@ -903,32 +903,33 @@ function updatePagination() {
     const totalPages = Math.ceil(filteredLogs.length / pageSize);
     const pagination = document.getElementById('logsPagination');
     const paginationList = pagination.querySelector('.pagination');
-    
+
     if (totalPages <= 1) {
         pagination.style.display = 'none';
         return;
     }
-    
+
     pagination.style.display = 'flex';
-    
+
     // Update page info
     const startRecord = (currentPage - 1) * pageSize + 1;
     const endRecord = Math.min(currentPage * pageSize, filteredLogs.length);
-    
+
     document.getElementById('pageStart').textContent = startRecord;
     document.getElementById('pageEnd').textContent = endRecord;
     document.getElementById('pageTotal').textContent = filteredLogs.length;
-    
+
     // Generate pagination
     let html = '';
-    
+
     // Previous button
     html += `
         <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>
+            ```text
+<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>
         </li>
     `;
-    
+
     // Page numbers
     for (let i = 1; i <= totalPages; i++) {
         if (i === currentPage || i === 1 || i === totalPages || 
@@ -942,14 +943,14 @@ function updatePagination() {
             html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
         }
     }
-    
+
     // Next button
     html += `
         <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>
         </li>
     `;
-    
+
     paginationList.innerHTML = html;
 }
 
@@ -958,7 +959,7 @@ function changePage(page) {
     if (page >= 1 && page <= totalPages) {
         currentPage = page;
         displayLogs();
-        
+
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -980,10 +981,10 @@ async function refreshLogs() {
                 <span class="ms-3">Refreshing logs...</span>
             </div>
         `;
-        
+
         await loadDataLogs();
         showSuccess('Logs refreshed successfully!');
-        
+
     } catch (error) {
         console.error('Error refreshing logs:', error);
         showError('Failed to refresh logs: ' + error.message);
@@ -1005,7 +1006,7 @@ async function exportLogs(format) {
                 ip_address: log.ipAddress,
                 session_id: log.sessionId
             };
-            
+
             // Flatten field changes
             const exportData = [];
             log.fieldChanges.forEach(change => {
@@ -1016,18 +1017,18 @@ async function exportLogs(format) {
                     new_value: change.newValue
                 });
             });
-            
+
             return exportData;
         }).flat();
-        
+
         if (format === 'csv') {
             exportToCSV(dataToExport);
         } else if (format === 'json') {
             exportToJSON(dataToExport);
         }
-        
+
         showSuccess(`Logs exported as ${format.toUpperCase()} successfully!`);
-        
+
     } catch (error) {
         console.error('Error exporting logs:', error);
         showError('Failed to export logs: ' + error.message);
@@ -1036,10 +1037,10 @@ async function exportLogs(format) {
 
 function exportToCSV(data) {
     if (data.length === 0) return;
-    
+
     const headers = Object.keys(data[0]);
     let csv = headers.join(',') + '\n';
-    
+
     data.forEach(row => {
         const values = headers.map(header => {
             const value = row[header] || '';
@@ -1047,7 +1048,7 @@ function exportToCSV(data) {
         });
         csv += values.join(',') + '\n';
     });
-    
+
     downloadFile(csv, `data_change_logs_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
 }
 
@@ -1098,9 +1099,9 @@ function showAlert(type, message) {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.appendChild(alertDiv);
-    
+
     setTimeout(() => {
         if (alertDiv.parentNode) {
             alertDiv.remove();
@@ -1108,11 +1109,123 @@ function showAlert(type, message) {
     }, 5000);
 }
 
+async function loadLogs() {
+    try {
+        showLoading(true);
+        console.log('🔄 Starting to load logs...');
+
+        if (!window.teableAPI) {
+            throw new Error('Teable API not available. Please check your configuration.');
+        }
+
+        if (!window.teableAPI.systemTables) {
+            console.log('⚠️ System tables not initialized, attempting to initialize...');
+            try {
+                await window.teableAPI.ensureSystemTables();
+                console.log('✅ System tables initialized successfully');
+            } catch (initError) {
+                throw new Error(`Failed to initialize system tables: ${initError.message}`);
+            }
+        }
+
+        if (!window.teableAPI.systemTables.dataLogs) {
+            throw new Error('Data logs table not available. Please run system setup first.');
+        }
+
+        console.log('📊 Loading logs from table:', window.teableAPI.systemTables.dataLogs);
+
+        // Get logs data with pagination
+        const logsData = await window.teableAPI.getRecords(window.teableAPI.systemTables.dataLogs, { 
+            limit: 1000
+        });
+
+        allLogs = logsData.records || [];
+        console.log(`✅ Loaded ${allLogs.length} log entries`);
+
+        // Sort logs by timestamp (newest first)
+        allLogs.sort((a, b) => {
+            const timestampA = new Date(a.fields.timestamp || a.fields.changed_at || '1970-01-01');
+            const timestampB = new Date(b.fields.timestamp || b.fields.changed_at || '1970-01-01');
+            return timestampB - timestampA;
+        });
+
+        console.log('📝 Sample log entry:', allLogs[0]);
+
+        // Apply current filters
+        applyFilters();
+
+        // Update statistics
+        updateLogStatistics();
+
+        if (allLogs.length === 0) {
+            showInfo('No log entries found. Make some changes to tables or records to see logs appear here.');
+        } else {
+            showSuccess(`Loaded ${allLogs.length} log entries successfully`);
+        }
+
+    } catch (error) {
+        console.error('❌ Error loading logs:', error);
+        showError(`Failed to load logs: ${error.message}`);
+
+        // Show detailed error state
+        document.getElementById('logsTableBody').innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <div class="text-muted">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2 text-warning"></i>
+                        <h5>Error Loading Logs</h5>
+                        <p class="mb-3">${error.message}</p>
+                        <div class="d-flex gap-2 justify-content-center">
+                            <button class="btn btn-primary btn-sm" onclick="loadLogs()">
+                                <i class="fas fa-sync me-1"></i>Retry Loading
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="initializeSystemTables()">
+                                <i class="fas fa-cog me-1"></i>Initialize System
+                            </button>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            If this persists, check your Teable.io connection and permissions.
+                        </small>
+                    </div>
+                </td>
+            </tr>
+        `;
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Initialize system tables if needed
+async function initializeSystemTables() {
+    try {
+        showLoading(true);
+        console.log('🔧 Initializing system tables...');
+
+        if (!window.teableAPI) {
+            throw new Error('Teable API not available. Please check your configuration.');
+        }
+
+        await window.teableAPI.ensureSystemTables();
+        console.log('✅ System tables initialized successfully');
+
+        showSuccess('System tables initialized successfully. Loading logs...');
+
+        // Reload logs after initialization
+        setTimeout(() => {
+            loadLogs();
+        }, 1000);
+
+    } catch (error) {
+        console.error('❌ Error initializing system tables:', error);
+        showError(`Failed to initialize system tables: ${error.message}`);
+    } finally {
+        showLoading(false);
+    }
+}
+
 // Make functions globally available
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
-window.changePage = changePage;
-window.changePageSize = changePageSize;
-window.refreshLogs = refreshLogs;
 window.exportLogs = exportLogs;
-window.toggleHistory = toggleHistory;
+window.refreshLogs = refreshLogs;
+window.initializeSystemTables = initializeSystemTables;

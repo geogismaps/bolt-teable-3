@@ -1835,17 +1835,21 @@ async function debugTableData() {
 // Data change logging helper function
 async function logDataChange(tableId, recordId, actionType, oldValues, newValues) {
     try {
+        console.log('🔄 Attempting to log data change:', { tableId, recordId, actionType });
+        
         // Skip logging if data logs system not available
         if (!window.teableAPI || !window.teableAPI.systemTables || !window.teableAPI.systemTables.dataLogs) {
-            console.log('Data logging system not available, skipping log entry');
+            console.log('⚠️ Data logging system not available, skipping log entry');
             return;
         }
 
         const session = window.teableAuth?.getCurrentSession();
         if (!session) {
-            console.log('No user session available for logging');
+            console.log('⚠️ No user session available for logging');
             return;
         }
+
+        console.log('✅ Found session for logging:', session.email);
 
         // Get table name
         let tableName = 'Unknown';
@@ -1853,8 +1857,9 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
             const tables = await window.teableAPI.getTables();
             const table = (tables.tables || tables || []).find(t => t.id === tableId);
             tableName = table?.name || tableName;
+            console.log('✅ Found table name:', tableName);
         } catch (error) {
-            console.log('Could not get table name for logging:', error.message);
+            console.log('⚠️ Could not get table name for logging:', error.message);
         }
 
         const timestamp = new Date().toISOString();
@@ -1878,7 +1883,7 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                     changed_at: changedAt,
                     timestamp: timestamp,
                     user_role: session.role,
-                    ip_address: 'unknown',
+                    ip_address: 'web_interface',
                     session_id: session.loginTime || 'unknown'
                 });
             });
@@ -1897,7 +1902,7 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                     changed_at: changedAt,
                     timestamp: timestamp,
                     user_role: session.role,
-                    ip_address: 'unknown',
+                    ip_address: 'web_interface',
                     session_id: session.loginTime || 'unknown'
                 });
             });
@@ -1921,139 +1926,33 @@ async function logDataChange(tableId, recordId, actionType, oldValues, newValues
                         changed_at: changedAt,
                         timestamp: timestamp,
                         user_role: session.role,
-                        ip_address: 'unknown',
+                        ip_address: 'web_interface',
                         session_id: session.loginTime || 'unknown'
                     });
                 }
             });
         }
 
+        console.log(`📝 Creating ${logEntries.length} log entries for ${actionType} action`);
+
         // Create log entries in batch
+        let successCount = 0;
         for (const logEntry of logEntries) {
             try {
-                await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
+                console.log('📤 Creating log entry:', logEntry);
+                const result = await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
+                console.log('✅ Log entry created successfully:', result);
+                successCount++;
             } catch (logError) {
-                console.error('Failed to create data log entry:', logError);
+                console.error('❌ Failed to create data log entry:', logError);
+                console.error('Failed log entry data:', logEntry);
             }
         }
 
-        console.log(`Logged ${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
+        console.log(`✅ Successfully logged ${successCount}/${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
 
     } catch (error) {
-        console.error('Error logging data change:', error);
-        // Don't throw error to avoid breaking the main operation
-    }
-}
-
-// Data change logging helper function
-async function logDataChange(tableId, recordId, actionType, oldValues, newValues) {
-    try {
-        // Skip logging if data logs system not available
-        if (!window.teableAPI || !window.teableAPI.systemTables || !window.teableAPI.systemTables.dataLogs) {
-            console.log('Data logging system not available, skipping log entry');
-            return;
-        }
-
-        const session = window.teableAuth?.getCurrentSession();
-        if (!session) {
-            console.log('No user session available for logging');
-            return;
-        }
-
-        // Get table name
-        let tableName = 'Unknown';
-        try {
-            const tables = await window.teableAPI.getTables();
-            const table = (tables.tables || tables || []).find(t => t.id === tableId);
-            tableName = table?.name || tableName;
-        } catch (error) {
-            console.log('Could not get table name for logging:', error.message);
-        }
-
-        const timestamp = new Date().toISOString();
-        const changedAt = timestamp.split('T')[0];
-
-        // Create log entries for each field change
-        const logEntries = [];
-
-        if (actionType === 'create' && newValues) {
-            // Log all new fields
-            Object.keys(newValues).forEach(fieldName => {
-                logEntries.push({
-                    record_id: recordId,
-                    table_id: tableId,
-                    table_name: tableName,
-                    action_type: actionType,
-                    field_name: fieldName,
-                    old_value: null,
-                    new_value: String(newValues[fieldName] || ''),
-                    changed_by: session.email,
-                    changed_at: changedAt,
-                    timestamp: timestamp,
-                    user_role: session.role,
-                    ip_address: 'unknown',
-                    session_id: session.loginTime || 'unknown'
-                });
-            });
-        } else if (actionType === 'delete' && oldValues) {
-            // Log all deleted fields
-            Object.keys(oldValues).forEach(fieldName => {
-                logEntries.push({
-                    record_id: recordId,
-                    table_id: tableId,
-                    table_name: tableName,
-                    action_type: actionType,
-                    field_name: fieldName,
-                    old_value: String(oldValues[fieldName] || ''),
-                    new_value: null,
-                    changed_by: session.email,
-                    changed_at: changedAt,
-                    timestamp: timestamp,
-                    user_role: session.role,
-                    ip_address: 'unknown',
-                    session_id: session.loginTime || 'unknown'
-                });
-            });
-        } else if (actionType === 'update' && oldValues && newValues) {
-            // Log only changed fields
-            Object.keys(newValues).forEach(fieldName => {
-                const oldValue = oldValues[fieldName];
-                const newValue = newValues[fieldName];
-
-                // Only log if value actually changed
-                if (String(oldValue) !== String(newValue)) {
-                    logEntries.push({
-                        record_id: recordId,
-                        table_id: tableId,
-                        table_name: tableName,
-                        action_type: actionType,
-                        field_name: fieldName,
-                        old_value: String(oldValue || ''),
-                        new_value: String(newValue || ''),
-                        changed_by: session.email,
-                        changed_at: changedAt,
-                        timestamp: timestamp,
-                        user_role: session.role,
-                        ip_address: 'unknown',
-                        session_id: session.loginTime || 'unknown'
-                    });
-                }
-            });
-        }
-
-        // Create log entries in batch
-        for (const logEntry of logEntries) {
-            try {
-                await window.teableAPI.createRecord(window.teableAPI.systemTables.dataLogs, logEntry);
-            } catch (logError) {
-                console.error('Failed to create data log entry:', logError);
-            }
-        }
-
-        console.log(`Logged ${logEntries.length} field changes for ${actionType} action in table ${tableName}`);
-
-    } catch (error) {
-        console.error('Error logging data change:', error);
+        console.error('❌ Error logging data change:', error);
         // Don't throw error to avoid breaking the main operation
     }
 }
