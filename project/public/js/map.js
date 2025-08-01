@@ -34,21 +34,39 @@ const baseMaps = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
+    // Check authentication first
     if (!window.teableAuth.requireAuth()) return;
 
-    initializeMap();
+    // Wait for authentication to be fully ready before initializing map
+    setTimeout(() => {
+        initializeMap();
+    }, 100);
 });
 
 async function initializeMap() {
     try {
+        // Ensure we have a valid session
         currentUser = window.teableAuth.getCurrentSession();
+        if (!currentUser) {
+            console.error('No authenticated user found');
+            window.location.href = 'login.html';
+            return;
+        }
+
         document.getElementById('userDisplay').textContent = 
             `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
 
-        // Initialize API if needed
+        // Initialize API if needed and ensure it's properly configured
         if (currentUser.userType === 'space_owner') {
-            window.teableAPI.init(window.teableAuth.clientConfig);
+            const clientConfig = window.teableAuth.clientConfig;
+            if (!clientConfig) {
+                console.error('No client configuration found');
+                return;
+            }
+            window.teableAPI.init(clientConfig);
+            
+            // Wait for API to be ready
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
 
         // Initialize Leaflet map with maximum zoom level 25
@@ -82,6 +100,12 @@ async function initializeMap() {
 
 async function loadAvailableTables() {
     try {
+        // Ensure user is authenticated and API is ready
+        if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
+            console.log('Authentication or API not ready, skipping table loading');
+            return;
+        }
+
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
 
@@ -1136,8 +1160,16 @@ async function createDockedAttributeTable(layer) {
         existingTable.remove();
     }
 
-    // Load field permissions for current user
-    const fieldPermissions = await loadFieldPermissionsForTable(layer.tableId);
+    // Only load field permissions if user is properly authenticated
+    let fieldPermissions = {};
+    try {
+        if (currentUser && window.teableAPI && window.teableAPI.config.baseUrl) {
+            fieldPermissions = await loadFieldPermissionsForTable(layer.tableId);
+        }
+    } catch (error) {
+        console.log('Could not load field permissions, using defaults:', error.message);
+        fieldPermissions = {};
+    }
     
     // Store permissions on layer for later use
     layer.fieldPermissions = fieldPermissions;
@@ -1232,19 +1264,35 @@ async function createDockedAttributeTable(layer) {
 
 async function loadFieldPermissionsForTable(tableId) {
     try {
+        // Check authentication first
+        const currentUser = window.teableAuth.getCurrentSession();
+        if (!currentUser) {
+            console.log('No authenticated user, using default permissions');
+            return {};
+        }
+
+        // Check if API is ready
+        if (!window.teableAPI || !window.teableAPI.config || !window.teableAPI.config.baseUrl) {
+            console.log('API not ready, using default permissions');
+            return {};
+        }
+
         // Check cache first
         if (fieldPermissionsCache[tableId]) {
             console.log(`Using cached field permissions for table ${tableId}`);
             return fieldPermissionsCache[tableId];
         }
 
-        if (!window.teableAPI.systemTables.permissions) {
-            console.log('Permissions system not initialized, using default permissions');
-            return {};
+        // Wait for system tables to be initialized
+        let retries = 0;
+        while ((!window.teableAPI.systemTables || !window.teableAPI.systemTables.permissions) && retries < 10) {
+            console.log('Waiting for system tables to initialize...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            retries++;
         }
 
-        const currentUser = window.teableAuth.getCurrentSession();
-        if (!currentUser) {
+        if (!window.teableAPI.systemTables || !window.teableAPI.systemTables.permissions) {
+            console.log('Permissions system not initialized after waiting, using default permissions');
             return {};
         }
 

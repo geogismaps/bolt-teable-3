@@ -26,8 +26,16 @@ class TeableAuth {
                 throw new Error('Client configuration not found. Please configure the system first.');
             }
 
+            // Clear any existing field permissions cache to prevent interference
+            if (window.fieldPermissionsCache) {
+                window.fieldPermissionsCache = {};
+            }
+
             // Initialize API with client config for all authentication attempts
             window.teableAPI.init(this.clientConfig);
+
+            // Wait for API initialization
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             let session = null;
 
@@ -125,14 +133,15 @@ class TeableAuth {
 
             // Step 3: Verify admin password
             console.log('Hashing provided password for comparison...');
+            
+            if (!localUser.fields.admin_password_hash) {
+                throw new Error('No admin password hash found for space owner. Please reconfigure the space owner.');
+            }
+
             const adminPasswordHash = await window.teableAPI.hashPassword(password);
 
             console.log('Stored hash exists:', !!localUser.fields.admin_password_hash);
             console.log('Generated hash length:', adminPasswordHash ? adminPasswordHash.length : 0);
-
-            if (!localUser.fields.admin_password_hash) {
-                throw new Error('No admin password hash found for space owner. Please reconfigure the space owner.');
-            }
 
             if (localUser.fields.admin_password_hash !== adminPasswordHash) {
                 console.log('Password hash mismatch');
