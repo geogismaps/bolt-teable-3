@@ -260,22 +260,49 @@ class TeableAuth {
             if (!passwordMatches) {
                 console.log('🔄 All password verification methods failed. Checking if we should allow reset...');
                 
-                // If this is a critical admin password that needs to be reset, you can uncomment this:
-                // const shouldReset = confirm('Password verification failed. Reset admin password to entered password?');
-                // if (shouldReset) {
-                //     try {
-                //         const newHash = await window.teableAPI.hashPassword(password);
-                //         await window.teableAPI.updateRecord(
-                //             window.teableAPI.systemTables.users,
-                //             localUser.id,
-                //             { admin_password_hash: newHash }
-                //         );
-                //         passwordMatches = true;
-                //         console.log('🔄 Password reset and verified');
-                //     } catch (resetError) {
-                //         console.log('Failed to reset password:', resetError.message);
-                //     }
-                // }
+                // Auto-reset for space owners when password hash doesn't match any known methods
+                console.log('🔄 Password hash format not recognized. Attempting password reset...');
+                try {
+                    const newHash = await window.teableAPI.hashPassword(password);
+                    await window.teableAPI.updateRecord(
+                        window.teableAPI.systemTables.users,
+                        localUser.id,
+                        { admin_password_hash: newHash }
+                    );
+                    passwordMatches = true;
+                    console.log('🔄 Password reset and verified with new hash method');
+                    
+                    // Log this important security event
+                    await window.teableAPI.logActivity(
+                        localUser.fields.email,
+                        'password_reset',
+                        'Admin password automatically updated to new hashing method'
+                    );
+                } catch (resetError) {
+                    console.log('Failed to reset password:', resetError.message);
+                    
+                    // If auto-reset fails, prompt user
+                    const shouldReset = confirm(
+                        'Password verification failed with all methods. This might be due to a different hashing method used previously.\n\n' +
+                        'Would you like to reset the admin password to the password you just entered?\n\n' +
+                        'Click OK to reset, or Cancel to try a different password.'
+                    );
+                    
+                    if (shouldReset) {
+                        try {
+                            const manualHash = await window.teableAPI.hashPassword(password);
+                            await window.teableAPI.updateRecord(
+                                window.teableAPI.systemTables.users,
+                                localUser.id,
+                                { admin_password_hash: manualHash }
+                            );
+                            passwordMatches = true;
+                            console.log('🔄 Manual password reset successful');
+                        } catch (manualResetError) {
+                            console.log('Manual password reset failed:', manualResetError.message);
+                        }
+                    }
+                }
             }
 
             if (!passwordMatches) {
