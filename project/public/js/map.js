@@ -581,7 +581,10 @@ async function createLayerFromData(records, layerConfig) {
         // Create layer group
         const layerGroup = L.layerGroup(features);
 
-        // Store layer configuration
+        // Detect media layer type
+        const mediaType = detectMediaLayerType(layerConfig.name, records);
+        
+        // Store layer configuration with media type
         const layer = {
             ...layerConfig,
             leafletLayer: layerGroup,
@@ -589,6 +592,7 @@ async function createLayerFromData(records, layerConfig) {
             records: records,
             featureCount: validFeatureCount,
             bounds: null,
+            mediaType: mediaType, // Store detected media type
             properties: {
                 symbology: {
                     type: 'single',
@@ -611,6 +615,11 @@ async function createLayerFromData(records, layerConfig) {
                 }
             }
         };
+        
+        // Log media type detection
+        if (mediaType) {
+            console.log(`Detected media layer type "${mediaType}" for layer "${layerConfig.name}"`);
+        }
 
         // Calculate bounds
         if (features.length > 0) {
@@ -1130,7 +1139,8 @@ function updateLayersList() {
     let html = '';
     mapLayers.forEach((layer, index) => {
         const visibilityIcon = layer.visible ? 'fa-eye text-success' : 'fa-eye-slash text-muted';
-	const geometryIcon = getGeometryIcon(layer.type);
+        const geometryIcon = getGeometryIcon(layer);
+        const mediaTypeBadge = layer.mediaType ? `<span class="badge bg-info ms-2">${layer.mediaType}</span>` : '';
 
         html += `
             <div class="layer-item ${layer.visible ? 'active' : ''}" data-layer-id="${layer.id}">
@@ -1138,11 +1148,12 @@ function updateLayersList() {
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
                             <i class="fas ${visibilityIcon} me-2" onclick="toggleLayerVisibility('${layer.id}')"></i>
-			    <i class="${geometryIcon} me-2"></i>
+                            <i class="${geometryIcon} me-2"></i>
                             <strong>${layer.name}</strong>
+                            ${mediaTypeBadge}
                         </div>
                         <div class="small text-muted">
-                            ${layer.featureCount} features • ${layer.type}
+                            ${layer.featureCount} features • ${layer.mediaType || layer.type}
                         </div>
                     </div>
                     <div class="layer-controls">
@@ -1167,8 +1178,20 @@ function updateLayersList() {
     container.innerHTML = html;
 }
 
-function getGeometryIcon(type) {
-    switch (type) {
+function getGeometryIcon(layer) {
+    // Check for media type first
+    if (layer.mediaType) {
+        switch (layer.mediaType) {
+            case 'video': return 'fas fa-video text-danger';
+            case 'audio': return 'fas fa-music text-purple';
+            case 'image': return 'fas fa-camera text-info';
+            case 'pdf': return 'fas fa-file-pdf text-danger';
+            case '360_images': return 'fas fa-globe text-primary';
+        }
+    }
+    
+    // Fallback to geometry type
+    switch (layer.type) {
         case 'point': return 'fas fa-map-marker-alt text-danger';
         case 'line': return 'fas fa-route text-warning';
         case 'polygon': return 'fas fa-draw-polygon text-info';
@@ -6338,6 +6361,319 @@ function handleFullscreenChange() {
     }, 100);
 }
 
+// Enhanced media layer detection function
+function detectMediaLayerType(layerName, records) {
+    const name = layerName.toLowerCase();
+    
+    // Check layer name first
+    if (name.includes('360') || name.includes('panorama')) return '360_images';
+    if (name.includes('video')) return 'video';
+    if (name.includes('audio')) return 'audio';
+    if (name.includes('image') || name.includes('photo')) return 'image';
+    if (name.includes('pdf') || name.includes('document')) return 'pdf';
+    
+    // If name doesn't match, analyze URL patterns from data
+    if (records && records.length > 0) {
+        const urlFields = ['url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url'];
+        
+        for (const record of records.slice(0, 5)) { // Check first 5 records
+            const fields = record.fields || {};
+            
+            for (const fieldName of Object.keys(fields)) {
+                const fieldValue = fields[fieldName];
+                
+                if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
+                    const url = fieldValue.toLowerCase();
+                    
+                    // Video detection
+                    if (url.includes('youtube.com') || url.includes('youtu.be') || 
+                        url.includes('.mp4') || url.includes('.webm') || url.includes('.avi') ||
+                        url.includes('vimeo.com') || url.includes('video')) {
+                        return 'video';
+                    }
+                    
+                    // Audio detection
+                    if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg') ||
+                        url.includes('soundcloud.com') || url.includes('audio')) {
+                        return 'audio';
+                    }
+                    
+                    // Image detection
+                    if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image')) {
+                        return 'image';
+                    }
+                    
+                    // PDF detection
+                    if (url.includes('.pdf') || url.includes('document')) {
+                        return 'pdf';
+                    }
+                    
+                    // 360 detection
+                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        return '360_images';
+                    }
+                }
+            }
+        }
+    }
+    
+    return null; // Standard layer
+}
+
+// Function to find URL field in record data
+function findUrlField(recordData) {
+    const urlFieldNames = ['url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url', 'src', 'source'];
+    
+    for (const fieldName of urlFieldNames) {
+        if (recordData[fieldName] && typeof recordData[fieldName] === 'string' && recordData[fieldName].startsWith('http')) {
+            return recordData[fieldName];
+        }
+    }
+    
+    // Check all fields for URL-like values
+    for (const [fieldName, value] of Object.entries(recordData)) {
+        if (typeof value === 'string' && value.startsWith('http')) {
+            return value;
+        }
+    }
+    
+    return null;
+}
+
+// Video player modal
+function openVideoModal(url, title = 'Video Player') {
+    // Remove existing modal
+    const existingModal = document.getElementById('videoPlayerModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    let embedUrl = url;
+    
+    // Convert YouTube URLs to embed format
+    if (url.includes('youtube.com/watch?v=')) {
+        const videoId = url.split('v=')[1].split('&')[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else if (url.includes('youtu.be/')) {
+        const videoId = url.split('youtu.be/')[1].split('?')[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else if (url.includes('vimeo.com/')) {
+        const videoId = url.split('vimeo.com/')[1];
+        embedUrl = `https://player.vimeo.com/video/${videoId}`;
+    }
+    
+    const modalHTML = `
+        <div class="modal fade" id="videoPlayerModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-play-circle me-2"></i>${title}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="video-container" style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%;">
+                            ${embedUrl !== url ? 
+                                `<iframe src="${embedUrl}" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
+                                    frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
+                                </iframe>` :
+                                `<video controls style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                                    <source src="${url}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>`
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('videoPlayerModal'));
+    modal.show();
+}
+
+// Audio player modal
+function openAudioModal(url, title = 'Audio Player') {
+    const existingModal = document.getElementById('audioPlayerModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modalHTML = `
+        <div class="modal fade" id="audioPlayerModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-music me-2"></i>${title}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <audio controls style="width: 100%; max-width: 500px;">
+                            <source src="${url}" type="audio/mpeg">
+                            <source src="${url}" type="audio/wav">
+                            <source src="${url}" type="audio/ogg">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('audioPlayerModal'));
+    modal.show();
+}
+
+// Image viewer modal
+function openImageModal(url, title = 'Image Viewer') {
+    const existingModal = document.getElementById('imageViewerModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modalHTML = `
+        <div class="modal fade" id="imageViewerModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-image me-2"></i>${title}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <img src="${url}" class="img-fluid" style="max-height: 70vh;" alt="Image">
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
+    modal.show();
+}
+
+// PDF viewer modal
+function openPdfModal(url, title = 'PDF Viewer') {
+    const existingModal = document.getElementById('pdfViewerModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modalHTML = `
+        <div class="modal fade" id="pdfViewerModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-file-pdf me-2"></i>${title}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <iframe src="${url}" style="width: 100%; height: 70vh;" frameborder="0">
+                            <p>Your browser does not support PDFs. 
+                            <a href="${url}" target="_blank">Download the PDF</a>.</p>
+                        </iframe>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('pdfViewerModal'));
+    modal.show();
+}
+
+// 360° viewer modal (using Pannellum)
+function open360Modal(url, title = '360° Viewer') {
+    const existingModal = document.getElementById('pannellumModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modalHTML = `
+        <div class="modal fade" id="pannellumModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-globe me-2"></i>${title}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div id="pannellum-container" style="width: 100%; height: 70vh;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Original
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('pannellumModal'));
+    
+    modal._element.addEventListener('shown.bs.modal', function() {
+        if (typeof pannellum !== 'undefined') {
+            pannellum.viewer('pannellum-container', {
+                type: 'equirectangular',
+                panorama: url,
+                autoLoad: true,
+                showControls: true
+            });
+        } else {
+            document.getElementById('pannellum-container').innerHTML = `
+                <div class="alert alert-warning">
+                    360° viewer not available. 
+                    <a href="${url}" target="_blank">View image directly</a>
+                </div>
+            `;
+        }
+    });
+    
+    modal.show();
+}
+
 function handleFeatureClick(feature, featureIndex, layerConfig) {
     // Check if the feature is already selected
     const isSelected = selectedFeatures.includes(feature);
@@ -6368,25 +6704,39 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
         }
         
         if (recordData) {
-            // Check if popups are enabled for this layer
-            const popupEnabled = currentLayer.properties?.popup?.enabled !== false;
+            // Detect media layer type and handle accordingly
+            const mediaType = detectMediaLayerType(currentLayer.name, currentLayer.records);
+            const mediaUrl = findUrlField(recordData);
             
-            if (popupEnabled) {
-                // Create popup content using the current layer configuration (which includes updated popup fields)
-                const popupContent = createFeaturePopup(recordData, currentLayer);
+            if (mediaType && mediaUrl) {
+                // Handle media layers with modals
+                const title = recordData.title || recordData.name || `${currentLayer.name} Media`;
                 
-                // Update the popup with the new content that respects field selection
-                if (feature.getPopup()) {
-                    feature.getPopup().setContent(popupContent);
-                    feature.openPopup();
-                } else {
-                    feature.bindPopup(popupContent).openPopup();
+                switch (mediaType) {
+                    case 'video':
+                        openVideoModal(mediaUrl, title);
+                        break;
+                    case 'audio':
+                        openAudioModal(mediaUrl, title);
+                        break;
+                    case 'image':
+                        openImageModal(mediaUrl, title);
+                        break;
+                    case 'pdf':
+                        openPdfModal(mediaUrl, title);
+                        break;
+                    case '360_images':
+                        open360Modal(mediaUrl, title);
+                        break;
+                    default:
+                        // Fallback to regular popup
+                        showRegularPopup(feature, recordData, currentLayer);
                 }
                 
-                console.log(`Popup opened for feature ${featureIndex} in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
+                console.log(`Opened ${mediaType} modal for feature ${featureIndex} in layer "${currentLayer.name}"`);
             } else {
-                console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
-                showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
+                // Regular layer - show popup
+                showRegularPopup(feature, recordData, currentLayer);
             }
         }
     } else {
@@ -6400,5 +6750,28 @@ function handleFeatureClick(feature, featureIndex, layerConfig) {
                 fillOpacity: originalStyle.fillOpacity || 0.7
             });
         }
+    }
+}
+
+function showRegularPopup(feature, recordData, currentLayer) {
+    // Check if popups are enabled for this layer
+    const popupEnabled = currentLayer.properties?.popup?.enabled !== false;
+    
+    if (popupEnabled) {
+        // Create popup content using the current layer configuration (which includes updated popup fields)
+        const popupContent = createFeaturePopup(recordData, currentLayer);
+        
+        // Update the popup with the new content that respects field selection
+        if (feature.getPopup()) {
+            feature.getPopup().setContent(popupContent);
+            feature.openPopup();
+        } else {
+            feature.bindPopup(popupContent).openPopup();
+        }
+        
+        console.log(`Regular popup opened for feature in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
+    } else {
+        console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
+        showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
     }
 }
