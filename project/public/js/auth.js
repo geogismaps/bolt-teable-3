@@ -132,21 +132,87 @@ class TeableAuth {
             }
 
             // Step 3: Verify admin password
-            console.log('Hashing provided password for comparison...');
+            console.log('Verifying admin password...');
             
             if (!localUser.fields.admin_password_hash) {
                 throw new Error('No admin password hash found for space owner. Please reconfigure the space owner.');
             }
 
-            const adminPasswordHash = await window.teableAPI.hashPassword(password);
+            // Try multiple hashing methods for compatibility
+            let passwordMatches = false;
+            const storedHash = localUser.fields.admin_password_hash;
+            
+            console.log('Stored hash exists:', !!storedHash);
+            console.log('Stored hash length:', storedHash ? storedHash.length : 0);
+            
+            // Method 1: Current API hashing
+            try {
+                const apiHash = await window.teableAPI.hashPassword(password);
+                console.log('API hash generated:', apiHash ? apiHash.substring(0, 10) + '...' : 'null');
+                if (storedHash === apiHash) {
+                    passwordMatches = true;
+                    console.log('✅ Password verified with API hash method');
+                }
+            } catch (hashError) {
+                console.log('API hash method failed:', hashError.message);
+            }
+            
+            // Method 2: Simple SHA-256 (fallback for older stored passwords)
+            if (!passwordMatches) {
+                try {
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(password);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const simpleHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    
+                    console.log('Simple hash generated:', simpleHash ? simpleHash.substring(0, 10) + '...' : 'null');
+                    if (storedHash === simpleHash) {
+                        passwordMatches = true;
+                        console.log('✅ Password verified with simple SHA-256 method');
+                        
+                        // Update to new hashing method
+                        try {
+                            const newHash = await window.teableAPI.hashPassword(password);
+                            await window.teableAPI.updateRecord(
+                                window.teableAPI.systemTables.users,
+                                localUser.id,
+                                { admin_password_hash: newHash }
+                            );
+                            console.log('🔄 Updated password hash to new method');
+                        } catch (updateError) {
+                            console.log('Failed to update password hash:', updateError.message);
+                        }
+                    }
+                } catch (simpleHashError) {
+                    console.log('Simple hash method failed:', simpleHashError.message);
+                }
+            }
+            
+            // Method 3: Direct comparison (for plain text - should be avoided but for compatibility)
+            if (!passwordMatches) {
+                if (storedHash === password) {
+                    passwordMatches = true;
+                    console.log('⚠️ Password verified with plain text (updating to hashed)');
+                    
+                    // Update to hashed password immediately
+                    try {
+                        const newHash = await window.teableAPI.hashPassword(password);
+                        await window.teableAPI.updateRecord(
+                            window.teableAPI.systemTables.users,
+                            localUser.id,
+                            { admin_password_hash: newHash }
+                        );
+                        console.log('🔄 Updated plain text password to hashed');
+                    } catch (updateError) {
+                        console.log('Failed to update plain text password:', updateError.message);
+                    }
+                }
+            }
 
-            console.log('Stored hash exists:', !!localUser.fields.admin_password_hash);
-            console.log('Generated hash length:', adminPasswordHash ? adminPasswordHash.length : 0);
-
-            if (localUser.fields.admin_password_hash !== adminPasswordHash) {
-                console.log('Password hash mismatch');
-                console.log('Expected hash starts with:', localUser.fields.admin_password_hash.substring(0, 10));
-                console.log('Generated hash starts with:', adminPasswordHash.substring(0, 10));
+            if (!passwordMatches) {
+                console.log('❌ Password verification failed with all methods');
+                console.log('Expected hash starts with:', storedHash.substring(0, 10));
                 throw new Error('Invalid admin password for space owner');
             }
 
