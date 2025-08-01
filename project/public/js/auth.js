@@ -1,4 +1,3 @@
-
 /**
  * Mixed Authentication System for Teable GIS
  * Supports both Space Owner and App User authentication
@@ -62,7 +61,7 @@ class TeableAuth {
 
             this.currentSession = session;
             this.saveSession();
-            
+
             // Log activity
             try {
                 await window.teableAPI.logActivity(
@@ -94,12 +93,27 @@ class TeableAuth {
 
             // Step 2: Get user from local app_users table
             console.log('Checking local app_users table...');
+
+            // Ensure system tables are properly initialized
+            if (!window.teableAPI.systemTables || !window.teableAPI.systemTables.users) {
+                console.log('System tables not initialized, trying to initialize...');
+                await window.teableAPI.ensureSystemTables();
+            }
+
             const users = await window.teableAPI.getRecords(window.teableAPI.systemTables.users);
-            const localUser = users.records.find(u => 
+            console.log(`Found ${users.records?.length || 0} users in system table`);
+
+            const localUser = users.records?.find(u => 
                 u.fields.email === email.toLowerCase() && 
                 (u.fields.role === 'Owner' || u.fields.role === 'owner') &&
                 u.fields.admin_password_hash
             );
+
+            console.log('Local user found:', !!localUser);
+            if (localUser) {
+                console.log('User role:', localUser.fields.role);
+                console.log('Has admin password hash:', !!localUser.fields.admin_password_hash);
+            }
 
             if (!localUser) {
                 throw new Error('Space owner not found or admin password not set');
@@ -110,12 +124,24 @@ class TeableAuth {
             }
 
             // Step 3: Verify admin password
+            console.log('Hashing provided password for comparison...');
             const adminPasswordHash = await window.teableAPI.hashPassword(password);
-            console.log('Comparing passwords...');
-            
+
+            console.log('Stored hash exists:', !!localUser.fields.admin_password_hash);
+            console.log('Generated hash length:', adminPasswordHash ? adminPasswordHash.length : 0);
+
+            if (!localUser.fields.admin_password_hash) {
+                throw new Error('No admin password hash found for space owner. Please reconfigure the space owner.');
+            }
+
             if (localUser.fields.admin_password_hash !== adminPasswordHash) {
+                console.log('Password hash mismatch');
+                console.log('Expected hash starts with:', localUser.fields.admin_password_hash.substring(0, 10));
+                console.log('Generated hash starts with:', adminPasswordHash.substring(0, 10));
                 throw new Error('Invalid admin password for space owner');
             }
+
+            console.log('Password verification successful');
 
             // Step 4: Fetch current space owner from Teable.io for verification
             console.log('Verifying against live Teable.io space data...');
@@ -301,7 +327,7 @@ class TeableAuth {
      */
     hasRoleOrHigher(requiredRole) {
         if (!this.currentSession) return false;
-        
+
         const roleHierarchy = {
             'Viewer': 1,
             'Commenter': 2,
@@ -309,10 +335,10 @@ class TeableAuth {
             'Admin': 4,
             'Owner': 5
         };
-        
+
         const userLevel = roleHierarchy[this.currentSession.role] || 0;
         const requiredLevel = roleHierarchy[requiredRole] || 0;
-        
+
         return userLevel >= requiredLevel;
     }
 
@@ -333,12 +359,12 @@ class TeableAuth {
             const sessionData = localStorage.getItem('teable_session');
             if (sessionData) {
                 this.currentSession = JSON.parse(sessionData);
-                
+
                 // Check if session is expired (24 hours)
                 const loginTime = new Date(this.currentSession.loginTime);
                 const now = new Date();
                 const hoursDiff = (now - loginTime) / (1000 * 60 * 60);
-                
+
                 if (hoursDiff > 24) {
                     console.log('Session expired, logging out');
                     this.logout();
@@ -418,12 +444,12 @@ class TeableAuth {
             window.location.href = 'login.html';
             return false;
         }
-        
+
         // Ensure API is configured for authenticated users
         if (this.clientConfig && !window.teableAPI.config.baseUrl) {
             window.teableAPI.init(this.clientConfig);
         }
-        
+
         return true;
     }
 
@@ -449,7 +475,7 @@ window.teableAuth.init();
 window.togglePasswordVisibility = function(inputId) {
     const input = document.getElementById(inputId);
     const icon = input.nextElementSibling && input.nextElementSibling.querySelector('i');
-    
+
     if (input.type === 'password') {
         input.type = 'text';
         if (icon) icon.className = 'fas fa-eye-slash';
