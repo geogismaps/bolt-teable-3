@@ -1,0 +1,199 @@
+Teable API initialized: Object
+teable-api.js:23 Teable API initialized: Object
+map.js:103 Detected customer context: default
+map.js:113 Custom drone imagery tiles enabled for customer default
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/base/bselmJtOz4q7qmCLG4z/table Object
+teable-api.js:56 API Response: Array(8)
+map.js:312 Loaded 4 available tables
+map.js:223 Map initialized successfully with customer context
+map.js:2608 Switched to satellite basemap (zoom: 0-21)
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tbl5vb1bMthwK5oQR3E/record?limit=5 Object
+teable-api.js:56 API Response: Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tbl5vb1bMthwK5oQR3E/record?limit=1000 Object
+teable-api.js:56 API Response: Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/base/bselmJtOz4q7qmCLG4z/table Object
+teable-api.js:56 API Response: Array(8)
+teable-api.js:632 data_change_logs table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgOsWKcHaNkMr8AMB...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgOsWKcHaNkMr8AMB/field Object
+teable-api.js:56 API Response: Array(13)
+teable-api.js:559 📋 Current fields in table: Array(13)
+teable-api.js:560 📋 Expected fields: Array(13)
+teable-api.js:582 ✅ All required fields exist in table tblgOsWKcHaNkMr8AMB
+teable-api.js:675 app_users table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblIJ4f94QjRM6k1GbW...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblIJ4f94QjRM6k1GbW/field Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tbl5vb1bMthwK5oQR3E/record?limit=1000 Object
+teable-api.js:56 API Response: Array(12)
+teable-api.js:559 📋 Current fields in table: Array(12)
+teable-api.js:560 📋 Expected fields: Array(12)
+teable-api.js:582 ✅ All required fields exist in table tblIJ4f94QjRM6k1GbW
+teable-api.js:712 field_permissions table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblmWJ0T39MW4lSliKM...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblmWJ0T39MW4lSliKM/field Object
+teable-api.js:56 API Response: Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/base/bselmJtOz4q7qmCLG4z/table Object
+teable-api.js:56 API Response: Array(8)
+teable-api.js:559 📋 Current fields in table: Array(8)
+teable-api.js:560 📋 Expected fields: Array(8)
+teable-api.js:582 ✅ All required fields exist in table tblmWJ0T39MW4lSliKM
+teable-api.js:737 system_activity table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgTeftsts5dc0nG3I...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgTeftsts5dc0nG3I/field Object
+teable-api.js:56 API Response: Array(8)
+teable-api.js:632 data_change_logs table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgOsWKcHaNkMr8AMB...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgOsWKcHaNkMr8AMB/field Object
+teable-api.js:56 API Response: Array(13)
+teable-api.js:559 📋 Current fields in table: Array(13)
+teable-api.js:560 📋 Expected fields: Array(13)
+teable-api.js:582 ✅ All required fields exist in table tblgOsWKcHaNkMr8AMB
+teable-api.js:675 app_users table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblIJ4f94QjRM6k1GbW...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblIJ4f94QjRM6k1GbW/field Object
+teable-api.js:56 API Response: Array(6)
+teable-api.js:559 📋 Current fields in table: Array(6)
+teable-api.js:560 📋 Expected fields: Array(6)
+teable-api.js:582 ✅ All required fields exist in table tblgTeftsts5dc0nG3I
+teable-api.js:742 System tables ensured: Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblmWJ0T39MW4lSliKM/record Object
+teable-api.js:56 API Response: Array(12)
+teable-api.js:559 📋 Current fields in table: Array(12)
+teable-api.js:560 📋 Expected fields: Array(12)
+teable-api.js:582 ✅ All required fields exist in table tblIJ4f94QjRM6k1GbW
+teable-api.js:712 field_permissions table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblmWJ0T39MW4lSliKM...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblmWJ0T39MW4lSliKM/field Object
+teable-api.js:56 API Response: Array(8)
+teable-api.js:559 📋 Current fields in table: Array(8)
+teable-api.js:560 📋 Expected fields: Array(8)
+teable-api.js:582 ✅ All required fields exist in table tblmWJ0T39MW4lSliKM
+teable-api.js:737 system_activity table exists, ensuring all fields...
+teable-api.js:553 🔍 Checking fields for table tblgTeftsts5dc0nG3I...
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblgTeftsts5dc0nG3I/field Object
+teable-api.js:56 API Response: Object
+map.js:1522 Loaded field permissions for table tbl5vb1bMthwK5oQR3E: 0 permissions found
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(5)
+map.js:1617 Filtered 5 fields to 5 visible fields
+map.js:688 Permitted fields after filtering: Array(5)
+map.js:705 Popup not configured for layer "360": showing all 5 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:621 Detected media layer type "360" for layer "360"
+map.js:643 Created layer "360" with 14 features
+teable-api.js:56 API Response: Array(6)
+teable-api.js:559 📋 Current fields in table: Array(6)
+teable-api.js:560 📋 Expected fields: Array(6)
+teable-api.js:582 ✅ All required fields exist in table tblgTeftsts5dc0nG3I
+teable-api.js:742 System tables ensured: Object
+teable-api.js:45 API Request: https://qm3r38ds.rpcld.com/api/table/tblmWJ0T39MW4lSliKM/record Object
+teable-api.js:56 API Response: Object
+map.js:1522 Loaded field permissions for table tbl5vb1bMthwK5oQR3E: 0 permissions found
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(5)
+map.js:1617 Filtered 5 fields to 5 visible fields
+map.js:688 Permitted fields after filtering: Array(5)
+map.js:705 Popup not configured for layer "360": showing all 5 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(4)
+map.js:1617 Filtered 4 fields to 4 visible fields
+map.js:688 Permitted fields after filtering: Array(4)
+map.js:705 Popup not configured for layer "360": showing all 4 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:685 Creating popup for layer "360" - all fields: Array(3)
+map.js:1617 Filtered 3 fields to 3 visible fields
+map.js:688 Permitted fields after filtering: Array(3)
+map.js:705 Popup not configured for layer "360": showing all 3 permitted fields
+map.js:621 Detected media layer type "360" for layer "360"
+map.js:643 Created layer "360" with 14 features
