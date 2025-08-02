@@ -793,10 +793,32 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
             return fieldPriority[key];
         }
         
+        // Enhanced field name pattern detection for 360°
+        const keyLower = key.toLowerCase();
+        if (keyLower.includes('lat')) return 1;
+        if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
+        if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
+        
+        // Enhanced 360° field detection with more patterns
+        if (keyLower.includes('360') || 
+            keyLower.includes('panorama') || 
+            keyLower.includes('pano') ||
+            keyLower.includes('spherical') ||
+            keyLower.includes('equirectangular') ||
+            keyLower.includes('vr') ||
+            keyLower === '360_url' ||
+            keyLower === '360url') {
+            return 4;
+        }
+        
+        if (keyLower.includes('video')) return 5;
+        if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
+        if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
+        
         // Check if it's a URL and detect media type
         if (typeof value === 'string' && value.match(/^https?:\/\//)) {
             const layerName = layerConfig ? layerConfig.name : null;
-            const mediaType = detectURLMediaType(value, layerName);
+            const mediaType = detectURLMediaType(value, layerName, key);
             
             switch (mediaType) {
                 case 'pdf': return 3;
@@ -807,16 +829,6 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
                 default: return 50;
             }
         }
-        
-        // Check field name patterns
-        const keyLower = key.toLowerCase();
-        if (keyLower.includes('lat')) return 1;
-        if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
-        if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
-        if (keyLower.includes('360') || keyLower.includes('panorama') || keyLower.includes('pano')) return 4;
-        if (keyLower.includes('video')) return 5;
-        if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
-        if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
         
         return fieldPriority.default;
     };
@@ -853,7 +865,7 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         const isMediaField = priority >= 3 && priority <= 7;
         
         // Format value with enhanced media detection
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
@@ -875,7 +887,7 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         if (isLocationField) {
             labelText = `📍 ${key}`;
         } else if (isMediaField) {
-            const mediaType = detectURLMediaType(value, layerConfig?.name);
+            const mediaType = detectURLMediaType(value, layerConfig?.name, key);
             switch (mediaType) {
                 case 'pdf': labelText = `📄 ${key}`; break;
                 case '360': labelText = `🌐 ${key}`; break;
@@ -925,7 +937,7 @@ function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIco
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
         
@@ -958,7 +970,7 @@ function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcon
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
@@ -991,7 +1003,7 @@ function renderCustomTemplate(template, fields, fieldsToShow) {
     return content;
 }
 
-function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null) {
+function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null, fieldName = null) {
     if (value === null || value === undefined) {
         return '<em class="text-muted">No data</em>';
     }
@@ -1005,7 +1017,7 @@ function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null) 
     // Check if this is a media URL and enhance the display
     if (highlightLinks && typeof value === 'string' && value.match(/^https?:\/\//)) {
         const layerName = layerConfig ? layerConfig.name : null;
-        const mediaType = detectURLMediaType(value, layerName);
+        const mediaType = detectURLMediaType(value, layerName, fieldName);
         
         if (mediaType) {
             // Get media type icon and action text
@@ -3058,10 +3070,42 @@ function setupLayerSorting() {
 }
 
 // Media detection and viewing functions
-function detectURLMediaType(url, layerName = null) {
+function detectURLMediaType(url, layerName = null, fieldName = null) {
     if (!url || typeof url !== 'string') return null;
     
     const urlLower = url.toLowerCase();
+    
+    // Enhanced 360 image detection - check field name first (highest priority)
+    if (fieldName) {
+        const fieldLower = fieldName.toLowerCase();
+        if (fieldLower.includes('360') || 
+            fieldLower.includes('panorama') || 
+            fieldLower.includes('pano') ||
+            fieldLower.includes('equirectangular') ||
+            fieldLower.includes('spherical') ||
+            fieldLower.includes('vr')) {
+            console.log(`Field "${fieldName}" detected as 360° based on field name pattern`);
+            return '360';
+        }
+    }
+    
+    // Check URL content for 360 patterns
+    if (urlLower.includes('360') || 
+        urlLower.includes('panorama') || 
+        urlLower.includes('pano') ||
+        urlLower.includes('equirectangular') ||
+        urlLower.includes('streetview')) {
+        return '360';
+    }
+    
+    // Check layer name for 360 patterns
+    if (layerName && (
+        layerName.toLowerCase().includes('360') ||
+        layerName.toLowerCase().includes('panorama') ||
+        layerName.toLowerCase().includes('pano')
+    )) {
+        return '360';
+    }
     
     // Video detection
     if (urlLower.includes('video') || urlLower.match(/\.(mp4|avi|mov|wmv|flv|webm)(\?|$)/)) {
@@ -3071,19 +3115,6 @@ function detectURLMediaType(url, layerName = null) {
     // Audio detection
     if (urlLower.includes('audio') || urlLower.match(/\.(mp3|wav|ogg|aac|flac)(\?|$)/)) {
         return 'audio';
-    }
-    
-    // 360 image detection - improved patterns
-    if (urlLower.includes('360') || 
-        urlLower.includes('panorama') || 
-        urlLower.includes('pano') ||
-        urlLower.includes('equirectangular') ||
-        (layerName && (
-            layerName.toLowerCase().includes('360') ||
-            layerName.toLowerCase().includes('panorama') ||
-            layerName.toLowerCase().includes('pano')
-        ))) {
-        return '360';
     }
     
     // PDF detection
