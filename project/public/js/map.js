@@ -3318,85 +3318,224 @@ function initializePannellumViewer(url) {
         
         container.innerHTML = '';
         
-        console.log('Initializing 360° viewer with URL:', url);
+        console.log('Initializing Pannellum 360° viewer with URL:', url);
         
-        // Create a simple interactive 360° viewer using CSS transforms and mouse events
-        const viewerHTML = `
-            <div id="panorama-viewer" style="
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-                position: relative;
-                cursor: grab;
-                background: #000;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            ">
-                <img id="panorama-image" src="${url}" style="
-                    width: auto;
-                    height: 100%;
-                    min-width: 100%;
-                    object-fit: cover;
-                    transform-origin: center center;
-                    transition: transform 0.1s ease-out;
-                    user-select: none;
-                    -webkit-user-select: none;
-                    -moz-user-select: none;
-                " draggable="false" />
-                <div id="viewer-controls" style="
-                    position: absolute;
-                    bottom: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: rgba(0,0,0,0.7);
-                    padding: 10px;
-                    border-radius: 5px;
-                    color: white;
-                    font-size: 12px;
-                    z-index: 1000;
-                ">
-                    <div style="text-align: center; margin-bottom: 5px;">
-                        <button onclick="resetPanoramaView()" style="
-                            background: #007bff;
-                            color: white;
-                            border: none;
-                            padding: 5px 10px;
-                            border-radius: 3px;
-                            cursor: pointer;
-                            margin-right: 10px;
-                        ">Reset View</button>
-                        <button onclick="toggleAutoRotate()" style="
-                            background: #28a745;
-                            color: white;
-                            border: none;
-                            padding: 5px 10px;
-                            border-radius: 3px;
-                            cursor: pointer;
-                        ">Auto Rotate</button>
-                    </div>
-                    <div style="text-align: center; color: #ccc;">
-                        Drag to rotate • Scroll to zoom • Use controls below
-                    </div>
-                </div>
-            </div>
-        `;
+        // Check if Pannellum is available
+        if (typeof pannellum === 'undefined') {
+            throw new Error('Pannellum library not loaded');
+        }
         
-        container.innerHTML = viewerHTML;
+        // Create Pannellum viewer
+        window.pannellumViewer = pannellum.viewer('panorama360', {
+            "type": "equirectangular",
+            "panorama": url,
+            "autoLoad": true,
+            "autoRotate": -2, // Slow auto-rotation
+            "showZoomCtrl": true,
+            "showFullscreenCtrl": true,
+            "showControls": true,
+            "keyboardZoom": true,
+            "mouseZoom": true,
+            "draggable": true,
+            "disableKeyboardCtrl": false,
+            "showZoomCtrl": true,
+            "compass": true,
+            "northOffset": 0,
+            "preview": url,
+            "previewTitle": "360° Panoramic View",
+            "previewAuthor": "GIS System",
+            "hfov": 100, // Horizontal field of view
+            "pitch": 0, // Initial pitch
+            "yaw": 0, // Initial yaw
+            "minHfov": 50,
+            "maxHfov": 120,
+            "minPitch": -90,
+            "maxPitch": 90,
+            "haov": 360, // Horizontal angle of view (full 360°)
+            "vaov": 180, // Vertical angle of view (full 180°)
+            "backgroundColor": [0, 0, 0],
+            "hotSpots": [], // Can add hot spots later if needed
+            "strings": {
+                "loadButtonLabel": "Click to Load 360° View",
+                "loadingLabel": "Loading 360° Image...",
+                "bylineLabel": "360° Panoramic Image",
+                "noPanoramaError": "No 360° panorama image was specified.",
+                "fileAccessError": "The file %s could not be accessed.",
+                "malformedURLError": "The panorama URL is malformed.",
+                "iOS8WebGLError": "WebGL is not supported in iOS 8.",
+                "genericWebGLError": "WebGL is not supported.",
+                "textureSizeError": "The panorama is too large for your device/browser. It's %spx wide, but your device/browser only supports images up to %spx wide. Try another device/browser or use a smaller image."
+            }
+        });
         
-        // Initialize interactive controls
-        setupPanoramaInteraction();
+        // Add event listeners for better user experience
+        window.pannellumViewer.on('load', function() {
+            console.log('✅ 360° panorama loaded successfully');
+            showSuccess('360° panoramic view loaded! Use mouse to explore, scroll to zoom, click fullscreen for immersive experience.');
+        });
         
-        console.log('✅ 360° viewer initialized successfully');
-        showSuccess('360° image loaded! Drag to rotate, scroll to zoom.');
+        window.pannellumViewer.on('error', function(err) {
+            console.error('Pannellum error:', err);
+            displayPannellumError(url, err.message || 'Unknown error loading panorama');
+        });
+        
+        window.pannellumViewer.on('animatefinished', function() {
+            console.log('360° animation finished');
+        });
+        
+        // Add custom controls overlay
+        setTimeout(() => {
+            addCustomPanoramaControls();
+        }, 1000);
+        
+        console.log('✅ Pannellum 360° viewer initialized successfully');
         
     } catch (error) {
-        console.error('Error initializing 360° viewer:', error);
+        console.error('Error initializing Pannellum 360° viewer:', error);
         displayPannellumError(url, error.message);
     }
 }
 
-// Setup panorama interaction
+// Add custom controls for Pannellum viewer
+function addCustomPanoramaControls() {
+    const container = document.getElementById('panorama360');
+    if (!container || !window.pannellumViewer) return;
+    
+    // Create custom controls overlay
+    const controlsHTML = `
+        <div id="panorama-custom-controls" style="
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            font-size: 12px;
+            z-index: 1000;
+            min-width: 200px;
+        ">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <strong>360° Controls</strong>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <button onclick="resetPannellumView()" style="
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-right: 5px;
+                    font-size: 11px;
+                ">Reset View</button>
+                <button onclick="togglePannellumAutoRotate()" id="autoRotateBtn" style="
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 11px;
+                ">Auto Rotate</button>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <button onclick="pannellumLookUp()" style="
+                    background: #17a2b8;
+                    color: white;
+                    border: none;
+                    padding: 6px 10px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    margin-right: 3px;
+                    font-size: 10px;
+                ">Look Up</button>
+                <button onclick="pannellumLookDown()" style="
+                    background: #17a2b8;
+                    color: white;
+                    border: none;
+                    padding: 6px 10px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    margin-right: 3px;
+                    font-size: 10px;
+                ">Look Down</button>
+                <button onclick="pannellumCenter()" style="
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    padding: 6px 10px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 10px;
+                ">Center</button>
+            </div>
+            <div style="text-align: center; color: #ccc; font-size: 10px; line-height: 1.3;">
+                🖱️ Drag to rotate<br>
+                🔍 Scroll to zoom<br>
+                ⌨️ Arrow keys to navigate<br>
+                📱 Touch gestures supported
+            </div>
+        </div>
+    `;
+    
+    // Remove existing custom controls
+    const existingControls = container.querySelector('#panorama-custom-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+    
+    // Add new custom controls
+    container.insertAdjacentHTML('beforeend', controlsHTML);
+}
+
+// Global control functions for Pannellum
+window.resetPannellumView = function() {
+    if (window.pannellumViewer) {
+        window.pannellumViewer.setPitch(0);
+        window.pannellumViewer.setYaw(0);
+        window.pannellumViewer.setHfov(100);
+        showSuccess('360° view reset to center');
+    }
+};
+
+window.togglePannellumAutoRotate = function() {
+    if (window.pannellumViewer) {
+        const currentAutoRotate = window.pannellumViewer.getConfig().autoRotate;
+        if (currentAutoRotate) {
+            window.pannellumViewer.setAutoRotate(false);
+            document.getElementById('autoRotateBtn').textContent = 'Auto Rotate';
+            document.getElementById('autoRotateBtn').style.background = '#28a745';
+        } else {
+            window.pannellumViewer.setAutoRotate(-2);
+            document.getElementById('autoRotateBtn').textContent = 'Stop Rotate';
+            document.getElementById('autoRotateBtn').style.background = '#dc3545';
+        }
+    }
+};
+
+window.pannellumLookUp = function() {
+    if (window.pannellumViewer) {
+        const currentPitch = window.pannellumViewer.getPitch();
+        window.pannellumViewer.setPitch(Math.min(90, currentPitch + 15));
+    }
+};
+
+window.pannellumLookDown = function() {
+    if (window.pannellumViewer) {
+        const currentPitch = window.pannellumViewer.getPitch();
+        window.pannellumViewer.setPitch(Math.max(-90, currentPitch - 15));
+    }
+};
+
+window.pannellumCenter = function() {
+    if (window.pannellumViewer) {
+        window.pannellumViewer.setPitch(0);
+        showSuccess('360° view centered horizontally');
+    }
+};
+
+// Setup panorama interaction (legacy function - now handled by Pannellum)
 function setupPanoramaInteraction() {
     const viewer = document.getElementById('panorama-viewer');
     const image = document.getElementById('panorama-image');
