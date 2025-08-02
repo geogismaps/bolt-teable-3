@@ -188,29 +188,36 @@ async function initializeMap() {
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        // Initialize customer-specific basemaps
-        await initializeCustomerBaseMaps();
-
-        // Initialize Leaflet map with maximum zoom level 25
+        // Initialize Leaflet map FIRST
         map = L.map('map', {
             maxZoom: 25,
             zoomControl: true,
             zoomSnap: 0.5,
-            zoomDelta: 0.5
+            zoomDelta: 0.5,
+            preferCanvas: true
         }).setView([20.5937, 78.9629], 5);
 
-        // Add default base layer with maximum zoom level 25 - ensure it loads
+        console.log('✅ Map object created successfully');
+
+        // Initialize customer-specific basemaps
+        await initializeCustomerBaseMaps();
+
+        // Add default base layer IMMEDIATELY after map creation
         const defaultBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution,
-            maxZoom: baseMaps.openstreetmap.maxZoom || 25
+            maxZoom: baseMaps.openstreetmap.maxZoom || 25,
+            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
         });
         
+        // Add tile layer and force immediate loading
         defaultBaseLayer.addTo(map);
+        console.log('✅ Default base layer added to map');
         
-        // Force initial basemap to load properly
+        // Force map container resize and tile loading
         setTimeout(() => {
-            map.invalidateSize();
-            defaultBaseLayer.redraw();
+            map.invalidateSize(true);
+            map.panBy([0, 0]); // Force a redraw
+            console.log('✅ Map invalidated and redrawn');
         }, 100);
 
         // Initialize measurement group
@@ -222,16 +229,19 @@ async function initializeMap() {
         // Add zoom event listener to show appropriate basemap recommendations
         map.on('zoomend', handleZoomChange);
 
-        // Load available tables
+        // Load available tables and try to load any existing data
         await loadAvailableTables();
+        
+        // Try to load a default layer if tables are available
+        await tryLoadDefaultLayer();
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('Map initialized successfully with customer context');
+        console.log('✅ Map initialized successfully with base layer visible');
 
     } catch (error) {
-        console.error('Map initialization failed:', error);
+        console.error('❌ Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
 }
@@ -549,11 +559,115 @@ async function loadAvailableTables() {
             });
         }
 
-        console.log(`Loaded ${userTables.length} available tables`);
+        console.log(`✅ Loaded ${userTables.length} available tables`);
 
     } catch (error) {
-        console.error('Error loading tables:', error);
+        console.error('❌ Error loading tables:', error);
         showError('Failed to load tables: ' + error.message);
+    }
+}
+
+async function tryLoadDefaultLayer() {
+    try {
+        // Only try if we have API access
+        if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
+            console.log('ℹ️ No API access - skipping automatic layer loading');
+            return;
+        }
+
+        // Get tables again to find one with data
+        const tablesData = await window.teableAPI.getTables();
+        const tables = tablesData.tables || tablesData || [];
+        
+        // Filter to user tables only
+        const userTables = tables.filter(t => 
+            !t.name.startsWith('app_') && 
+            !t.name.startsWith('field_') && 
+            !t.name.startsWith('system_') &&
+            t.name !== 'data_change_logs'
+        );
+
+        console.log(`🔍 Found ${userTables.length} user tables, checking for data...`);
+
+        // Try to find a table with geometry data
+        for (const table of userTables.slice(0, 3)) { // Check first 3 tables only
+            try {
+                console.log(`📋 Checking table: ${table.name} (${table.id})`);
+                
+                // Get a small sample of records
+                const recordsData = await window.teableAPI.getRecords(table.id, { limit: 5 });
+                const records = recordsData.records || [];
+                
+                if (records.length > 0) {
+                    console.log(`📄 Found ${records.length} records in ${table.name}`);
+                    
+                    // Check if any records have geometry-like fields
+                    const sampleRecord = records[0];
+                    const fields = Object.keys(sampleRecord.fields || {});
+                    
+                    const geometryField = fields.find(field => {
+                        const fieldLower = field.toLowerCase();
+                        return fieldLower.includes('geom') || 
+                               fieldLower.includes('wkt') || 
+                               fieldLower.includes('shape') ||
+                               fieldLower.includes('polygon') ||
+                               fieldLower.includes('point') ||
+                               fieldLower.includes('coordinates');
+                    });
+
+                    if (geometryField) {
+                        console.log(`🎯 Found geometry field "${geometryField}" in table "${table.name}"`);
+                        
+                        // Try to create a layer from this table
+                        const layerConfig = {
+                            id: 'auto_' + Date.now().toString(),
+                            name: table.name + ' (Auto-loaded)',
+                            tableId: table.id,
+                            geometryField: geometryField,
+                            color: '#3498db',
+                            visible: true,
+                            type: 'table'
+                        };
+
+                        // Get all records for the layer
+                        const allRecordsData = await window.teableAPI.getRecords(table.id, { limit: 100 });
+                        const allRecords = allRecordsData.records || [];
+                        
+                        console.log(`📊 Loading ${allRecords.length} records into layer...`);
+                        
+                        // Create the layer
+                        const layer = await createLayerFromData(allRecords, layerConfig);
+                        
+                        if (layer && layer.featureCount > 0) {
+                            console.log(`✅ Successfully auto-loaded layer "${table.name}" with ${layer.featureCount} features`);
+                            
+                            // Update layers list
+                            updateLayersList();
+                            updateMapStatistics();
+                            
+                            // Zoom to the layer
+                            if (layer.bounds && layer.bounds.isValid()) {
+                                setTimeout(() => {
+                                    map.fitBounds(layer.bounds.pad(0.1));
+                                    showSuccess(`🎉 Auto-loaded "${table.name}" with ${layer.featureCount} features and zoomed to extent!`);
+                                }, 1000);
+                            } else {
+                                showSuccess(`✅ Auto-loaded "${table.name}" with ${layer.featureCount} features!`);
+                            }
+                            
+                            return; // Stop after successfully loading one layer
+                        }
+                    }
+                }
+            } catch (tableError) {
+                console.log(`⚠️ Could not load table ${table.name}:`, tableError.message);
+            }
+        }
+        
+        console.log('ℹ️ No suitable table with geometry data found for auto-loading');
+        
+    } catch (error) {
+        console.log('ℹ️ Could not auto-load default layer:', error.message);
     }
 }
 
@@ -2788,10 +2902,18 @@ function removeLayer(layerId) {
 // Basemap functionality
 function changeBasemap() {
     const basemapType = document.getElementById('basemapSelector').value;
+    
+    if (!map) {
+        console.error('Map not initialized when trying to change basemap');
+        return;
+    }
+
+    console.log(`🗺️ Switching to ${basemapType} basemap...`);
 
     // Remove current base layer
     map.eachLayer(layer => {
-        if (layer._url && layer._url.includes('tile')) {
+        if (layer._url && (layer._url.includes('tile') || layer._url.includes('/{z}/'))) {
+            console.log('Removing existing tile layer:', layer._url);
             map.removeLayer(layer);
         }
     });
@@ -2801,7 +2923,9 @@ function changeBasemap() {
     if (basemap) {
         const tileLayerOptions = {
             attribution: basemap.attribution,
-            maxZoom: basemap.maxZoom || 25
+            maxZoom: basemap.maxZoom || 25,
+            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+            timeout: 10000 // 10 second timeout
         };
         
         // Add minZoom for custom tiles like drone imagery
@@ -2811,8 +2935,6 @@ function changeBasemap() {
         
         // Special handling for drone imagery
         if (basemapType === 'drone_imagery') {
-            tileLayerOptions.errorTileUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='; // Transparent 1x1 pixel
-            
             const currentZoom = map.getZoom();
             
             // Show info about zoom requirements for drone imagery
@@ -2826,9 +2948,9 @@ function changeBasemap() {
         // Create and add the tile layer
         const tileLayer = L.tileLayer(basemap.url, tileLayerOptions);
         
-        // Add error handling for missing tiles
+        // Add comprehensive error handling
         tileLayer.on('tileerror', function(error) {
-            console.warn('Tile loading error:', error);
+            console.warn(`Tile loading error for ${basemapType}:`, error);
             if (basemapType === 'drone_imagery') {
                 // Only show error once per session to avoid spam
                 if (!window.droneImageryErrorShown) {
@@ -2838,29 +2960,40 @@ function changeBasemap() {
             }
         });
         
-        // Ensure tile layer loads properly
+        // Add success handlers
         tileLayer.on('loading', function() {
-            console.log(`Loading ${basemapType} tiles...`);
+            console.log(`📡 Loading ${basemapType} tiles...`);
         });
         
         tileLayer.on('load', function() {
-            console.log(`${basemapType} tiles loaded successfully`);
+            console.log(`✅ ${basemapType} tiles loaded successfully`);
         });
         
-        tileLayer.addTo(map);
+        tileLayer.on('tileload', function(e) {
+            console.log(`✅ Tile loaded:`, e.coords);
+        });
         
-        // Force map refresh and tile loading
+        // Add to map FIRST
+        tileLayer.addTo(map);
+        console.log(`✅ ${basemapType} tile layer added to map`);
+        
+        // Force immediate map updates
         setTimeout(() => {
-            map.invalidateSize();
-            tileLayer.redraw();
-        }, 100);
+            map.invalidateSize(true);
+            map.panBy([0, 0]); // Force tile refresh
+            console.log(`✅ Map refreshed for ${basemapType}`);
+        }, 50);
         
         // Update map's max zoom if necessary
         if (basemap.maxZoom) {
             map.options.maxZoom = Math.max(map.options.maxZoom, basemap.maxZoom);
         }
         
-        console.log(`Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
+        console.log(`✅ Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
+        showSuccess(`Switched to ${basemapType} basemap`);
+    } else {
+        console.error(`Basemap type ${basemapType} not found in baseMaps configuration`);
+        showError(`Basemap ${basemapType} not available`);
     }
 }
 
