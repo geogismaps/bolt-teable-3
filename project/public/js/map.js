@@ -6841,12 +6841,14 @@ function open360Modal(url, title = '360° Viewer') {
     }
     
     const bootstrapModal = new bootstrap.Modal(modal);
+    let viewer = null;
+    let autoRotateInterval = null;
     
     // Initialize 360 viewer when modal is shown
     modal.addEventListener('shown.bs.modal', function() {
         if (typeof pannellum !== 'undefined' && pannellumContainer) {
             try {
-                pannellum.viewer('panorama360', {
+                viewer = pannellum.viewer('panorama360', {
                     type: 'equirectangular',
                     panorama: url,
                     autoLoad: true,
@@ -6855,9 +6857,22 @@ function open360Modal(url, title = '360° Viewer') {
                     showFullscreenCtrl: true,
                     mouseZoom: true,
                     compass: true,
-                    northOffset: 0
+                    northOffset: 0,
+                    pitch: 0,
+                    yaw: 0,
+                    hfov: 100,
+                    minHfov: 50,
+                    maxHfov: 120,
+                    autoRotate: 0, // Start with auto-rotation off
+                    keyboardZoom: true,
+                    mouseZoom: true,
+                    draggable: true
                 });
-                console.log('Pannellum 360 viewer initialized');
+                
+                // Add custom navigation and control buttons
+                addPannellumControls(viewer);
+                
+                console.log('Pannellum 360 viewer initialized with enhanced controls');
             } catch (error) {
                 console.error('Error initializing Pannellum:', error);
                 pannellumContainer.innerHTML = `
@@ -6889,8 +6904,256 @@ function open360Modal(url, title = '360° Viewer') {
         }
     });
     
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function() {
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+        if (viewer) {
+            viewer.destroy();
+            viewer = null;
+        }
+        // Remove custom controls
+        const customControls = document.querySelector('.pannellum-custom-controls');
+        if (customControls) {
+            customControls.remove();
+        }
+    });
+    
     bootstrapModal.show();
     console.log(`Opened 360° modal for: ${title}`);
+}
+
+// Add custom navigation and control buttons to Pannellum viewer
+function addPannellumControls(viewer) {
+    // Wait for viewer to be ready
+    setTimeout(() => {
+        const pannellumContainer = document.getElementById('panorama360');
+        if (!pannellumContainer) return;
+        
+        // Create custom controls container
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'pannellum-custom-controls';
+        controlsContainer.style.cssText = `
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        `;
+        
+        // Arrow navigation controls
+        const navigationSection = document.createElement('div');
+        navigationSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-arrows-alt me-1"></i>Navigation
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px; justify-content: center;">
+                <div></div>
+                <button id="pan-up" class="pan-btn" title="Look Up">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <div></div>
+                <button id="pan-left" class="pan-btn" title="Look Left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button id="pan-center" class="pan-btn" title="Reset View">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+                <button id="pan-right" class="pan-btn" title="Look Right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div></div>
+                <button id="pan-down" class="pan-btn" title="Look Down">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div></div>
+            </div>
+        `;
+        
+        // Auto-rotation controls
+        const autoRotateSection = document.createElement('div');
+        autoRotateSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-sync-alt me-1"></i>Auto Rotation
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; text-align: center;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span>Speed:</span>
+                    <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
+                           style="width: 80px; height: 15px;">
+                    <span id="speed-value">2x</span>
+                </label>
+            </div>
+        `;
+        
+        // Zoom controls
+        const zoomSection = document.createElement('div');
+        zoomSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-search me-1"></i>Zoom
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="zoom-in" class="control-btn" title="Zoom In">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button id="zoom-out" class="control-btn" title="Zoom Out">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="zoom-reset" class="control-btn" title="Reset Zoom">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        `;
+        
+        controlsContainer.appendChild(navigationSection);
+        controlsContainer.appendChild(autoRotateSection);
+        controlsContainer.appendChild(zoomSection);
+        
+        // Add styles for buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            .pan-btn, .control-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                width: 40px;
+                height: 35px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+            .pan-btn:hover, .control-btn:hover {
+                background: rgba(255, 255, 255, 0.4);
+                border-color: rgba(255, 255, 255, 0.6);
+                transform: scale(1.05);
+            }
+            .pan-btn:active, .control-btn:active {
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0.95);
+            }
+            #rotation-speed {
+                background: rgba(255, 255, 255, 0.3);
+                border: none;
+                border-radius: 10px;
+            }
+            #rotation-speed::-webkit-slider-thumb {
+                background: white;
+                border-radius: 50%;
+                width: 12px;
+                height: 12px;
+                cursor: pointer;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        pannellumContainer.appendChild(controlsContainer);
+        
+        // Add event listeners
+        let isAutoRotating = false;
+        let rotationDirection = 1; // 1 for right, -1 for left
+        
+        // Navigation controls
+        document.getElementById('pan-up').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.min(currentPitch + 10, 90));
+        });
+        
+        document.getElementById('pan-down').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.max(currentPitch - 10, -90));
+        });
+        
+        document.getElementById('pan-left').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw - 15);
+        });
+        
+        document.getElementById('pan-right').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw + 15);
+        });
+        
+        document.getElementById('pan-center').addEventListener('click', () => {
+            viewer.setPitch(0);
+            viewer.setYaw(0);
+            viewer.setHfov(100);
+        });
+        
+        // Auto-rotation controls
+        document.getElementById('auto-rotate-start').addEventListener('click', () => {
+            if (!isAutoRotating) {
+                const speed = parseFloat(document.getElementById('rotation-speed').value);
+                viewer.setAutoRotate(speed * rotationDirection);
+                isAutoRotating = true;
+                console.log(`Started auto-rotation at ${speed}x speed`);
+            }
+        });
+        
+        document.getElementById('auto-rotate-stop').addEventListener('click', () => {
+            viewer.setAutoRotate(0);
+            isAutoRotating = false;
+            console.log('Stopped auto-rotation');
+        });
+        
+        document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
+            rotationDirection *= -1;
+            if (isAutoRotating) {
+                const speed = parseFloat(document.getElementById('rotation-speed').value);
+                viewer.setAutoRotate(speed * rotationDirection);
+            }
+            console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);
+        });
+        
+        // Speed control
+        document.getElementById('rotation-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = speed + 'x';
+            if (isAutoRotating) {
+                viewer.setAutoRotate(speed * rotationDirection);
+            }
+        });
+        
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.max(currentHfov - 10, 50));
+        });
+        
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.min(currentHfov + 10, 120));
+        });
+        
+        document.getElementById('zoom-reset').addEventListener('click', () => {
+            viewer.setHfov(100);
+        });
+        
+        console.log('Pannellum custom controls added successfully');
+        
+    }, 500); // Wait for Pannellum to fully initialize
 }
 
 function handleFeatureClick(feature, featureIndex, layerConfig) {

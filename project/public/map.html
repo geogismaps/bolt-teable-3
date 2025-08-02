@@ -563,6 +563,23 @@
         /* Pannellum custom styling */
         .pnlm-container {
             border-radius: 8px !important;
+            position: relative;
+        }
+
+        .pannellum-custom-controls {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .pannellum-custom-controls button {
+            outline: none;
+            user-select: none;
+        }
+
+        .pannellum-custom-controls button:focus {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
         }
 
         .pnlm-ui .pnlm-controls {
