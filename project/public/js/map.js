@@ -199,11 +199,19 @@ async function initializeMap() {
             zoomDelta: 0.5
         }).setView([20.5937, 78.9629], 5);
 
-        // Add default base layer with maximum zoom level 25
-        L.tileLayer(baseMaps.openstreetmap.url, {
+        // Add default base layer with maximum zoom level 25 - ensure it loads
+        const defaultBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution,
             maxZoom: baseMaps.openstreetmap.maxZoom || 25
-        }).addTo(map);
+        });
+        
+        defaultBaseLayer.addTo(map);
+        
+        // Force initial basemap to load properly
+        setTimeout(() => {
+            map.invalidateSize();
+            defaultBaseLayer.redraw();
+        }, 100);
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
@@ -226,6 +234,238 @@ async function initializeMap() {
         console.error('Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
+}
+
+// Zoom popup control functions (global scope for popup access)
+window.zoomToCurrentPopupFeature = function(zoomLevel) {
+    if (!window.currentPopupFeature) return;
+    
+    const zoomLevels = {
+        'close': 25,
+        'medium': 20,
+        'far': 15
+    };
+    
+    const targetZoom = zoomLevels[zoomLevel] || 20;
+    
+    if (window.currentPopupFeature.getLatLng) {
+        const latlng = window.currentPopupFeature.getLatLng();
+        map.setView(latlng, targetZoom);
+    } else if (window.currentPopupFeature.getBounds) {
+        const bounds = window.currentPopupFeature.getBounds();
+        map.fitBounds(bounds, { maxZoom: targetZoom });
+    }
+};
+
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
+    
+    if (window.currentPopupFeature.getLatLng) {
+        const latlng = window.currentPopupFeature.getLatLng();
+        map.panTo(latlng);
+    } else if (window.currentPopupFeature.getBounds) {
+        const bounds = window.currentPopupFeature.getBounds();
+        map.panTo(bounds.getCenter());
+    }
+};
+
+// Media layer detection function
+function detectMediaLayerType(layerName, records) {
+    if (!records || records.length === 0) return null;
+    
+    const name = layerName.toLowerCase();
+    
+    // Direct name matching
+    if (name.includes('video')) return 'video';
+    if (name.includes('audio')) return 'audio';
+    if (name.includes('image') || name.includes('photo')) return 'image';
+    if (name.includes('pdf') || name.includes('document')) return 'pdf';
+    if (name.includes('360') || name.includes('panorama')) return '360';
+    
+    // Analyze field content
+    const mediaFields = [];
+    records.forEach(record => {
+        Object.values(record.fields || {}).forEach(value => {
+            if (typeof value === 'string') {
+                const url = value.toLowerCase();
+                if (url.includes('.mp4') || url.includes('.avi') || url.includes('.mov')) {
+                    mediaFields.push('video');
+                } else if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg')) {
+                    mediaFields.push('audio');
+                } else if (url.includes('.jpg') || url.includes('.png') || url.includes('.gif')) {
+                    mediaFields.push('image');
+                } else if (url.includes('.pdf')) {
+                    mediaFields.push('pdf');
+                }
+            }
+        });
+    });
+    
+    // Return most common media type
+    if (mediaFields.length > 0) {
+        const counts = {};
+        mediaFields.forEach(type => counts[type] = (counts[type] || 0) + 1);
+        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+    }
+    
+    return null;
+}
+
+// Handle feature clicks for media layers
+function handleFeatureClick(feature, featureIndex, layerConfig) {
+    // Basic feature selection
+    if (!selectedFeatures.includes(feature)) {
+        selectedFeatures.push(feature);
+    }
+    
+    // If this is a media layer, open appropriate viewer
+    if (layerConfig.mediaType && feature.recordData) {
+        const mediaUrls = extractMediaUrls(feature.recordData);
+        if (mediaUrls.length > 0) {
+            switch (layerConfig.mediaType) {
+                case 'video':
+                    openVideoPlayer(mediaUrls[0], feature.recordData);
+                    break;
+                case 'audio':
+                    openAudioPlayer(mediaUrls[0], feature.recordData);
+                    break;
+                case 'image':
+                    openImageViewer(mediaUrls[0], feature.recordData);
+                    break;
+                case 'pdf':
+                    openPDFViewer(mediaUrls[0], feature.recordData);
+                    break;
+                case '360':
+                    open360Viewer(mediaUrls[0], feature.recordData);
+                    break;
+            }
+        }
+    }
+}
+
+// Extract media URLs from record data
+function extractMediaUrls(recordData) {
+    const urls = [];
+    Object.values(recordData || {}).forEach(value => {
+        if (typeof value === 'string' && isMediaUrl(value)) {
+            urls.push(value);
+        }
+    });
+    return urls;
+}
+
+// Check if string is a media URL
+function isMediaUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const mediaExtensions = ['.mp4', '.avi', '.mov', '.mp3', '.wav', '.ogg', '.jpg', '.jpeg', '.png', '.gif', '.pdf'];
+    return mediaExtensions.some(ext => url.toLowerCase().includes(ext)) || url.startsWith('http');
+}
+
+// Media player functions
+function openVideoPlayer(videoUrl, recordData) {
+    document.getElementById('videoSource').src = videoUrl;
+    document.getElementById('videoPlayer').load();
+    
+    const modal = new bootstrap.Modal(document.getElementById('videoModal'));
+    modal.show();
+}
+
+function openAudioPlayer(audioUrl, recordData) {
+    document.getElementById('audioSource').src = audioUrl;
+    document.getElementById('audioPlayer').load();
+    
+    const modal = new bootstrap.Modal(document.getElementById('audioModal'));
+    modal.show();
+}
+
+function openImageViewer(imageUrl, recordData) {
+    document.getElementById('imageViewer').src = imageUrl;
+    
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    modal.show();
+}
+
+function openPDFViewer(pdfUrl, recordData) {
+    // Load PDF using PDF.js
+    const modal = new bootstrap.Modal(document.getElementById('pdfModal'));
+    modal.show();
+    
+    // Basic PDF loading - would need proper PDF.js implementation
+    console.log('Loading PDF:', pdfUrl);
+}
+
+function open360Viewer(imageUrl, recordData) {
+    // Initialize Pannellum viewer
+    const modal = new bootstrap.Modal(document.getElementById('image360Modal'));
+    modal.show();
+    
+    setTimeout(() => {
+        if (window.pannellum) {
+            window.pannellum.viewer('panorama360', {
+                type: 'equirectangular',
+                panorama: imageUrl,
+                autoLoad: true,
+                showControls: true
+            });
+        }
+    }, 500);
+}
+
+// Map utility functions
+function updateMapStatistics() {
+    // Update map statistics display if elements exist
+    const totalFeatures = mapLayers.reduce((sum, layer) => sum + (layer.featureCount || 0), 0);
+    const visibleLayers = mapLayers.filter(layer => layer.visible).length;
+    
+    console.log(`Map Statistics: ${mapLayers.length} layers, ${totalFeatures} features, ${visibleLayers} visible`);
+}
+
+function resetMapView() {
+    map.setView([20.5937, 78.9629], 5);
+}
+
+function zoomToAllLayers() {
+    if (mapLayers.length === 0) {
+        showWarning('No layers to zoom to');
+        return;
+    }
+    
+    const allBounds = [];
+    mapLayers.forEach(layer => {
+        if (layer.bounds && layer.visible) {
+            allBounds.push(layer.bounds);
+        }
+    });
+    
+    if (allBounds.length > 0) {
+        const group = new L.featureGroup();
+        allBounds.forEach(bounds => {
+            group.addLayer(L.rectangle(bounds));
+        });
+        map.fitBounds(group.getBounds().pad(0.1));
+        showSuccess(`Zoomed to ${allBounds.length} visible layers`);
+    }
+}
+
+function zoomToDroneImageryLevel() {
+    map.setZoom(20);
+    showInfo('Zoomed to drone imagery level (zoom 20)');
+}
+
+function exportMap() {
+    showInfo('Export functionality would be implemented here');
+}
+
+function fullscreenMap() {
+    const mapElement = document.getElementById('map');
+    if (mapElement.requestFullscreen) {
+        mapElement.requestFullscreen();
+    } else if (mapElement.webkitRequestFullscreen) {
+        mapElement.webkitRequestFullscreen();
+    } else if (mapElement.msRequestFullscreen) {
+        mapElement.msRequestFullscreen();
+    }
+    setTimeout(() => map.invalidateSize(), 100);
 }
 
 // Add zoom level display to map
@@ -2598,7 +2838,22 @@ function changeBasemap() {
             }
         });
         
+        // Ensure tile layer loads properly
+        tileLayer.on('loading', function() {
+            console.log(`Loading ${basemapType} tiles...`);
+        });
+        
+        tileLayer.on('load', function() {
+            console.log(`${basemapType} tiles loaded successfully`);
+        });
+        
         tileLayer.addTo(map);
+        
+        // Force map refresh and tile loading
+        setTimeout(() => {
+            map.invalidateSize();
+            tileLayer.redraw();
+        }, 100);
         
         // Update map's max zoom if necessary
         if (basemap.maxZoom) {
