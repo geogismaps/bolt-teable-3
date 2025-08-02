@@ -746,17 +746,21 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        // Format value
+        // Format value with enhanced media detection
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
-        content += `<div class="popup-field d-flex align-items-start mb-2" data-field="${key}">`;
-        content += `<div class="field-label flex-shrink-0 me-2"><strong>${permissionIndicator}${fieldIcon}${key}:</strong></div>`;
-        content += `<div class="field-value flex-grow-1">${formattedValue}</div>`;
+        // Check if this is a media field for enhanced styling
+        const isMediaField = typeof value === 'string' && value.match(/^https?:\/\//) && detectURLMediaType(value);
+        const fieldClass = isMediaField ? 'popup-field media-popup-field' : 'popup-field';
         
-        if (showCopyButtons) {
-            content += `<button class="btn btn-xs btn-outline-secondary ms-1" onclick="copyToClipboard('${value}')" title="Copy">
+        content += `<div class="${fieldClass}" data-field="${key}">`;
+        content += `<div class="field-label mb-1"><strong>${permissionIndicator}${fieldIcon}${key}:</strong></div>`;
+        content += `<div class="field-value">${formattedValue}</div>`;
+        
+        if (showCopyButtons && !isMediaField) {
+            content += `<button class="btn btn-xs btn-outline-secondary mt-1" onclick="copyToClipboard('${value?.replace(/'/g, "\\'")}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div>`;
@@ -862,18 +866,51 @@ function formatFieldValue(value, highlightLinks, maxLength) {
     
     let formattedValue = String(value);
     
-    // Truncate if too long
-    if (maxLength && formattedValue.length > maxLength) {
-        formattedValue = formattedValue.substring(0, maxLength) + '...';
+    // Check if this is a media URL and enhance the display
+    if (highlightLinks && typeof value === 'string' && value.match(/^https?:\/\//)) {
+        const mediaType = detectURLMediaType(value);
+        
+        if (mediaType) {
+            // Get media type icon and action text
+            const mediaInfo = getMediaTypeInfo(mediaType);
+            
+            // Create shortened URL for display
+            let displayUrl = formattedValue;
+            if (maxLength && formattedValue.length > maxLength) {
+                displayUrl = formattedValue.substring(0, maxLength - 3) + '...';
+            }
+            
+            // Create enhanced media field display
+            return `
+                <div class="media-field-container">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="media-type-icon">${mediaInfo.icon}</span>
+                        <button class="btn btn-sm btn-outline-primary media-view-btn" 
+                                onclick="openMediaFromURL('${value.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${mediaType}', '${mediaInfo.title}')"
+                                title="View ${mediaInfo.title}">
+                            ${mediaInfo.buttonText}
+                        </button>
+                        <small class="text-muted flex-grow-1">${displayUrl}</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Regular URL - truncate if needed
+            if (maxLength && formattedValue.length > maxLength) {
+                formattedValue = formattedValue.substring(0, maxLength) + '...';
+            }
+            return `<a href="${value}" target="_blank" class="text-primary">${formattedValue}</a>`;
+        }
     }
     
-    // Highlight links
-    if (highlightLinks && typeof value === 'string') {
-        if (value.match(/^https?:\/\//)) {
-            formattedValue = `<a href="${value}" target="_blank" class="text-primary">${formattedValue}</a>`;
-        } else if (value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-            formattedValue = `<a href="mailto:${value}" class="text-primary">${formattedValue}</a>`;
-        }
+    // Handle email addresses
+    if (highlightLinks && typeof value === 'string' && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        return `<a href="mailto:${value}" class="text-primary">${formattedValue}</a>`;
+    }
+    
+    // Regular text value - truncate if needed
+    if (maxLength && formattedValue.length > maxLength) {
+        formattedValue = formattedValue.substring(0, maxLength) + '...';
     }
     
     return formattedValue;
@@ -6442,6 +6479,114 @@ function handleFullscreenChange() {
         }
     }, 100);
 }
+
+// Detect media type specifically from URL
+function detectURLMediaType(url) {
+    if (!url || typeof url !== 'string') return null;
+    
+    const urlLower = url.toLowerCase();
+    
+    // 360° detection (highest priority)
+    if (urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+        return '360';
+    }
+    
+    // Video detection
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || 
+        urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.avi') ||
+        urlLower.includes('vimeo.com') || urlLower.includes('video')) {
+        return 'video';
+    }
+    
+    // Audio detection
+    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') ||
+        urlLower.includes('soundcloud.com') || urlLower.includes('audio')) {
+        return 'audio';
+    }
+    
+    // Image detection
+    if (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image')) {
+        return 'image';
+    }
+    
+    // PDF detection
+    if (urlLower.includes('.pdf') || urlLower.includes('document')) {
+        return 'pdf';
+    }
+    
+    return null;
+}
+
+// Get media type information for display
+function getMediaTypeInfo(mediaType) {
+    const mediaTypes = {
+        'video': {
+            icon: '🎥',
+            title: 'Video',
+            buttonText: 'View Video'
+        },
+        'audio': {
+            icon: '🎵',
+            title: 'Audio',
+            buttonText: 'Play Audio'
+        },
+        'image': {
+            icon: '📷',
+            title: 'Image',
+            buttonText: 'View Image'
+        },
+        'pdf': {
+            icon: '📄',
+            title: 'PDF',
+            buttonText: 'View PDF'
+        },
+        '360': {
+            icon: '🌐',
+            title: '360° View',
+            buttonText: 'View 360°'
+        }
+    };
+    
+    return mediaTypes[mediaType] || {
+        icon: '🔗',
+        title: 'Link',
+        buttonText: 'Open Link'
+    };
+}
+
+// Open media from URL with appropriate modal
+window.openMediaFromURL = function(url, mediaType, title = 'Media') {
+    try {
+        switch (mediaType) {
+            case 'video':
+                openVideoModal(url, title);
+                break;
+            case 'audio':
+                openAudioModal(url, title);
+                break;
+            case 'image':
+                openImageModal(url, title);
+                break;
+            case 'pdf':
+                openPdfModal(url, title);
+                break;
+            case '360':
+                open360Modal(url, title);
+                break;
+            default:
+                // Fallback to opening in new tab
+                window.open(url, '_blank');
+        }
+        
+        console.log(`Opened ${mediaType} modal for URL: ${url}`);
+    } catch (error) {
+        console.error('Error opening media:', error);
+        showError('Failed to open media: ' + error.message);
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+    }
+};
 
 // Enhanced media layer detection function
 function detectMediaLayerType(layerName, records) {

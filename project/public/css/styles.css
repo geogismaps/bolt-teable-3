@@ -770,3 +770,100 @@ body {
     background-color: #0d6efd;
     color: white;
 }
+
+/* Enhanced Media Field Styles */
+.media-field-container {
+    margin: 4px 0;
+    padding: 6px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.media-type-icon {
+    font-size: 16px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.media-view-btn {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.media-view-btn:hover {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.media-field-container .text-muted {
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+/* Enhanced popup field styling */
+.popup-field {
+    margin-bottom: 8px;
+    padding: 4px 0;
+}
+
+.popup-field:last-child {
+    margin-bottom: 0;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+.field-value {
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+/* Media popup field styling */
+.media-popup-field {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #dee2e6;
+}
+
+.media-popup-field .field-label {
+    color: #495057;
+    font-weight: 600;
+}
+
+.media-popup-field .media-field-container {
+    background: white;
+    border: 1px solid #ced4da;
+    margin-top: 4px;
+}
+
+/* Responsive media buttons in popups */
+@media (max-width: 576px) {
+    .media-field-container .d-flex {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .media-view-btn {
+        align-self: flex-start;
+    }
+    
+    .media-field-container .text-muted {
+        max-width: 100%;
+        word-break: break-all;
+    }
+}
