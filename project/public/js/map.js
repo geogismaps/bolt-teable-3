@@ -188,47 +188,22 @@ async function initializeMap() {
             await new Promise(resolve => setTimeout(resolve, 200));
         }
 
-        // Initialize Leaflet map FIRST
+        // Initialize customer-specific basemaps
+        await initializeCustomerBaseMaps();
+
+        // Initialize Leaflet map with maximum zoom level 25
         map = L.map('map', {
             maxZoom: 25,
             zoomControl: true,
             zoomSnap: 0.5,
-            zoomDelta: 0.5,
-            preferCanvas: true
-        });
+            zoomDelta: 0.5
+        }).setView([20.5937, 78.9629], 5);
 
-        console.log('✅ Map object created successfully');
-
-        // Initialize customer-specific basemaps
-        await initializeCustomerBaseMaps();
-
-        // Add default base layer IMMEDIATELY after map creation
-        const defaultBaseLayer = L.tileLayer(baseMaps.openstreetmap.url, {
+        // Add default base layer with maximum zoom level 25
+        L.tileLayer(baseMaps.openstreetmap.url, {
             attribution: baseMaps.openstreetmap.attribution,
-            maxZoom: baseMaps.openstreetmap.maxZoom || 25,
-            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-        });
-        
-        // Add tile layer FIRST, then set view
-        defaultBaseLayer.addTo(map);
-        console.log('✅ Default base layer added to map');
-        
-        // Set map view AFTER adding the base layer
-        map.setView([20.5937, 78.9629], 5);
-        console.log('✅ Map view set to default coordinates');
-        
-        // Force map container resize and tile loading with multiple attempts
-        setTimeout(() => {
-            map.invalidateSize(true);
-            console.log('✅ Map size invalidated');
-        }, 100);
-        
-        setTimeout(() => {
-            map.invalidateSize(true);
-            map.panBy([1, 0]); // Small pan to force tile refresh
-            map.panBy([-1, 0]); // Pan back
-            console.log('✅ Map tiles force refreshed');
-        }, 500);
+            maxZoom: baseMaps.openstreetmap.maxZoom || 25
+        }).addTo(map);
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
@@ -239,253 +214,18 @@ async function initializeMap() {
         // Add zoom event listener to show appropriate basemap recommendations
         map.on('zoomend', handleZoomChange);
 
-        // Load available tables and try to load any existing data
+        // Load available tables
         await loadAvailableTables();
-        
-        // Try to load a default layer if tables are available
-        await tryLoadDefaultLayer();
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
 
-        console.log('✅ Map initialized successfully with base layer visible');
+        console.log('Map initialized successfully with customer context');
 
     } catch (error) {
-        console.error('❌ Map initialization failed:', error);
+        console.error('Map initialization failed:', error);
         showError('Failed to initialize map: ' + error.message);
     }
-}
-
-// Zoom popup control functions (global scope for popup access)
-window.zoomToCurrentPopupFeature = function(zoomLevel) {
-    if (!window.currentPopupFeature) return;
-    
-    const zoomLevels = {
-        'close': 25,
-        'medium': 20,
-        'far': 15
-    };
-    
-    const targetZoom = zoomLevels[zoomLevel] || 20;
-    
-    if (window.currentPopupFeature.getLatLng) {
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.setView(latlng, targetZoom);
-    } else if (window.currentPopupFeature.getBounds) {
-        const bounds = window.currentPopupFeature.getBounds();
-        map.fitBounds(bounds, { maxZoom: targetZoom });
-    }
-};
-
-window.centerCurrentPopupFeature = function() {
-    if (!window.currentPopupFeature) return;
-    
-    if (window.currentPopupFeature.getLatLng) {
-        const latlng = window.currentPopupFeature.getLatLng();
-        map.panTo(latlng);
-    } else if (window.currentPopupFeature.getBounds) {
-        const bounds = window.currentPopupFeature.getBounds();
-        map.panTo(bounds.getCenter());
-    }
-};
-
-// Media layer detection function
-function detectMediaLayerType(layerName, records) {
-    if (!records || records.length === 0) return null;
-    
-    const name = layerName.toLowerCase();
-    
-    // Direct name matching
-    if (name.includes('video')) return 'video';
-    if (name.includes('audio')) return 'audio';
-    if (name.includes('image') || name.includes('photo')) return 'image';
-    if (name.includes('pdf') || name.includes('document')) return 'pdf';
-    if (name.includes('360') || name.includes('panorama')) return '360';
-    
-    // Analyze field content
-    const mediaFields = [];
-    records.forEach(record => {
-        Object.values(record.fields || {}).forEach(value => {
-            if (typeof value === 'string') {
-                const url = value.toLowerCase();
-                if (url.includes('.mp4') || url.includes('.avi') || url.includes('.mov')) {
-                    mediaFields.push('video');
-                } else if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg')) {
-                    mediaFields.push('audio');
-                } else if (url.includes('.jpg') || url.includes('.png') || url.includes('.gif')) {
-                    mediaFields.push('image');
-                } else if (url.includes('.pdf')) {
-                    mediaFields.push('pdf');
-                }
-            }
-        });
-    });
-    
-    // Return most common media type
-    if (mediaFields.length > 0) {
-        const counts = {};
-        mediaFields.forEach(type => counts[type] = (counts[type] || 0) + 1);
-        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-    }
-    
-    return null;
-}
-
-// Handle feature clicks for media layers
-function handleFeatureClick(feature, featureIndex, layerConfig) {
-    // Basic feature selection
-    if (!selectedFeatures.includes(feature)) {
-        selectedFeatures.push(feature);
-    }
-    
-    // If this is a media layer, open appropriate viewer
-    if (layerConfig.mediaType && feature.recordData) {
-        const mediaUrls = extractMediaUrls(feature.recordData);
-        if (mediaUrls.length > 0) {
-            switch (layerConfig.mediaType) {
-                case 'video':
-                    openVideoPlayer(mediaUrls[0], feature.recordData);
-                    break;
-                case 'audio':
-                    openAudioPlayer(mediaUrls[0], feature.recordData);
-                    break;
-                case 'image':
-                    openImageViewer(mediaUrls[0], feature.recordData);
-                    break;
-                case 'pdf':
-                    openPDFViewer(mediaUrls[0], feature.recordData);
-                    break;
-                case '360':
-                    open360Viewer(mediaUrls[0], feature.recordData);
-                    break;
-            }
-        }
-    }
-}
-
-// Extract media URLs from record data
-function extractMediaUrls(recordData) {
-    const urls = [];
-    Object.values(recordData || {}).forEach(value => {
-        if (typeof value === 'string' && isMediaUrl(value)) {
-            urls.push(value);
-        }
-    });
-    return urls;
-}
-
-// Check if string is a media URL
-function isMediaUrl(url) {
-    if (!url || typeof url !== 'string') return false;
-    const mediaExtensions = ['.mp4', '.avi', '.mov', '.mp3', '.wav', '.ogg', '.jpg', '.jpeg', '.png', '.gif', '.pdf'];
-    return mediaExtensions.some(ext => url.toLowerCase().includes(ext)) || url.startsWith('http');
-}
-
-// Media player functions
-function openVideoPlayer(videoUrl, recordData) {
-    document.getElementById('videoSource').src = videoUrl;
-    document.getElementById('videoPlayer').load();
-    
-    const modal = new bootstrap.Modal(document.getElementById('videoModal'));
-    modal.show();
-}
-
-function openAudioPlayer(audioUrl, recordData) {
-    document.getElementById('audioSource').src = audioUrl;
-    document.getElementById('audioPlayer').load();
-    
-    const modal = new bootstrap.Modal(document.getElementById('audioModal'));
-    modal.show();
-}
-
-function openImageViewer(imageUrl, recordData) {
-    document.getElementById('imageViewer').src = imageUrl;
-    
-    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
-    modal.show();
-}
-
-function openPDFViewer(pdfUrl, recordData) {
-    // Load PDF using PDF.js
-    const modal = new bootstrap.Modal(document.getElementById('pdfModal'));
-    modal.show();
-    
-    // Basic PDF loading - would need proper PDF.js implementation
-    console.log('Loading PDF:', pdfUrl);
-}
-
-function open360Viewer(imageUrl, recordData) {
-    // Initialize Pannellum viewer
-    const modal = new bootstrap.Modal(document.getElementById('image360Modal'));
-    modal.show();
-    
-    setTimeout(() => {
-        if (window.pannellum) {
-            window.pannellum.viewer('panorama360', {
-                type: 'equirectangular',
-                panorama: imageUrl,
-                autoLoad: true,
-                showControls: true
-            });
-        }
-    }, 500);
-}
-
-// Map utility functions
-function updateMapStatistics() {
-    // Update map statistics display if elements exist
-    const totalFeatures = mapLayers.reduce((sum, layer) => sum + (layer.featureCount || 0), 0);
-    const visibleLayers = mapLayers.filter(layer => layer.visible).length;
-    
-    console.log(`Map Statistics: ${mapLayers.length} layers, ${totalFeatures} features, ${visibleLayers} visible`);
-}
-
-function resetMapView() {
-    map.setView([20.5937, 78.9629], 5);
-}
-
-function zoomToAllLayers() {
-    if (mapLayers.length === 0) {
-        showWarning('No layers to zoom to');
-        return;
-    }
-    
-    const allBounds = [];
-    mapLayers.forEach(layer => {
-        if (layer.bounds && layer.visible) {
-            allBounds.push(layer.bounds);
-        }
-    });
-    
-    if (allBounds.length > 0) {
-        const group = new L.featureGroup();
-        allBounds.forEach(bounds => {
-            group.addLayer(L.rectangle(bounds));
-        });
-        map.fitBounds(group.getBounds().pad(0.1));
-        showSuccess(`Zoomed to ${allBounds.length} visible layers`);
-    }
-}
-
-function zoomToDroneImageryLevel() {
-    map.setZoom(20);
-    showInfo('Zoomed to drone imagery level (zoom 20)');
-}
-
-function exportMap() {
-    showInfo('Export functionality would be implemented here');
-}
-
-function fullscreenMap() {
-    const mapElement = document.getElementById('map');
-    if (mapElement.requestFullscreen) {
-        mapElement.requestFullscreen();
-    } else if (mapElement.webkitRequestFullscreen) {
-        mapElement.webkitRequestFullscreen();
-    } else if (mapElement.msRequestFullscreen) {
-        mapElement.msRequestFullscreen();
-    }
-    setTimeout(() => map.invalidateSize(), 100);
 }
 
 // Add zoom level display to map
@@ -569,127 +309,11 @@ async function loadAvailableTables() {
             });
         }
 
-        console.log(`✅ Loaded ${userTables.length} available tables`);
+        console.log(`Loaded ${userTables.length} available tables`);
 
     } catch (error) {
-        console.error('❌ Error loading tables:', error);
+        console.error('Error loading tables:', error);
         showError('Failed to load tables: ' + error.message);
-    }
-}
-
-async function tryLoadDefaultLayer() {
-    try {
-        // Only try if we have API access
-        if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
-            console.log('ℹ️ No API access - skipping automatic layer loading');
-            return;
-        }
-
-        // Get tables again to find one with data
-        const tablesData = await window.teableAPI.getTables();
-        const tables = tablesData.tables || tablesData || [];
-        
-        // Filter to user tables only
-        const userTables = tables.filter(t => 
-            !t.name.startsWith('app_') && 
-            !t.name.startsWith('field_') && 
-            !t.name.startsWith('system_') &&
-            t.name !== 'data_change_logs'
-        );
-
-        console.log(`🔍 Found ${userTables.length} user tables, checking for data...`);
-
-        // Try to find a table with geometry data
-        for (const table of userTables.slice(0, 3)) { // Check first 3 tables only
-            try {
-                console.log(`📋 Checking table: ${table.name} (${table.id})`);
-                
-                // Get a small sample of records
-                const recordsData = await window.teableAPI.getRecords(table.id, { limit: 5 });
-                const records = recordsData.records || [];
-                
-                if (records.length > 0) {
-                    console.log(`📄 Found ${records.length} records in ${table.name}`);
-                    
-                    // Check if any records have geometry-like fields
-                    const sampleRecord = records[0];
-                    const fields = Object.keys(sampleRecord.fields || {});
-                    
-                    const geometryField = fields.find(field => {
-                        const fieldLower = field.toLowerCase();
-                        return fieldLower.includes('geom') || 
-                               fieldLower.includes('wkt') || 
-                               fieldLower.includes('shape') ||
-                               fieldLower.includes('polygon') ||
-                               fieldLower.includes('point') ||
-                               fieldLower.includes('coordinates');
-                    });
-
-                    if (geometryField) {
-                        console.log(`🎯 Found geometry field "${geometryField}" in table "${table.name}"`);
-                        
-                        // Try to create a layer from this table
-                        const layerConfig = {
-                            id: 'auto_' + Date.now().toString(),
-                            name: table.name + ' (Auto-loaded)',
-                            tableId: table.id,
-                            geometryField: geometryField,
-                            color: '#3498db',
-                            visible: true,
-                            type: 'table'
-                        };
-
-                        // Get all records for the layer
-                        const allRecordsData = await window.teableAPI.getRecords(table.id, { limit: 100 });
-                        const allRecords = allRecordsData.records || [];
-                        
-                        console.log(`📊 Loading ${allRecords.length} records into layer...`);
-                        
-                        // Create the layer
-                        const layer = await createLayerFromData(allRecords, layerConfig);
-                        
-                        if (layer && layer.featureCount > 0) {
-                            console.log(`✅ Successfully auto-loaded layer "${table.name}" with ${layer.featureCount} features`);
-                            
-                            // Force layer to be visible and added to map
-                            if (layer.leafletLayer && !map.hasLayer(layer.leafletLayer)) {
-                                layer.leafletLayer.addTo(map);
-                                console.log(`✅ Force-added layer "${table.name}" to map`);
-                            }
-                            
-                            // Update layers list
-                            updateLayersList();
-                            updateMapStatistics();
-                            
-                            // Force map refresh to show the layer
-                            setTimeout(() => {
-                                map.invalidateSize(true);
-                                console.log(`✅ Map refreshed to display layer "${table.name}"`);
-                            }, 500);
-                            
-                            // Zoom to the layer
-                            if (layer.bounds && layer.bounds.isValid()) {
-                                setTimeout(() => {
-                                    map.fitBounds(layer.bounds.pad(0.1));
-                                    showSuccess(`🎉 Auto-loaded "${table.name}" with ${layer.featureCount} features and zoomed to extent!`);
-                                }, 1500);
-                            } else {
-                                showSuccess(`✅ Auto-loaded "${table.name}" with ${layer.featureCount} features!`);
-                            }
-                            
-                            return; // Stop after successfully loading one layer
-                        }
-                    }
-                }
-            } catch (tableError) {
-                console.log(`⚠️ Could not load table ${table.name}:`, tableError.message);
-            }
-        }
-        
-        console.log('ℹ️ No suitable table with geometry data found for auto-loading');
-        
-    } catch (error) {
-        console.log('ℹ️ Could not auto-load default layer:', error.message);
     }
 }
 
@@ -1008,16 +632,9 @@ async function createLayerFromData(records, layerConfig) {
             }
         }
 
-        // Add to map if visible - with error handling
+        // Add to map if visible
         if (layerConfig.visible) {
-            try {
-                layerGroup.addTo(map);
-                console.log(`✅ Layer "${layerConfig.name}" added to map and is visible`);
-            } catch (error) {
-                console.error(`❌ Error adding layer "${layerConfig.name}" to map:`, error);
-            }
-        } else {
-            console.log(`ℹ️ Layer "${layerConfig.name}" created but not visible`);
+            layerGroup.addTo(map);
         }
 
         // Add to layers array
@@ -2930,32 +2547,13 @@ function removeLayer(layerId) {
 
 // Basemap functionality
 function changeBasemap() {
-    const basemapSelector = document.getElementById('basemapSelector');
-    if (!basemapSelector) {
-        console.error('Basemap selector not found');
-        return;
-    }
-    
-    const basemapType = basemapSelector.value;
-    
-    if (!map) {
-        console.error('Map not initialized when trying to change basemap');
-        return;
-    }
+    const basemapType = document.getElementById('basemapSelector').value;
 
-    console.log(`🗺️ Switching to ${basemapType} basemap...`);
-
-    // Remove current base layer more reliably
-    const layersToRemove = [];
+    // Remove current base layer
     map.eachLayer(layer => {
-        if (layer._url && (layer._url.includes('tile') || layer._url.includes('/{z}/'))) {
-            layersToRemove.push(layer);
+        if (layer._url && layer._url.includes('tile')) {
+            map.removeLayer(layer);
         }
-    });
-    
-    layersToRemove.forEach(layer => {
-        console.log('Removing existing tile layer:', layer._url);
-        map.removeLayer(layer);
     });
 
     // Add new base layer with appropriate zoom constraints
@@ -2963,10 +2561,7 @@ function changeBasemap() {
     if (basemap) {
         const tileLayerOptions = {
             attribution: basemap.attribution,
-            maxZoom: basemap.maxZoom || 25,
-            errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-            timeout: 10000, // 10 second timeout
-            crossOrigin: true
+            maxZoom: basemap.maxZoom || 25
         };
         
         // Add minZoom for custom tiles like drone imagery
@@ -2974,49 +2569,43 @@ function changeBasemap() {
             tileLayerOptions.minZoom = basemap.minZoom;
         }
         
-        // Create the tile layer
+        // Special handling for drone imagery
+        if (basemapType === 'drone_imagery') {
+            tileLayerOptions.errorTileUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='; // Transparent 1x1 pixel
+            
+            const currentZoom = map.getZoom();
+            
+            // Show info about zoom requirements for drone imagery
+            if (currentZoom < basemap.minZoom) {
+                showInfo(`🚁 Drone imagery is available at zoom level ${basemap.minZoom} and above. Current zoom: ${currentZoom}`);
+            } else {
+                showSuccess(`🚁 High-resolution drone imagery activated! Zoom levels ${basemap.minZoom}-${basemap.maxZoom} available.`);
+            }
+        }
+        
+        // Create and add the tile layer
         const tileLayer = L.tileLayer(basemap.url, tileLayerOptions);
         
-        // Add comprehensive error handling
+        // Add error handling for missing tiles
         tileLayer.on('tileerror', function(error) {
-            console.warn(`Tile loading error for ${basemapType}:`, error);
+            console.warn('Tile loading error:', error);
+            if (basemapType === 'drone_imagery') {
+                // Only show error once per session to avoid spam
+                if (!window.droneImageryErrorShown) {
+                    showWarning('Some drone imagery tiles may not be available at this location/zoom level.');
+                    window.droneImageryErrorShown = true;
+                }
+            }
         });
         
-        // Add loading events
-        tileLayer.on('loading', function() {
-            console.log(`📡 Loading ${basemapType} tiles...`);
-        });
-        
-        tileLayer.on('load', function() {
-            console.log(`✅ ${basemapType} tiles loaded successfully`);
-        });
-        
-        // Add to map
         tileLayer.addTo(map);
-        console.log(`✅ ${basemapType} tile layer added to map`);
-        
-        // Force immediate map updates with multiple strategies
-        setTimeout(() => {
-            map.invalidateSize(true);
-            console.log(`✅ Map size invalidated for ${basemapType}`);
-        }, 50);
-        
-        setTimeout(() => {
-            map.panBy([1, 0]);
-            map.panBy([-1, 0]); // Force tile refresh
-            console.log(`✅ Map tiles force refreshed for ${basemapType}`);
-        }, 150);
         
         // Update map's max zoom if necessary
         if (basemap.maxZoom) {
             map.options.maxZoom = Math.max(map.options.maxZoom, basemap.maxZoom);
         }
         
-        console.log(`✅ Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
-        showSuccess(`Switched to ${basemapType} basemap`);
-    } else {
-        console.error(`Basemap type ${basemapType} not found in baseMaps configuration`);
-        showError(`Basemap ${basemapType} not available`);
+        console.log(`Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
     }
 }
 
