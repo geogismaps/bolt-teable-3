@@ -2970,19 +2970,27 @@ function detectURLMediaType(url, layerName = null) {
         return 'audio';
     }
     
-    // 360 image detection
-    if (urlLower.includes('360') || (layerName && layerName.toLowerCase().includes('360'))) {
+    // 360 image detection - improved patterns
+    if (urlLower.includes('360') || 
+        urlLower.includes('panorama') || 
+        urlLower.includes('pano') ||
+        urlLower.includes('equirectangular') ||
+        (layerName && (
+            layerName.toLowerCase().includes('360') ||
+            layerName.toLowerCase().includes('panorama') ||
+            layerName.toLowerCase().includes('pano')
+        ))) {
         return '360';
-    }
-    
-    // Regular image detection
-    if (urlLower.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)/)) {
-        return 'image';
     }
     
     // PDF detection
     if (urlLower.includes('pdf') || urlLower.match(/\.pdf(\?|$)/)) {
         return 'pdf';
+    }
+    
+    // Regular image detection (after 360 detection)
+    if (urlLower.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)/)) {
+        return 'image';
     }
     
     return null;
@@ -3163,81 +3171,123 @@ function open360ImageModal(url, title = '') {
     }
     
     const modal = new bootstrap.Modal(document.getElementById('image360Modal'));
-    modal.show();
     
-    // Initialize Pannellum viewer after modal is shown
-    setTimeout(() => {
-        try {
-            // Destroy existing viewer if it exists
-            if (window.pannellumViewer) {
-                try {
-                    window.pannellumViewer.destroy();
-                } catch (e) {
-                    console.log('Previous viewer cleanup:', e.message);
-                }
+    // Initialize Pannellum viewer when modal is shown
+    modal._element.addEventListener('shown.bs.modal', function () {
+        initializePannellumViewer(url);
+    });
+    
+    // Clean up viewer when modal is hidden
+    modal._element.addEventListener('hidden.bs.modal', function () {
+        if (window.pannellumViewer) {
+            try {
+                window.pannellumViewer.destroy();
+                window.pannellumViewer = null;
+            } catch (e) {
+                console.log('Viewer cleanup:', e.message);
             }
-            
-            // Clear the container first
-            const container = document.getElementById('panorama360');
-            if (container) {
-                container.innerHTML = '';
-            }
-            
-            // Check if pannellum is available
-            if (typeof pannellum === 'undefined') {
-                throw new Error('Pannellum library not loaded');
-            }
-            
-            // Initialize new Pannellum viewer
-            window.pannellumViewer = pannellum.viewer('panorama360', {
-                type: 'equirectangular',
-                panorama: url,
-                autoLoad: true,
-                autoRotate: -2,
-                compass: true,
-                northOffset: 0,
-                showControls: true,
-                showFullscreenCtrl: true,
-                showZoomCtrl: true,
-                mouseZoom: true,
-                touchPanSpeedCoeffFactor: 1,
-                orientationOnByDefault: false,
-                hfov: 100,
-                minHfov: 50,
-                maxHfov: 120,
-                pitch: 0,
-                yaw: 0,
-                keyboardZoom: true,
-                draggable: true
-            });
-            
-            console.log('360° Pannellum viewer initialized successfully');
-            
-        } catch (error) {
-            console.error('Error initializing 360° viewer:', error);
-            
-            // Fallback to display error message
-            const container = document.getElementById('panorama360');
-            if (container) {
-                container.innerHTML = `
-                    <div class="alert alert-warning text-center p-4">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        360° viewer could not be initialized.
-                        <br><br>
-                        <p>Error: ${error.message}</p>
-                        <a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
-                            <i class="fas fa-external-link-alt me-1"></i>View image directly
-                        </a>
-                    </div>
-                `;
-            }
-            
-            showError('Failed to load 360° image viewer: ' + error.message);
         }
-    }, 500);
+    });
+    
+    modal.show();
     
     // Store current media URL for download
     window.currentMediaURL = url;
+}
+
+function initializePannellumViewer(url) {
+    try {
+        // Destroy existing viewer if it exists
+        if (window.pannellumViewer) {
+            try {
+                window.pannellumViewer.destroy();
+            } catch (e) {
+                console.log('Previous viewer cleanup:', e.message);
+            }
+        }
+        
+        // Clear the container first
+        const container = document.getElementById('panorama360');
+        if (!container) {
+            throw new Error('Panorama container not found');
+        }
+        
+        container.innerHTML = '';
+        
+        // Check if pannellum is available
+        if (typeof pannellum === 'undefined') {
+            throw new Error('Pannellum library not loaded. Please ensure pannellum.js is included.');
+        }
+        
+        console.log('Initializing Pannellum viewer with URL:', url);
+        
+        // Initialize new Pannellum viewer
+        window.pannellumViewer = pannellum.viewer('panorama360', {
+            type: 'equirectangular',
+            panorama: url,
+            autoLoad: true,
+            autoRotate: -2,
+            compass: true,
+            northOffset: 0,
+            showControls: true,
+            showFullscreenCtrl: true,
+            showZoomCtrl: true,
+            mouseZoom: true,
+            touchPanSpeedCoeffFactor: 1,
+            orientationOnByDefault: false,
+            hfov: 100,
+            minHfov: 50,
+            maxHfov: 120,
+            pitch: 0,
+            yaw: 0,
+            keyboardZoom: true,
+            draggable: true,
+            onload: function() {
+                console.log('360° panorama loaded successfully');
+                showSuccess('360° image loaded! Use mouse to pan and zoom.');
+            },
+            onerror: function(error) {
+                console.error('Pannellum error:', error);
+                displayPannellumError(url, error);
+            }
+        });
+        
+        console.log('360° Pannellum viewer initialized successfully');
+        
+    } catch (error) {
+        console.error('Error initializing 360° viewer:', error);
+        displayPannellumError(url, error.message);
+    }
+}
+
+function displayPannellumError(url, error) {
+    const container = document.getElementById('panorama360');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-warning text-center p-4">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <h5>360° Viewer Error</h5>
+                <p>Could not initialize the 360° panoramic viewer.</p>
+                <p class="small text-muted">Error: ${error}</p>
+                <div class="mt-3">
+                    <a href="${url}" target="_blank" class="btn btn-primary me-2">
+                        <i class="fas fa-external-link-alt me-1"></i>View Image Directly
+                    </a>
+                    <button class="btn btn-outline-secondary" onclick="retryPannellumInit('${url}')">
+                        <i class="fas fa-redo me-1"></i>Retry
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    showError('Failed to load 360° image viewer: ' + error);
+}
+
+function retryPannellumInit(url) {
+    console.log('Retrying Pannellum initialization...');
+    setTimeout(() => {
+        initializePannellumViewer(url);
+    }, 100);
 }
 
 // PDF loading function
@@ -3331,7 +3381,14 @@ function downloadCurrentMedia() {
 
 function fullscreen360() {
     if (window.pannellumViewer) {
-        window.pannellumViewer.toggleFullscreen();
+        try {
+            window.pannellumViewer.toggleFullscreen();
+        } catch (error) {
+            console.error('Error toggling fullscreen:', error);
+            showError('Could not toggle fullscreen mode');
+        }
+    } else {
+        showError('360° viewer not initialized');
     }
 }
 
