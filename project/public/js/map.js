@@ -523,11 +523,11 @@ async function createLayerFromData(records, layerConfig) {
                             marker.layerId = layerConfig.id;
                             marker.featureIndex = index;
 
-                            // Add click handler for selection
+                            // Add click handler for selection - NO AUTO-PLAY
                             marker.on('click', function(e) {
                                 // Store reference for popup controls
                                 window.currentPopupFeature = this;
-                                handleFeatureClick(this, index, layerConfig);
+                                // Just open popup, don't auto-play media
                             });
 
                             features.push(marker);
@@ -552,11 +552,11 @@ async function createLayerFromData(records, layerConfig) {
                                         polygon.layerId = layerConfig.id;
                                         polygon.featureIndex = index;
 
-                                        // Add click handler for selection
+                                        // Add click handler for selection - NO AUTO-PLAY
                                         polygon.on('click', function(e) {
                                             // Store reference for popup controls
                                             window.currentPopupFeature = this;
-                                            handleFeatureClick(this, index, layerConfig);
+                                            // Just open popup, don't auto-play media
                                         });
 
                                         features.push(polygon);
@@ -583,6 +583,38 @@ async function createLayerFromData(records, layerConfig) {
 
         // Detect media layer type
         const mediaType = detectMediaLayerType(layerConfig.name, records);
+        
+        function detectMediaLayerType(layerName, records) {
+            if (!records || records.length === 0) return null;
+            
+            const mediaTypes = new Set();
+            let mediaCount = 0;
+            
+            records.forEach(record => {
+                if (record.fields) {
+                    Object.values(record.fields).forEach(value => {
+                        if (typeof value === 'string' && value.match(/^https?:\/\//)) {
+                            const mediaType = detectURLMediaType(value, layerName);
+                            if (mediaType) {
+                                mediaTypes.add(mediaType);
+                                mediaCount++;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // If more than 50% of records have media URLs, consider it a media layer
+            if (mediaCount > records.length * 0.5) {
+                if (mediaTypes.size === 1) {
+                    return Array.from(mediaTypes)[0]; // Single media type
+                } else if (mediaTypes.size > 1) {
+                    return 'mixed'; // Mixed media types
+                }
+            }
+            
+            return null;
+        }
         
         // Store layer configuration with media type
         const layer = {
@@ -882,13 +914,13 @@ function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null) 
                 displayUrl = formattedValue.substring(0, maxLength - 3) + '...';
             }
             
-            // Create enhanced media field display
+            // Create enhanced media field display - NO AUTO-PLAY
             return `
                 <div class="media-field-container">
                     <div class="d-flex align-items-center gap-2">
                         <span class="media-type-icon">${mediaInfo.icon}</span>
                         <button class="btn btn-sm btn-outline-primary media-view-btn" 
-                                onclick="openMediaFromURL('${value.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${mediaType}', '${mediaInfo.title}')"
+                                onclick="event.stopPropagation(); openMediaFromURL('${value.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${mediaType}', '${mediaInfo.title}')"
                                 title="View ${mediaInfo.title}">
                             ${mediaInfo.buttonText}
                         </button>
@@ -901,13 +933,13 @@ function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null) 
             if (maxLength && formattedValue.length > maxLength) {
                 formattedValue = formattedValue.substring(0, maxLength) + '...';
             }
-            return `<a href="${value}" target="_blank" class="text-primary">${formattedValue}</a>`;
+            return `<a href="${value}" target="_blank" class="text-primary" onclick="event.stopPropagation()">${formattedValue}</a>`;
         }
     }
     
     // Handle email addresses
     if (highlightLinks && typeof value === 'string' && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-        return `<a href="mailto:${value}" class="text-primary">${formattedValue}</a>`;
+        return `<a href="mailto:${value}" class="text-primary" onclick="event.stopPropagation()">${formattedValue}</a>`;
     }
     
     // Regular text value - truncate if needed
@@ -2922,6 +2954,418 @@ function setupLayerSorting() {
     // Implementation would go here
 }
 
+// Media detection and viewing functions
+function detectURLMediaType(url, layerName = null) {
+    if (!url || typeof url !== 'string') return null;
+    
+    const urlLower = url.toLowerCase();
+    
+    // Video detection
+    if (urlLower.includes('video') || urlLower.match(/\.(mp4|avi|mov|wmv|flv|webm)(\?|$)/)) {
+        return 'video';
+    }
+    
+    // Audio detection
+    if (urlLower.includes('audio') || urlLower.match(/\.(mp3|wav|ogg|aac|flac)(\?|$)/)) {
+        return 'audio';
+    }
+    
+    // 360 image detection
+    if (urlLower.includes('360') || (layerName && layerName.toLowerCase().includes('360'))) {
+        return '360';
+    }
+    
+    // Regular image detection
+    if (urlLower.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)/)) {
+        return 'image';
+    }
+    
+    // PDF detection
+    if (urlLower.includes('pdf') || urlLower.match(/\.pdf(\?|$)/)) {
+        return 'pdf';
+    }
+    
+    return null;
+}
+
+function getMediaTypeInfo(mediaType) {
+    const mediaInfo = {
+        'video': {
+            icon: '🎥',
+            title: 'Video',
+            buttonText: 'Play Video'
+        },
+        'audio': {
+            icon: '🎵',
+            title: 'Audio',
+            buttonText: 'Play Audio'
+        },
+        'image': {
+            icon: '🖼️',
+            title: 'Image',
+            buttonText: 'View Image'
+        },
+        'pdf': {
+            icon: '📄',
+            title: 'PDF',
+            buttonText: 'View PDF'
+        },
+        '360': {
+            icon: '🌐',
+            title: '360° Image',
+            buttonText: 'View 360°'
+        }
+    };
+    
+    return mediaInfo[mediaType] || {
+        icon: '🔗',
+        title: 'Link',
+        buttonText: 'Open Link'
+    };
+}
+
+function openMediaFromURL(url, mediaType, title = '') {
+    console.log(`Opening ${mediaType} media:`, url);
+    
+    try {
+        switch (mediaType) {
+            case 'video':
+                openVideoModal(url, title);
+                break;
+            case 'audio':
+                openAudioModal(url, title);
+                break;
+            case 'image':
+                openImageModal(url, title);
+                break;
+            case 'pdf':
+                openPDFModal(url, title);
+                break;
+            case '360':
+                open360ImageModal(url, title);
+                break;
+            default:
+                window.open(url, '_blank');
+        }
+    } catch (error) {
+        console.error('Error opening media:', error);
+        showError('Failed to open media: ' + error.message);
+    }
+}
+
+function openVideoModal(url, title = '') {
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const videoInfo = document.getElementById('videoInfo');
+    
+    if (videoPlayer && videoSource) {
+        videoSource.src = url;
+        videoPlayer.load();
+        
+        if (videoInfo) {
+            videoInfo.innerHTML = `
+                <strong>Video:</strong> ${title || 'Media File'}<br>
+                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
+                <strong>Type:</strong> Video Media
+            `;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('videoModal'));
+        modal.show();
+        
+        // Store current media URL for download
+        window.currentMediaURL = url;
+    }
+}
+
+function openAudioModal(url, title = '') {
+    const audioPlayer = document.getElementById('audioPlayer');
+    const audioSource = document.getElementById('audioSource');
+    const audioInfo = document.getElementById('audioInfo');
+    
+    if (audioPlayer && audioSource) {
+        audioSource.src = url;
+        audioPlayer.load();
+        
+        if (audioInfo) {
+            audioInfo.innerHTML = `
+                <strong>Audio:</strong> ${title || 'Media File'}<br>
+                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
+                <strong>Type:</strong> Audio Media
+            `;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('audioModal'));
+        modal.show();
+        
+        // Store current media URL for download
+        window.currentMediaURL = url;
+    }
+}
+
+function openImageModal(url, title = '') {
+    const imageViewer = document.getElementById('imageViewer');
+    const imageInfo = document.getElementById('imageInfo');
+    
+    if (imageViewer) {
+        imageViewer.src = url;
+        imageViewer.alt = title || 'Image';
+        
+        if (imageInfo) {
+            imageInfo.innerHTML = `
+                <strong>Image:</strong> ${title || 'Media File'}<br>
+                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
+                <strong>Type:</strong> Image Media
+            `;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+        modal.show();
+        
+        // Store current media URL for download
+        window.currentMediaURL = url;
+    }
+}
+
+function openPDFModal(url, title = '') {
+    const pdfInfo = document.getElementById('pdfInfo');
+    
+    if (pdfInfo) {
+        pdfInfo.innerHTML = `
+            <strong>PDF:</strong> ${title || 'PDF Document'}<br>
+            <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
+            <strong>Type:</strong> PDF Document
+        `;
+    }
+    
+    // Load PDF using PDF.js
+    loadPDFDocument(url);
+    
+    const modal = new bootstrap.Modal(document.getElementById('pdfModal'));
+    modal.show();
+    
+    // Store current media URL for download
+    window.currentMediaURL = url;
+}
+
+function open360ImageModal(url, title = '') {
+    const image360Info = document.getElementById('image360Info');
+    
+    if (image360Info) {
+        image360Info.innerHTML = `
+            <strong>360° Image:</strong> ${title || '360° Image'}<br>
+            <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
+            <strong>Type:</strong> 360° Panoramic Image<br>
+            <small class="text-muted">Use mouse to drag and explore the 360° view</small>
+        `;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('image360Modal'));
+    modal.show();
+    
+    // Initialize Pannellum viewer after modal is shown
+    setTimeout(() => {
+        try {
+            // Destroy existing viewer if it exists
+            if (window.pannellumViewer) {
+                window.pannellumViewer.destroy();
+            }
+            
+            // Initialize new Pannellum viewer
+            window.pannellumViewer = pannellum.viewer('panorama360', {
+                type: 'equirectangular',
+                panorama: url,
+                autoLoad: true,
+                autoRotate: -2,
+                compass: true,
+                northOffset: 0,
+                showControls: true,
+                showFullscreenCtrl: true,
+                showZoomCtrl: true,
+                mouseZoom: true,
+                touchPanSpeedCoeffFactor: 1,
+                orientationOnByDefault: false,
+                hfov: 100,
+                minHfov: 50,
+                maxHfov: 120,
+                pitch: 0,
+                yaw: 0
+            });
+            
+            console.log('360° viewer initialized successfully');
+            
+        } catch (error) {
+            console.error('Error initializing 360° viewer:', error);
+            showError('Failed to load 360° image viewer. Please check the image URL.');
+        }
+    }, 500);
+    
+    // Store current media URL for download
+    window.currentMediaURL = url;
+}
+
+// PDF loading function
+let pdfDocument = null;
+let currentPDFPage = 1;
+let pdfScale = 1.0;
+
+async function loadPDFDocument(url) {
+    try {
+        if (typeof pdfjsLib === 'undefined') {
+            throw new Error('PDF.js library not loaded');
+        }
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        const loadingTask = pdfjsLib.getDocument(url);
+        pdfDocument = await loadingTask.promise;
+        
+        document.getElementById('totalPages').textContent = pdfDocument.numPages;
+        currentPDFPage = 1;
+        
+        renderPDFPage(currentPDFPage);
+        
+    } catch (error) {
+        console.error('Error loading PDF:', error);
+        showError('Failed to load PDF document');
+    }
+}
+
+async function renderPDFPage(pageNumber) {
+    if (!pdfDocument) return;
+    
+    try {
+        const page = await pdfDocument.getPage(pageNumber);
+        const canvas = document.getElementById('pdfCanvas');
+        const context = canvas.getContext('2d');
+        
+        const viewport = page.getViewport({ scale: pdfScale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        
+        document.getElementById('currentPage').textContent = pageNumber;
+        currentPDFPage = pageNumber;
+        
+        // Update navigation buttons
+        document.getElementById('prevPageBtn').disabled = pageNumber <= 1;
+        document.getElementById('nextPageBtn').disabled = pageNumber >= pdfDocument.numPages;
+        
+    } catch (error) {
+        console.error('Error rendering PDF page:', error);
+    }
+}
+
+function previousPDFPage() {
+    if (currentPDFPage > 1) {
+        renderPDFPage(currentPDFPage - 1);
+    }
+}
+
+function nextPDFPage() {
+    if (pdfDocument && currentPDFPage < pdfDocument.numPages) {
+        renderPDFPage(currentPDFPage + 1);
+    }
+}
+
+function zoomPDF(factor) {
+    pdfScale *= factor;
+    document.getElementById('pdfZoomLevel').textContent = Math.round(pdfScale * 100) + '%';
+    renderPDFPage(currentPDFPage);
+}
+
+// Media control functions
+function downloadCurrentMedia() {
+    if (window.currentMediaURL) {
+        const link = document.createElement('a');
+        link.href = window.currentMediaURL;
+        link.download = 'media_file';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+function fullscreen360() {
+    if (window.pannellumViewer) {
+        window.pannellumViewer.toggleFullscreen();
+    }
+}
+
+function fullscreenVideo() {
+    const videoPlayer = document.getElementById('videoPlayer');
+    if (videoPlayer && videoPlayer.requestFullscreen) {
+        videoPlayer.requestFullscreen();
+    }
+}
+
+function fullscreenImage() {
+    const imageViewer = document.getElementById('imageViewer');
+    if (imageViewer && imageViewer.requestFullscreen) {
+        imageViewer.requestFullscreen();
+    }
+}
+
+function printPDF() {
+    if (window.currentMediaURL) {
+        window.open(window.currentMediaURL, '_blank');
+    }
+}
+
+function adjustPlaybackRate(adjustment) {
+    const audioPlayer = document.getElementById('audioPlayer');
+    if (audioPlayer) {
+        if (adjustment === 0) {
+            audioPlayer.playbackRate = 1.0;
+        } else {
+            audioPlayer.playbackRate = Math.max(0.25, Math.min(2.0, audioPlayer.playbackRate + adjustment));
+        }
+    }
+}
+
+// Image zoom functions
+let imageScale = 1;
+let imageTranslateX = 0;
+let imageTranslateY = 0;
+
+function zoomImage(factor) {
+    const imageViewer = document.getElementById('imageViewer');
+    if (imageViewer) {
+        imageScale *= factor;
+        imageScale = Math.max(0.1, Math.min(5, imageScale));
+        updateImageTransform();
+    }
+}
+
+function resetImageZoom() {
+    imageScale = 1;
+    imageTranslateX = 0;
+    imageTranslateY = 0;
+    updateImageTransform();
+}
+
+function updateImageTransform() {
+    const imageViewer = document.getElementById('imageViewer');
+    if (imageViewer) {
+        imageViewer.style.transform = `scale(${imageScale}) translate(${imageTranslateX}px, ${imageTranslateY}px)`;
+    }
+}
+
+function toggleImageZoom(event) {
+    if (imageScale === 1) {
+        zoomImage(2);
+    } else {
+        resetImageZoom();
+    }
+}
+
 // Utility functions
 function showSuccess(message) {
     showAlert('success', message);
@@ -3927,6 +4371,57 @@ function handleTemplateChange() {
         customSection.style.display = 'none';
     }
 }
+
+// Handle feature click without auto-playing media
+function handleFeatureClick(feature, index, layerConfig) {
+    // This function is called when a feature is clicked
+    // It should only show the popup, not auto-play any media
+    console.log('Feature clicked, showing popup only');
+}
+
+// Global popup control functions
+window.zoomToCurrentPopupFeature = function(zoomLevel = 'close') {
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for zooming');
+        return;
+    }
+    
+    const feature = window.currentPopupFeature;
+    const layerId = feature.layerId;
+    const featureIndex = feature.featureIndex;
+    
+    if (layerId !== undefined && featureIndex !== undefined) {
+        const zoomOptions = {
+            'close': { padding: 0.05, maxZoom: 25 },
+            'medium': { padding: 0.1, maxZoom: 20 },
+            'far': { padding: 0.3, maxZoom: 15 }
+        };
+        
+        zoomToFeature(layerId, featureIndex, zoomOptions[zoomLevel]);
+    }
+};
+
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for centering');
+        return;
+    }
+    
+    const feature = window.currentPopupFeature;
+    
+    try {
+        if (feature.getBounds) {
+            const center = feature.getBounds().getCenter();
+            map.setView(center, map.getZoom());
+        } else if (feature.getLatLng) {
+            const latlng = feature.getLatLng();
+            map.setView(latlng, map.getZoom());
+        }
+        showSuccess('Map centered on feature');
+    } catch (error) {
+        showError('Failed to center on feature');
+    }
+};
 
 // Popup enable/disable handler
 function handlePopupToggle() {
