@@ -6825,9 +6825,16 @@ function openPdfModal(url, title = 'PDF Viewer') {
 
 // 360° viewer modal (using Pannellum)
 function open360Modal(url, title = '360° Viewer') {
-    const modal = document.getElementById('panoramaModal');
-    const pannellumContainer = document.getElementById('pannellum');
-    const modalTitle = modal.querySelector('.modal-title');
+    const modal = document.getElementById('image360Modal');
+    const pannellumContainer = document.getElementById('panorama360');
+    const modalTitle = modal ? modal.querySelector('.modal-title') : null;
+    
+    if (!modal) {
+        console.error('360° modal not found with ID "image360Modal"');
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+        return;
+    }
     
     if (modalTitle) {
         modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
@@ -6839,7 +6846,7 @@ function open360Modal(url, title = '360° Viewer') {
     modal.addEventListener('shown.bs.modal', function() {
         if (typeof pannellum !== 'undefined' && pannellumContainer) {
             try {
-                pannellum.viewer('pannellum', {
+                pannellum.viewer('panorama360', {
                     type: 'equirectangular',
                     panorama: url,
                     autoLoad: true,
@@ -6865,18 +6872,20 @@ function open360Modal(url, title = '360° Viewer') {
             }
         } else {
             // Fallback to regular image display
-            pannellumContainer.innerHTML = `
-                <div class="text-center">
-                    <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
-                    <div class="alert alert-info mt-3">
-                        <i class="fas fa-info-circle me-2"></i>
-                        360° viewer library not loaded. Displaying as regular image.
-                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
-                            <i class="fas fa-external-link-alt me-1"></i>View original
-                        </a>
+            if (pannellumContainer) {
+                pannellumContainer.innerHTML = `
+                    <div class="text-center">
+                        <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            360° viewer library not loaded. Displaying as regular image.
+                            <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>View original
+                            </a>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         }
     });
     
