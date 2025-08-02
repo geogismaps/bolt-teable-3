@@ -857,13 +857,258 @@ body {
         flex-direction: column;
         gap: 4px;
     }
-    
+
     .media-view-btn {
         align-self: flex-start;
     }
-    
+
     .media-field-container .text-muted {
         max-width: 100%;
         word-break: break-all;
     }
 }
+
+/* Media type badges */
+        .media-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .badge-video { background: #ff4757; color: white; }
+        .badge-audio { background: #5f27cd; color: white; }
+        .badge-image { background: #00d2d3; color: white; }
+        .badge-pdf { background: #ff6b6b; color: white; }
+        .badge-360 { background: #007bff; color: white; }
+
+        /* Unified Media Table Styles */
+        .media-enhanced {
+            border: 2px solid #e3f2fd;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        .media-gallery {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .media-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .media-item {
+            background: white;
+            border: 1px solid #ddd !important;
+            border-radius: 8px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .media-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-color: #007bff !important;
+        }
+
+        .media-icon {
+            transition: transform 0.2s ease;
+        }
+
+        .media-item:hover .media-icon {
+            transform: scale(1.1);
+        }
+
+        .media-field-container {
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 6px;
+            padding: 8px;
+            margin: 4px 0;
+            border-left: 4px solid #007bff;
+        }
+
+        .media-view-btn {
+            transition: all 0.2s ease;
+        }
+
+        .media-view-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+        }
+
+        .media-type-icon {
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        .field-information {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .field-row {
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .field-row:last-child {
+            border-bottom: none;
+        }
+
+        .field-label {
+            font-size: 0.9em;
+            color: #495057;
+            min-width: 100px;
+        }
+
+        .field-value {
+            font-size: 0.9em;
+            color: #212529;
+            word-break: break-word;
+        }
+
+        /* Enhanced layer icons for mixed media */
+        .layer-item .media-type-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 8px;
+        }
+
+        /* Mixed media layer indicator */
+        .mixed-media-layer {
+            border-left: 4px solid #6f42c1;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        .mixed-media-layer:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+
+        /* Media modal enhancements */
+        .modal-content {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border-bottom: none;
+        }
+
+        .modal-header .btn-close {
+            filter: invert(1);
+        }
+
+        /* PDF viewer specific styles */
+        .pdf-toolbar {
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 15px;
+        }
+
+        .pdf-navigation {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pdf-zoom {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #pdfCanvas {
+            display: block;
+            margin: 20px auto;
+            max-width: 100%;
+            box-shadow: 0 4px 12px rgba(0,0, 0, 0.15);
+            border-radius: 4px;
+        }
+
+        /* Audio player enhancements */
+        .audio-visualizer {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .audio-waveform {
+            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 4px 4px;
+            background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 14px;
+            animation: audioWave 2s ease-in-out infinite;
+        }
+
+        @keyframes audioWave {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .audio-controls {
+            margin-top: 15px;
+        }
+
+        /* 360 viewer enhancements */
+        #panorama360 {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Image viewer zoom controls */
+        .image-controls {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 8px;
+            padding: 5px;
+        }
+
+        .image-controls .btn {
+            margin: 2px;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Responsive adjustments for media items */
+        @media (max-width: 768px) {
+            .media-grid {
+                flex-direction: column;
+            }
+
+            .media-item {
+                min-width: 100%;
+            }
+
+            .media-field-container .d-flex {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .media-view-btn {
+                width: 100%;
+            }
+        }
