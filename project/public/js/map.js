@@ -747,12 +747,13 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
         // Format value with enhanced media detection
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
         // Check if this is a media field for enhanced styling
-        const isMediaField = typeof value === 'string' && value.match(/^https?:\/\//) && detectURLMediaType(value);
+        const layerName = layerConfig ? layerConfig.name : null;
+        const isMediaField = typeof value === 'string' && value.match(/^https?:\/\//) && detectURLMediaType(value, layerName);
         const fieldClass = isMediaField ? 'popup-field media-popup-field' : 'popup-field';
         
         content += `<div class="${fieldClass}" data-field="${key}">`;
@@ -789,7 +790,7 @@ function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIco
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
         
@@ -822,7 +823,7 @@ function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcon
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength);
+        const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
@@ -855,7 +856,7 @@ function renderCustomTemplate(template, fields, fieldsToShow) {
     return content;
 }
 
-function formatFieldValue(value, highlightLinks, maxLength) {
+function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null) {
     if (value === null || value === undefined) {
         return '<em class="text-muted">No data</em>';
     }
@@ -868,7 +869,8 @@ function formatFieldValue(value, highlightLinks, maxLength) {
     
     // Check if this is a media URL and enhance the display
     if (highlightLinks && typeof value === 'string' && value.match(/^https?:\/\//)) {
-        const mediaType = detectURLMediaType(value);
+        const layerName = layerConfig ? layerConfig.name : null;
+        const mediaType = detectURLMediaType(value, layerName);
         
         if (mediaType) {
             // Get media type icon and action text
@@ -6481,13 +6483,15 @@ function handleFullscreenChange() {
 }
 
 // Detect media type specifically from URL
-function detectURLMediaType(url) {
+function detectURLMediaType(url, layerName = null) {
     if (!url || typeof url !== 'string') return null;
     
     const urlLower = url.toLowerCase();
+    const nameCheck = layerName ? layerName.toLowerCase() : '';
     
-    // 360° detection (highest priority)
-    if (urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+    // 360° detection (highest priority) - check both URL and layer name
+    if (nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+        console.log(`URL detected as 360° content: ${url}`);
         return '360';
     }
     
@@ -6504,9 +6508,9 @@ function detectURLMediaType(url) {
         return 'audio';
     }
     
-    // Image detection
-    if (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
-        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image')) {
+    // Image detection - but not if layer is named "360"
+    if (nameCheck !== '360' && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
         return 'image';
     }
     
@@ -6592,8 +6596,11 @@ window.openMediaFromURL = function(url, mediaType, title = 'Media') {
 function detectMediaLayerType(layerName, records) {
     const name = layerName.toLowerCase();
     
-    // Check layer name first - prioritize 360 detection
-    if (name.includes('360') || name.includes('panorama') || name.includes('streetview')) return '360';
+    // Check layer name first - prioritize 360 detection with exact match for "360"
+    if (name === '360' || name.includes('360') || name.includes('panorama') || name.includes('streetview')) {
+        console.log(`Layer "${layerName}" detected as 360° layer based on name`);
+        return '360';
+    }
     if (name.includes('video')) return 'video';
     if (name.includes('audio')) return 'audio';
     if (name.includes('image') || name.includes('photo')) return 'image';
@@ -6612,6 +6619,7 @@ function detectMediaLayerType(layerName, records) {
                     
                     // 360 detection (check first for priority)
                     if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        console.log(`URL contains 360° indicators: ${url}`);
                         return '360';
                     }
                     
@@ -6628,9 +6636,9 @@ function detectMediaLayerType(layerName, records) {
                         return 'audio';
                     }
                     
-                    // Image detection
-                    if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
-                        url.includes('.gif') || url.includes('.webp') || url.includes('image')) {
+                    // Image detection - but only if layer name is NOT "360"
+                    if (name !== '360' && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
                         return 'image';
                     }
                     
@@ -6640,6 +6648,12 @@ function detectMediaLayerType(layerName, records) {
                     }
                 }
             }
+        }
+        
+        // Special case: If layer name is "360" but no 360 URLs found, still treat as 360 layer
+        if (name === '360') {
+            console.log(`Layer named "360" will use Pannellum viewer regardless of URL content`);
+            return '360';
         }
     }
     
