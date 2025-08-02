@@ -195,7 +195,7 @@ async function initializeMap() {
             zoomSnap: 0.5,
             zoomDelta: 0.5,
             preferCanvas: true
-        }).setView([20.5937, 78.9629], 5);
+        });
 
         console.log('✅ Map object created successfully');
 
@@ -209,16 +209,26 @@ async function initializeMap() {
             errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
         });
         
-        // Add tile layer and force immediate loading
+        // Add tile layer FIRST, then set view
         defaultBaseLayer.addTo(map);
         console.log('✅ Default base layer added to map');
         
-        // Force map container resize and tile loading
+        // Set map view AFTER adding the base layer
+        map.setView([20.5937, 78.9629], 5);
+        console.log('✅ Map view set to default coordinates');
+        
+        // Force map container resize and tile loading with multiple attempts
         setTimeout(() => {
             map.invalidateSize(true);
-            map.panBy([0, 0]); // Force a redraw
-            console.log('✅ Map invalidated and redrawn');
+            console.log('✅ Map size invalidated');
         }, 100);
+        
+        setTimeout(() => {
+            map.invalidateSize(true);
+            map.panBy([1, 0]); // Small pan to force tile refresh
+            map.panBy([-1, 0]); // Pan back
+            console.log('✅ Map tiles force refreshed');
+        }, 500);
 
         // Initialize measurement group
         measurementGroup = L.layerGroup().addTo(map);
@@ -641,16 +651,28 @@ async function tryLoadDefaultLayer() {
                         if (layer && layer.featureCount > 0) {
                             console.log(`✅ Successfully auto-loaded layer "${table.name}" with ${layer.featureCount} features`);
                             
+                            // Force layer to be visible and added to map
+                            if (layer.leafletLayer && !map.hasLayer(layer.leafletLayer)) {
+                                layer.leafletLayer.addTo(map);
+                                console.log(`✅ Force-added layer "${table.name}" to map`);
+                            }
+                            
                             // Update layers list
                             updateLayersList();
                             updateMapStatistics();
+                            
+                            // Force map refresh to show the layer
+                            setTimeout(() => {
+                                map.invalidateSize(true);
+                                console.log(`✅ Map refreshed to display layer "${table.name}"`);
+                            }, 500);
                             
                             // Zoom to the layer
                             if (layer.bounds && layer.bounds.isValid()) {
                                 setTimeout(() => {
                                     map.fitBounds(layer.bounds.pad(0.1));
                                     showSuccess(`🎉 Auto-loaded "${table.name}" with ${layer.featureCount} features and zoomed to extent!`);
-                                }, 1000);
+                                }, 1500);
                             } else {
                                 showSuccess(`✅ Auto-loaded "${table.name}" with ${layer.featureCount} features!`);
                             }
@@ -986,9 +1008,16 @@ async function createLayerFromData(records, layerConfig) {
             }
         }
 
-        // Add to map if visible
+        // Add to map if visible - with error handling
         if (layerConfig.visible) {
-            layerGroup.addTo(map);
+            try {
+                layerGroup.addTo(map);
+                console.log(`✅ Layer "${layerConfig.name}" added to map and is visible`);
+            } catch (error) {
+                console.error(`❌ Error adding layer "${layerConfig.name}" to map:`, error);
+            }
+        } else {
+            console.log(`ℹ️ Layer "${layerConfig.name}" created but not visible`);
         }
 
         // Add to layers array
@@ -2901,7 +2930,13 @@ function removeLayer(layerId) {
 
 // Basemap functionality
 function changeBasemap() {
-    const basemapType = document.getElementById('basemapSelector').value;
+    const basemapSelector = document.getElementById('basemapSelector');
+    if (!basemapSelector) {
+        console.error('Basemap selector not found');
+        return;
+    }
+    
+    const basemapType = basemapSelector.value;
     
     if (!map) {
         console.error('Map not initialized when trying to change basemap');
@@ -2910,12 +2945,17 @@ function changeBasemap() {
 
     console.log(`🗺️ Switching to ${basemapType} basemap...`);
 
-    // Remove current base layer
+    // Remove current base layer more reliably
+    const layersToRemove = [];
     map.eachLayer(layer => {
         if (layer._url && (layer._url.includes('tile') || layer._url.includes('/{z}/'))) {
-            console.log('Removing existing tile layer:', layer._url);
-            map.removeLayer(layer);
+            layersToRemove.push(layer);
         }
+    });
+    
+    layersToRemove.forEach(layer => {
+        console.log('Removing existing tile layer:', layer._url);
+        map.removeLayer(layer);
     });
 
     // Add new base layer with appropriate zoom constraints
@@ -2925,7 +2965,8 @@ function changeBasemap() {
             attribution: basemap.attribution,
             maxZoom: basemap.maxZoom || 25,
             errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-            timeout: 10000 // 10 second timeout
+            timeout: 10000, // 10 second timeout
+            crossOrigin: true
         };
         
         // Add minZoom for custom tiles like drone imagery
@@ -2933,34 +2974,15 @@ function changeBasemap() {
             tileLayerOptions.minZoom = basemap.minZoom;
         }
         
-        // Special handling for drone imagery
-        if (basemapType === 'drone_imagery') {
-            const currentZoom = map.getZoom();
-            
-            // Show info about zoom requirements for drone imagery
-            if (currentZoom < basemap.minZoom) {
-                showInfo(`🚁 Drone imagery is available at zoom level ${basemap.minZoom} and above. Current zoom: ${currentZoom}`);
-            } else {
-                showSuccess(`🚁 High-resolution drone imagery activated! Zoom levels ${basemap.minZoom}-${basemap.maxZoom} available.`);
-            }
-        }
-        
-        // Create and add the tile layer
+        // Create the tile layer
         const tileLayer = L.tileLayer(basemap.url, tileLayerOptions);
         
         // Add comprehensive error handling
         tileLayer.on('tileerror', function(error) {
             console.warn(`Tile loading error for ${basemapType}:`, error);
-            if (basemapType === 'drone_imagery') {
-                // Only show error once per session to avoid spam
-                if (!window.droneImageryErrorShown) {
-                    showWarning('Some drone imagery tiles may not be available at this location/zoom level.');
-                    window.droneImageryErrorShown = true;
-                }
-            }
         });
         
-        // Add success handlers
+        // Add loading events
         tileLayer.on('loading', function() {
             console.log(`📡 Loading ${basemapType} tiles...`);
         });
@@ -2969,20 +2991,21 @@ function changeBasemap() {
             console.log(`✅ ${basemapType} tiles loaded successfully`);
         });
         
-        tileLayer.on('tileload', function(e) {
-            console.log(`✅ Tile loaded:`, e.coords);
-        });
-        
-        // Add to map FIRST
+        // Add to map
         tileLayer.addTo(map);
         console.log(`✅ ${basemapType} tile layer added to map`);
         
-        // Force immediate map updates
+        // Force immediate map updates with multiple strategies
         setTimeout(() => {
             map.invalidateSize(true);
-            map.panBy([0, 0]); // Force tile refresh
-            console.log(`✅ Map refreshed for ${basemapType}`);
+            console.log(`✅ Map size invalidated for ${basemapType}`);
         }, 50);
+        
+        setTimeout(() => {
+            map.panBy([1, 0]);
+            map.panBy([-1, 0]); // Force tile refresh
+            console.log(`✅ Map tiles force refreshed for ${basemapType}`);
+        }, 150);
         
         // Update map's max zoom if necessary
         if (basemap.maxZoom) {
