@@ -6985,13 +6985,13 @@ function addPannellumControls(viewer) {
                 <i class="fas fa-sync-alt me-1"></i>Auto Rotation
             </div>
             <div style="display: flex; gap: 5px; justify-content: center;">
-                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation">
+                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation" style="position: relative;">
                     <i class="fas fa-play"></i>
                 </button>
-                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation">
+                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation" style="position: relative;">
                     <i class="fas fa-pause"></i>
                 </button>
-                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction">
+                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction" style="position: relative;">
                     <i class="fas fa-undo"></i>
                 </button>
             </div>
@@ -6999,9 +6999,12 @@ function addPannellumControls(viewer) {
                 <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
                     <span>Speed:</span>
                     <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
-                           style="width: 80px; height: 15px;">
+                           style="width: 80px; height: 15px; cursor: pointer;">
                     <span id="speed-value">2x</span>
                 </label>
+            </div>
+            <div id="rotation-status" style="margin-top: 5px; font-size: 10px; text-align: center; color: rgba(255,255,255,0.8);">
+                Status: Stopped
             </div>
         `;
         
@@ -7104,11 +7107,21 @@ function addPannellumControls(viewer) {
         
         // Auto-rotation controls
         document.getElementById('auto-rotate-start').addEventListener('click', () => {
-            if (!isAutoRotating) {
-                const speed = parseFloat(document.getElementById('rotation-speed').value);
-                viewer.setAutoRotate(speed * rotationDirection);
-                isAutoRotating = true;
-                console.log(`Started auto-rotation at ${speed}x speed`);
+            const speed = parseFloat(document.getElementById('rotation-speed').value);
+            const rotationSpeed = speed * rotationDirection;
+            viewer.setAutoRotate(rotationSpeed);
+            isAutoRotating = true;
+            console.log(`Started auto-rotation at ${speed}x speed (direction: ${rotationDirection > 0 ? 'right' : 'left'})`);
+            
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(0, 255, 0, 0.4)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 255, 255, 0.2)';
+            
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = `Status: Rotating ${rotationDirection > 0 ? 'Right' : 'Left'} at ${speed}x`;
+                statusEl.style.color = 'rgba(0, 255, 0, 0.9)';
             }
         });
         
@@ -7116,6 +7129,17 @@ function addPannellumControls(viewer) {
             viewer.setAutoRotate(0);
             isAutoRotating = false;
             console.log('Stopped auto-rotation');
+            
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(255, 255, 255, 0.2)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 0, 0, 0.4)';
+            
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = 'Status: Stopped';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.8)';
+            }
         });
         
         document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
@@ -7125,6 +7149,14 @@ function addPannellumControls(viewer) {
                 viewer.setAutoRotate(speed * rotationDirection);
             }
             console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);
+            
+            // Visual feedback for direction change
+            const reverseBtn = document.getElementById('auto-rotate-reverse');
+            const originalBg = reverseBtn.style.background;
+            reverseBtn.style.background = 'rgba(255, 255, 0, 0.6)';
+            setTimeout(() => {
+                reverseBtn.style.background = originalBg;
+            }, 300);
         });
         
         // Speed control
@@ -7133,6 +7165,7 @@ function addPannellumControls(viewer) {
             document.getElementById('speed-value').textContent = speed + 'x';
             if (isAutoRotating) {
                 viewer.setAutoRotate(speed * rotationDirection);
+                console.log(`Updated rotation speed to ${speed}x`);
             }
         });
         
