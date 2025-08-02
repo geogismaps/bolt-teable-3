@@ -885,191 +885,86 @@ body {
         .badge-pdf { background: #ff6b6b; color: white; }
         .badge-360 { background: #007bff; color: white; }
 
-        /* Professional Popup Styling */
-        .professional-popup {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* Simple Standard Popup Styling */
+        .feature-popup {
+            font-family: Arial, sans-serif;
         }
 
-        .professional-popup .popup-field {
-            margin-bottom: 8px;
-            padding: 8px;
-            border-radius: 4px;
-            transition: all 0.2s ease;
-            background: white;
-            border-left: 3px solid #e9ecef;
+        .popup-field {
+            margin-bottom: 10px;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
         }
 
-        .professional-popup .popup-field:hover {
-            background-color: #f8f9fa;
-            border-left-color: #6c757d;
+        .popup-field:last-child {
+            border-bottom: none;
         }
 
-        /* Location Fields Styling */
-        .professional-popup .location-field {
-            background: #f8f9fa;
-            border-left: 3px solid #6c757d;
-            order: 1;
+        .field-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 3px;
         }
 
-        .professional-popup .location-field .field-title {
-            color: #495057;
-            font-weight: 600;
-        }
-
-        .professional-popup .location-value {
-            font-family: 'Courier New', monospace;
-            font-weight: 500;
-            color: #212529;
-            background: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            border: 1px solid #e9ecef;
-        }
-
-        /* Media Fields Styling */
-        .professional-popup .media-popup-field {
-            background: #f8f9fa;
-            border-left: 3px solid #6c757d;
-            order: 2;
-        }
-
-        .professional-popup .media-popup-field .field-title {
-            color: #495057;
-            font-weight: 600;
-        }
-
-        .professional-popup .media-value {
-            background: white;
-            padding: 6px;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-        }
-
-        /* Standard Fields Styling */
-        .professional-popup .popup-field:not(.location-field):not(.media-popup-field) {
-            background: white;
-            border-left: 3px solid #e9ecef;
-            order: 3;
-        }
-
-        .professional-popup .standard-value {
-            color: #495057;
+        .field-value {
+            color: #666;
             line-height: 1.4;
         }
 
-        /* Priority-based ordering */
-        .professional-popup .priority-high {
-            border-left-color: #6c757d;
-            background: #f8f9fa;
-        }
-
-        .professional-popup .priority-media {
-            border-left-color: #6c757d;
-            background: #f8f9fa;
-        }
-
-        .professional-popup .priority-normal {
-            border-left-color: #e9ecef;
-            background: white;
-        }
-
-        /* Enhanced field labels */
-        .professional-popup .field-label {
-            margin-bottom: 6px;
-        }
-
-        .professional-popup .field-title {
-            font-size: 0.9em;
-            letter-spacing: 0.3px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        /* Copy button styling */
-        .professional-popup .copy-btn {
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            margin-left: 8px;
-        }
-
-        .professional-popup .popup-field:hover .copy-btn {
-            opacity: 1;
-        }
-
-        /* Media field enhancements */
-        .professional-popup .media-field-container {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
+        /* Media field styling */
+        .media-field-container {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
             padding: 8px;
             margin: 4px 0;
         }
 
-        .professional-popup .media-view-btn {
-            background: #6c757d;
-            border: 1px solid #6c757d;
+        .media-view-btn {
+            background: #007bff;
+            border: 1px solid #007bff;
             color: white;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            text-decoration: none;
+            cursor: pointer;
         }
 
-        .professional-popup .media-view-btn:hover {
-            background: #495057;
-            border-color: #495057;
+        .media-view-btn:hover {
+            background: #0056b3;
+            border-color: #0056b3;
             color: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
-        .professional-popup .media-type-icon {
-            font-size: 1.2em;
-            margin-right: 6px;
+        .media-type-icon {
+            font-size: 14px;
+            margin-right: 5px;
         }
 
-        /* Professional popup header */
-        .professional-popup .popup-header {
-            background: #f8f9fa;
-            color: #495057;
-            padding: 12px 15px;
-            margin: -15px -15px 15px -15px;
-            border-radius: 8px 8px 0 0;
-            border-bottom: 1px solid #e9ecef;
+        /* Simple popup header */
+        .popup-header {
+            padding: 10px 0;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 10px;
         }
 
-        .professional-popup .popup-title {
-            font-weight: 600;
-            font-size: 1.1em;
+        .popup-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
             margin: 0;
         }
 
-        /* Responsive adjustments */
-        @media (max-width: 576px) {
-            .professional-popup .popup-field {
-                padding: 6px;
-                margin-bottom: 8px;
-            }
-            
-            .professional-popup .field-title {
-                font-size: 0.85em;
-            }
-            
-            .professional-popup .media-view-btn {
-                font-size: 0.8em;
-                padding: 4px 8px;
-            }
-        }
-
-        /* Enhanced Leaflet popup styling */
+        /* Standard Leaflet popup styling */
         .leaflet-popup-content-wrapper {
-            border-radius: 12px !important;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
-            border: none !important;
+            border-radius: 6px !important;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2) !important;
         }
 
         .leaflet-popup-content {
-            margin: 0 !important;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+            margin: 15px !important;
+            font-family: Arial, sans-serif !important;
         }
 
         .leaflet-popup-tip {

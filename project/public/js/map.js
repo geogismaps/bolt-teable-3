@@ -699,23 +699,11 @@ function createFeaturePopup(fields, layerConfig) {
     const showCopyButtons = popupSettings.showCopyButtons || false;
     const enableSearch = popupSettings.enableSearch || false;
 
-    let content = `<div class="feature-popup professional-popup" style="max-width: ${maxWidth}px;">`;
+    let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
     
-    // Professional popup header
+    // Simple popup header
     content += `<div class="popup-header">`;
-    content += `<div class="d-flex justify-content-between align-items-center">`;
-    content += `<h6 class="popup-title">
-                   <i class="fas fa-map-marker-alt me-2"></i>
-                   ${layerConfig.name}
-                 </h6>`;
-    content += `<div class="d-flex align-items-center gap-2">`;
-    content += getUserRoleBadge();
-    if (layerConfig.mediaType) {
-        const mediaInfo = getMediaTypeInfo(layerConfig.mediaType);
-        content += `<span class="badge bg-light text-dark">${mediaInfo.icon} ${layerConfig.mediaType}</span>`;
-    }
-    content += `</div>`;
-    content += `</div>`;
+    content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
     content += `</div>`;
     
     // Add search if enabled
