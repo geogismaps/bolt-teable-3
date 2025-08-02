@@ -3307,6 +3307,7 @@ function initializePannellumViewer(url) {
             } catch (e) {
                 console.log('Previous viewer cleanup:', e.message);
             }
+            window.pannellumViewer = null;
         }
         
         // Clear the container first
@@ -3317,45 +3318,77 @@ function initializePannellumViewer(url) {
         
         container.innerHTML = '';
         
-        // Check if pannellum is available
-        if (typeof pannellum === 'undefined') {
-            throw new Error('Pannellum library not loaded. Please ensure pannellum.js is included.');
-        }
+        console.log('Initializing 360° viewer with URL:', url);
         
-        console.log('Initializing Pannellum viewer with URL:', url);
+        // Create a simple interactive 360° viewer using CSS transforms and mouse events
+        const viewerHTML = `
+            <div id="panorama-viewer" style="
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                position: relative;
+                cursor: grab;
+                background: #000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                <img id="panorama-image" src="${url}" style="
+                    width: auto;
+                    height: 100%;
+                    min-width: 100%;
+                    object-fit: cover;
+                    transform-origin: center center;
+                    transition: transform 0.1s ease-out;
+                    user-select: none;
+                    -webkit-user-select: none;
+                    -moz-user-select: none;
+                " draggable="false" />
+                <div id="viewer-controls" style="
+                    position: absolute;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0,0,0,0.7);
+                    padding: 10px;
+                    border-radius: 5px;
+                    color: white;
+                    font-size: 12px;
+                    z-index: 1000;
+                ">
+                    <div style="text-align: center; margin-bottom: 5px;">
+                        <button onclick="resetPanoramaView()" style="
+                            background: #007bff;
+                            color: white;
+                            border: none;
+                            padding: 5px 10px;
+                            border-radius: 3px;
+                            cursor: pointer;
+                            margin-right: 10px;
+                        ">Reset View</button>
+                        <button onclick="toggleAutoRotate()" style="
+                            background: #28a745;
+                            color: white;
+                            border: none;
+                            padding: 5px 10px;
+                            border-radius: 3px;
+                            cursor: pointer;
+                        ">Auto Rotate</button>
+                    </div>
+                    <div style="text-align: center; color: #ccc;">
+                        Drag to rotate • Scroll to zoom • Use controls below
+                    </div>
+                </div>
+            </div>
+        `;
         
-        // Initialize new Pannellum viewer
-        window.pannellumViewer = pannellum.viewer('panorama360', {
-            type: 'equirectangular',
-            panorama: url,
-            autoLoad: true,
-            autoRotate: -2,
-            compass: true,
-            northOffset: 0,
-            showControls: true,
-            showFullscreenCtrl: true,
-            showZoomCtrl: true,
-            mouseZoom: true,
-            touchPanSpeedCoeffFactor: 1,
-            orientationOnByDefault: false,
-            hfov: 100,
-            minHfov: 50,
-            maxHfov: 120,
-            pitch: 0,
-            yaw: 0,
-            keyboardZoom: true,
-            draggable: true,
-            onload: function() {
-                console.log('360° panorama loaded successfully');
-                showSuccess('360° image loaded! Use mouse to pan and zoom.');
-            },
-            onerror: function(error) {
-                console.error('Pannellum error:', error);
-                displayPannellumError(url, error);
-            }
-        });
+        container.innerHTML = viewerHTML;
         
-        console.log('360° Pannellum viewer initialized successfully');
+        // Initialize interactive controls
+        setupPanoramaInteraction();
+        
+        console.log('✅ 360° viewer initialized successfully');
+        showSuccess('360° image loaded! Drag to rotate, scroll to zoom.');
         
     } catch (error) {
         console.error('Error initializing 360° viewer:', error);
@@ -3363,20 +3396,156 @@ function initializePannellumViewer(url) {
     }
 }
 
+// Setup panorama interaction
+function setupPanoramaInteraction() {
+    const viewer = document.getElementById('panorama-viewer');
+    const image = document.getElementById('panorama-image');
+    
+    if (!viewer || !image) return;
+    
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let currentRotationX = 0;
+    let currentRotationY = 0;
+    let currentScale = 1;
+    let autoRotateInterval = null;
+    
+    // Mouse events
+    viewer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        viewer.style.cursor = 'grabbing';
+        e.preventDefault();
+        
+        // Stop auto-rotate when user interacts
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        currentRotationY += deltaX * 0.5;
+        currentRotationX -= deltaY * 0.3;
+        
+        // Limit vertical rotation
+        currentRotationX = Math.max(-45, Math.min(45, currentRotationX));
+        
+        updateImageTransform();
+        
+        startX = e.clientX;
+        startY = e.clientY;
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        viewer.style.cursor = 'grab';
+    });
+    
+    // Touch events for mobile
+    viewer.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            e.preventDefault();
+        }
+    });
+    
+    viewer.addEventListener('touchmove', (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        
+        const deltaX = e.touches[0].clientX - startX;
+        const deltaY = e.touches[0].clientY - startY;
+        
+        currentRotationY += deltaX * 0.5;
+        currentRotationX -= deltaY * 0.3;
+        
+        currentRotationX = Math.max(-45, Math.min(45, currentRotationX));
+        
+        updateImageTransform();
+        
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        
+        e.preventDefault();
+    });
+    
+    viewer.addEventListener('touchend', () => {
+        isDragging = false;
+    });
+    
+    // Zoom with mouse wheel
+    viewer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        currentScale *= zoomFactor;
+        currentScale = Math.max(0.5, Math.min(3, currentScale));
+        
+        updateImageTransform();
+    });
+    
+    function updateImageTransform() {
+        image.style.transform = `
+            scale(${currentScale}) 
+            rotateY(${currentRotationY}deg) 
+            rotateX(${currentRotationX}deg)
+        `;
+    }
+    
+    // Global functions for controls
+    window.resetPanoramaView = function() {
+        currentRotationX = 0;
+        currentRotationY = 0;
+        currentScale = 1;
+        updateImageTransform();
+        
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+    };
+    
+    window.toggleAutoRotate = function() {
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        } else {
+            autoRotateInterval = setInterval(() => {
+                currentRotationY += 0.5;
+                updateImageTransform();
+            }, 50);
+        }
+    };
+    
+    // Start with a slight auto-rotation
+    setTimeout(() => {
+        window.toggleAutoRotate();
+    }, 1000);
+}
+
 function displayPannellumError(url, error) {
     const container = document.getElementById('panorama360');
     if (container) {
         container.innerHTML = `
-            <div class="alert alert-warning text-center p-4">
+            <div class="alert alert-warning text-center p-4" style="margin: 20px;">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 <h5>360° Viewer Error</h5>
-                <p>Could not initialize the 360° panoramic viewer.</p>
+                <p>Could not load the 360° panoramic image.</p>
                 <p class="small text-muted">Error: ${error}</p>
                 <div class="mt-3">
                     <a href="${url}" target="_blank" class="btn btn-primary me-2">
                         <i class="fas fa-external-link-alt me-1"></i>View Image Directly
                     </a>
-                    <button class="btn btn-outline-secondary" onclick="retryPannellumInit('${url}')">
+                    <button class="btn btn-outline-secondary" onclick="retry360Init('${url}')">
                         <i class="fas fa-redo me-1"></i>Retry
                     </button>
                 </div>
@@ -3386,8 +3555,8 @@ function displayPannellumError(url, error) {
     showError('Failed to load 360° image viewer: ' + error);
 }
 
-function retryPannellumInit(url) {
-    console.log('Retrying Pannellum initialization...');
+function retry360Init(url) {
+    console.log('Retrying 360° viewer initialization...');
     setTimeout(() => {
         initializePannellumViewer(url);
     }, 100);
