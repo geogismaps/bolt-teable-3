@@ -3050,6 +3050,8 @@ function openMediaFromURL(url, mediaType, title = '') {
     } catch (error) {
         console.error('Error opening media:', error);
         showError('Failed to open media: ' + error.message);
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
     }
 }
 
@@ -3168,7 +3170,22 @@ function open360ImageModal(url, title = '') {
         try {
             // Destroy existing viewer if it exists
             if (window.pannellumViewer) {
-                window.pannellumViewer.destroy();
+                try {
+                    window.pannellumViewer.destroy();
+                } catch (e) {
+                    console.log('Previous viewer cleanup:', e.message);
+                }
+            }
+            
+            // Clear the container first
+            const container = document.getElementById('panorama360');
+            if (container) {
+                container.innerHTML = '';
+            }
+            
+            // Check if pannellum is available
+            if (typeof pannellum === 'undefined') {
+                throw new Error('Pannellum library not loaded');
             }
             
             // Initialize new Pannellum viewer
@@ -3189,14 +3206,33 @@ function open360ImageModal(url, title = '') {
                 minHfov: 50,
                 maxHfov: 120,
                 pitch: 0,
-                yaw: 0
+                yaw: 0,
+                keyboardZoom: true,
+                draggable: true
             });
             
-            console.log('360° viewer initialized successfully');
+            console.log('360° Pannellum viewer initialized successfully');
             
         } catch (error) {
             console.error('Error initializing 360° viewer:', error);
-            showError('Failed to load 360° image viewer. Please check the image URL.');
+            
+            // Fallback to display error message
+            const container = document.getElementById('panorama360');
+            if (container) {
+                container.innerHTML = `
+                    <div class="alert alert-warning text-center p-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        360° viewer could not be initialized.
+                        <br><br>
+                        <p>Error: ${error.message}</p>
+                        <a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View image directly
+                        </a>
+                    </div>
+                `;
+            }
+            
+            showError('Failed to load 360° image viewer: ' + error.message);
         }
     }, 500);
     
@@ -6985,7 +7021,7 @@ function detectURLMediaType(url, layerName = null) {
     const nameCheck = layerName ? layerName.toLowerCase() : '';
     
     // 360° detection (highest priority) - check both URL and layer name
-    if (nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+    if (nameCheck.includes('360') || nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
         console.log(`URL detected as 360° content: ${url}`);
         return '360';
     }
@@ -7003,8 +7039,8 @@ function detectURLMediaType(url, layerName = null) {
         return 'audio';
     }
     
-    // Image detection - but not if layer is named "360"
-    if (nameCheck !== '360' && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+    // Image detection - but not if layer is named "360" or contains "360"
+    if (!nameCheck.includes('360') && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
         urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
         return 'image';
     }
@@ -7091,14 +7127,13 @@ window.openMediaFromURL = function(url, mediaType, title = 'Media') {
 function detectMediaLayerType(layerName, records) {
     const name = layerName.toLowerCase();
     
-    // Check layer name first - prioritize 360 detection with exact match for "360"
-    if (name === '360' || name.includes('360') || name.includes('panorama') || name.includes('streetview')) {
+    // Check layer name first - prioritize 360 detection
+    if (name.includes('360') || name === '360' || name.includes('panorama') || name.includes('streetview')) {
         console.log(`Layer "${layerName}" detected as 360° layer based on name`);
         return '360';
     }
     if (name.includes('video')) return 'video';
     if (name.includes('audio')) return 'audio';
-    if (name.includes('image') || name.includes('photo')) return 'image';
     if (name.includes('pdf') || name.includes('document')) return 'pdf';
     
     // If name doesn't match, analyze URL patterns from data
@@ -7131,23 +7166,23 @@ function detectMediaLayerType(layerName, records) {
                         return 'audio';
                     }
                     
-                    // Image detection - but only if layer name is NOT "360"
-                    if (name !== '360' && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
-                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
-                        return 'image';
-                    }
-                    
                     // PDF detection
                     if (url.includes('.pdf') || url.includes('document')) {
                         return 'pdf';
+                    }
+                    
+                    // Image detection - but only if layer name doesn't contain "360"
+                    if (!name.includes('360') && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
+                        return 'image';
                     }
                 }
             }
         }
         
-        // Special case: If layer name is "360" but no 360 URLs found, still treat as 360 layer
-        if (name === '360') {
-            console.log(`Layer named "360" will use Pannellum viewer regardless of URL content`);
+        // Special case: If layer name contains "360", always treat as 360 layer
+        if (name.includes('360') || name === '360') {
+            console.log(`Layer containing "360" will use Pannellum viewer regardless of URL content`);
             return '360';
         }
     }
