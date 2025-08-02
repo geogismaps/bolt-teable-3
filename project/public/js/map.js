@@ -699,11 +699,24 @@ function createFeaturePopup(fields, layerConfig) {
     const showCopyButtons = popupSettings.showCopyButtons || false;
     const enableSearch = popupSettings.enableSearch || false;
 
-    let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
+    let content = `<div class="feature-popup professional-popup" style="max-width: ${maxWidth}px;">`;
     
-    // Popup header with user role indicator
-    content += `<div class="popup-header d-flex justify-content-between align-items-center mb-2">`;
-    content += `<h6 class="popup-title mb-0">${layerConfig.name} ${getUserRoleBadge()}</h6>`;
+    // Professional popup header
+    content += `<div class="popup-header">`;
+    content += `<div class="d-flex justify-content-between align-items-center">`;
+    content += `<h6 class="popup-title">
+                   <i class="fas fa-map-marker-alt me-2"></i>
+                   ${layerConfig.name}
+                 </h6>`;
+    content += `<div class="d-flex align-items-center gap-2">`;
+    content += getUserRoleBadge();
+    if (layerConfig.mediaType) {
+        const mediaInfo = getMediaTypeInfo(layerConfig.mediaType);
+        content += `<span class="badge bg-light text-dark">${mediaInfo.icon} ${layerConfig.mediaType}</span>`;
+    }
+    content += `</div>`;
+    content += `</div>`;
+    content += `</div>`;
     
     // Add search if enabled
     if (enableSearch) {
@@ -764,9 +777,77 @@ function createFeaturePopup(fields, layerConfig) {
 }
 
 function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
-    let content = '<div class="popup-fields">';
+    let content = '<div class="popup-fields professional-popup">';
     
-    fieldsToShow.forEach(key => {
+    // Define professional field order with priority
+    const fieldPriority = {
+        // Location fields (highest priority)
+        'latitude': 1, 'lat': 1, 'Latitude': 1, 'LAT': 1,
+        'longitude': 2, 'lng': 2, 'lon': 2, 'Longitude': 2, 'LON': 2, 'LNG': 2,
+        
+        // Media fields (ordered as requested)
+        'pdf': 3, 'PDF': 3, 'pdf_link': 3, 'pdf_url': 3, 'document': 3,
+        '360': 4, '360_image': 4, '360_degree': 4, 'panorama': 4, 'pano': 4,
+        'video': 5, 'Video': 5, 'video_link': 5, 'video_url': 5,
+        
+        // Other media types
+        'image': 6, 'Image': 6, 'photo': 6, 'picture': 6,
+        'audio': 7, 'Audio': 7, 'sound': 7,
+        
+        // Regular fields get default priority
+        'default': 100
+    };
+    
+    // Function to get field priority and detect media type
+    const getFieldPriority = (key, value) => {
+        // Check explicit field name matches first
+        if (fieldPriority[key] !== undefined) {
+            return fieldPriority[key];
+        }
+        
+        // Check if it's a URL and detect media type
+        if (typeof value === 'string' && value.match(/^https?:\/\//)) {
+            const layerName = layerConfig ? layerConfig.name : null;
+            const mediaType = detectURLMediaType(value, layerName);
+            
+            switch (mediaType) {
+                case 'pdf': return 3;
+                case '360': return 4;
+                case 'video': return 5;
+                case 'image': return 6;
+                case 'audio': return 7;
+                default: return 50;
+            }
+        }
+        
+        // Check field name patterns
+        const keyLower = key.toLowerCase();
+        if (keyLower.includes('lat')) return 1;
+        if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
+        if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
+        if (keyLower.includes('360') || keyLower.includes('panorama') || keyLower.includes('pano')) return 4;
+        if (keyLower.includes('video')) return 5;
+        if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
+        if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
+        
+        return fieldPriority.default;
+    };
+    
+    // Sort fields by priority
+    const sortedFields = fieldsToShow.slice().sort((a, b) => {
+        const priorityA = getFieldPriority(a, fields[a]);
+        const priorityB = getFieldPriority(b, fields[b]);
+        
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+        
+        // If same priority, sort alphabetically
+        return a.localeCompare(b);
+    });
+    
+    // Render fields in professional order
+    sortedFields.forEach(key => {
         let value = fields[key];
         
         // Skip empty fields if not showing them
@@ -778,29 +859,63 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
+        // Get field priority for styling
+        const priority = getFieldPriority(key, value);
+        const isLocationField = priority <= 2;
+        const isMediaField = priority >= 3 && priority <= 7;
+        
         // Format value with enhanced media detection
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
         
-        // Check if this is a media field for enhanced styling
-        const layerName = layerConfig ? layerConfig.name : null;
-        const isMediaField = typeof value === 'string' && value.match(/^https?:\/\//) && detectURLMediaType(value, layerName);
-        const fieldClass = isMediaField ? 'popup-field media-popup-field' : 'popup-field';
+        // Determine field styling class
+        let fieldClass = 'popup-field';
+        if (isLocationField) {
+            fieldClass += ' location-field';
+        } else if (isMediaField) {
+            fieldClass += ' media-popup-field';
+        }
         
-        content += `<div class="${fieldClass}" data-field="${key}">`;
-        content += `<div class="field-label mb-1"><strong>${permissionIndicator}${fieldIcon}${key}:</strong></div>`;
-        content += `<div class="field-value">${formattedValue}</div>`;
+        // Add priority indicator for professional styling
+        const priorityClass = isLocationField ? 'priority-high' : isMediaField ? 'priority-media' : 'priority-normal';
+        
+        content += `<div class="${fieldClass} ${priorityClass}" data-field="${key}" data-priority="${priority}">`;
+        
+        // Enhanced label with better formatting
+        let labelText = key;
+        if (isLocationField) {
+            labelText = `📍 ${key}`;
+        } else if (isMediaField) {
+            const mediaType = detectURLMediaType(value, layerConfig?.name);
+            switch (mediaType) {
+                case 'pdf': labelText = `📄 ${key}`; break;
+                case '360': labelText = `🌐 ${key}`; break;
+                case 'video': labelText = `🎥 ${key}`; break;
+                case 'image': labelText = `🖼️ ${key}`; break;
+                case 'audio': labelText = `🎵 ${key}`; break;
+                default: labelText = `🔗 ${key}`;
+            }
+        }
+        
+        content += `<div class="field-label mb-1">
+                      <strong class="field-title">${permissionIndicator}${fieldIcon}${labelText}</strong>
+                    </div>`;
+        
+        content += `<div class="field-value ${isLocationField ? 'location-value' : isMediaField ? 'media-value' : 'standard-value'}">${formattedValue}</div>`;
         
         if (showCopyButtons && !isMediaField) {
-            content += `<button class="btn btn-xs btn-outline-secondary mt-1" onclick="copyToClipboard('${value?.replace(/'/g, "\\'")}')" title="Copy">
+            content += `<button class="btn btn-xs btn-outline-secondary mt-1 copy-btn" onclick="copyToClipboard('${value?.replace(/'/g, "\\'")}')" title="Copy ${key}">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div>`;
     });
     
-    if (fieldsToShow.length === 0) {
-        content += `<div class="text-muted text-center py-2"><em>No accessible fields to display</em></div>`;
+    if (sortedFields.length === 0) {
+        content += `<div class="text-muted text-center py-3">
+                      <i class="fas fa-info-circle fa-2x mb-2"></i>
+                      <p><em>No accessible fields to display</em></p>
+                    </div>`;
     }
     
     content += '</div>';
