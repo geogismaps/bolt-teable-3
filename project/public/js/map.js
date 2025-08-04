@@ -723,24 +723,29 @@ function createFeaturePopup(fields, layerConfig) {
     const selectedFields = layerConfig.properties?.popup?.fields;
     let fieldsToShow = [];
     
-    // Check if popup fields have been specifically configured and the configuration has been applied
-    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0 && layerConfig.properties?.popup?.configured) {
+    // PRIORITY 1: If user has specifically selected fields in iTool configuration, use ONLY those
+    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0) {
         // Only show the specifically selected fields that user has permission to see
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
             permittedFields.includes(field) &&
             fields.hasOwnProperty(field)
         );
-        console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} permitted selected fields:`, fieldsToShow);
+        console.log(`🎯 iTool configured: showing ONLY ${fieldsToShow.length} user-selected fields:`, fieldsToShow);
         
-        // If no valid fields after filtering, show a message
+        // Important: Show message if no fields match selection
         if (fieldsToShow.length === 0 && selectedFields.length > 0) {
-            console.log(`All selected fields were filtered out due to permissions or missing data`);
+            content += `<div class="alert alert-warning small">
+                <i class="fas fa-info-circle me-2"></i>
+                No selected fields available to display. Selected: ${selectedFields.join(', ')}
+            </div>`;
+            content += '</div>';
+            return content;
         }
     } else {
-        // If popup fields haven't been configured yet, show all permitted fields
+        // PRIORITY 2: If no specific selection, show all permitted fields (default behavior)
         fieldsToShow = permittedFields;
-        console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} permitted fields`);
+        console.log(`📋 Default: showing all ${fieldsToShow.length} permitted fields (no iTool selection)`);
     }
     
     if (fieldsToShow.length !== allFields.length) {
@@ -772,86 +777,117 @@ function createFeaturePopup(fields, layerConfig) {
 function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-fields professional-popup">';
     
-    // Define professional field order with priority
-    const fieldPriority = {
-        // Location fields (highest priority)
-        'latitude': 1, 'lat': 1, 'Latitude': 1, 'LAT': 1,
-        'longitude': 2, 'lng': 2, 'lon': 2, 'Longitude': 2, 'LON': 2, 'LNG': 2,
-        
-        // Media fields (ordered as requested)
-        'pdf': 3, 'PDF': 3, 'pdf_link': 3, 'pdf_url': 3, 'document': 3,
-        '360': 4, '360_image': 4, '360_degree': 4, 'panorama': 4, 'pano': 4,
-        'video': 5, 'Video': 5, 'video_link': 5, 'video_url': 5,
-        
-        // Other media types
-        'image': 6, 'Image': 6, 'photo': 6, 'picture': 6,
-        'audio': 7, 'Audio': 7, 'sound': 7,
-        
-        // Regular fields get default priority
-        'default': 100
-    };
+    // Check if user has specifically selected fields - if so, respect that order and don't auto-sort by media priority
+    const hasUserSelection = layerConfig?.properties?.popup?.fields && 
+                            Array.isArray(layerConfig.properties.popup.fields) && 
+                            layerConfig.properties.popup.fields.length > 0;
     
-    // Function to get field priority and detect media type
-    const getFieldPriority = (key, value) => {
-        // Check explicit field name matches first
-        if (fieldPriority[key] !== undefined) {
-            return fieldPriority[key];
-        }
-        
-        // Enhanced field name pattern detection for 360°
-        const keyLower = key.toLowerCase();
-        if (keyLower.includes('lat')) return 1;
-        if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
-        if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
-        
-        // Enhanced 360° field detection with more patterns
-        if (keyLower.includes('360') || 
-            keyLower.includes('panorama') || 
-            keyLower.includes('pano') ||
-            keyLower.includes('spherical') ||
-            keyLower.includes('equirectangular') ||
-            keyLower.includes('vr') ||
-            keyLower === '360_url' ||
-            keyLower === '360url') {
-            return 4;
-        }
-        
-        if (keyLower.includes('video')) return 5;
-        if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
-        if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
-        
-        // Check if it's a URL and detect media type
-        if (typeof value === 'string' && value.match(/^https?:\/\//)) {
-            const layerName = layerConfig ? layerConfig.name : null;
-            const mediaType = detectURLMediaType(value, layerName, key);
+    let sortedFields = fieldsToShow.slice();
+    
+    if (hasUserSelection) {
+        // User has made specific field selections - preserve their selection order
+        const selectedFieldsOrder = layerConfig.properties.popup.fields;
+        sortedFields = fieldsToShow.sort((a, b) => {
+            const indexA = selectedFieldsOrder.indexOf(a);
+            const indexB = selectedFieldsOrder.indexOf(b);
             
-            switch (mediaType) {
-                case 'pdf': return 3;
-                case '360': return 4;
-                case 'video': return 5;
-                case 'image': return 6;
-                case 'audio': return 7;
-                default: return 50;
+            // If both fields are in the selection, sort by selection order
+            if (indexA !== -1 && indexB !== -1) {
+                return indexA - indexB;
             }
-        }
+            // If only one field is in selection, prioritize it
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            // If neither is in selection, sort alphabetically
+            return a.localeCompare(b);
+        });
         
-        return fieldPriority.default;
-    };
+        console.log(`📋 Showing fields in user-selected order:`, sortedFields);
+        
+    } else {
+        // No user selection - use automatic priority sorting for media fields
+        const fieldPriority = {
+            // Location fields (highest priority)
+            'latitude': 1, 'lat': 1, 'Latitude': 1, 'LAT': 1,
+            'longitude': 2, 'lng': 2, 'lon': 2, 'Longitude': 2, 'LON': 2, 'LNG': 2,
+            
+            // Media fields (ordered as requested)
+            'pdf': 3, 'PDF': 3, 'pdf_link': 3, 'pdf_url': 3, 'document': 3,
+            '360': 4, '360_image': 4, '360_degree': 4, 'panorama': 4, 'pano': 4,
+            'video': 5, 'Video': 5, 'video_link': 5, 'video_url': 5,
+            
+            // Other media types
+            'image': 6, 'Image': 6, 'photo': 6, 'picture': 6,
+            'audio': 7, 'Audio': 7, 'sound': 7,
+            
+            // Regular fields get default priority
+            'default': 100
+        };
+        
+        // Function to get field priority and detect media type
+        const getFieldPriority = (key, value) => {
+            // Check explicit field name matches first
+            if (fieldPriority[key] !== undefined) {
+                return fieldPriority[key];
+            }
+            
+            // Enhanced field name pattern detection for 360°
+            const keyLower = key.toLowerCase();
+            if (keyLower.includes('lat')) return 1;
+            if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
+            if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
+            
+            // Enhanced 360° field detection with more patterns
+            if (keyLower.includes('360') || 
+                keyLower.includes('panorama') || 
+                keyLower.includes('pano') ||
+                keyLower.includes('spherical') ||
+                keyLower.includes('equirectangular') ||
+                keyLower.includes('vr') ||
+                keyLower === '360_url' ||
+                keyLower === '360url') {
+                return 4;
+            }
+            
+            if (keyLower.includes('video')) return 5;
+            if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
+            if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
+            
+            // Check if it's a URL and detect media type
+            if (typeof value === 'string' && value.match(/^https?:\/\//)) {
+                const layerName = layerConfig ? layerConfig.name : null;
+                const mediaType = detectURLMediaType(value, layerName, key);
+                
+                switch (mediaType) {
+                    case 'pdf': return 3;
+                    case '360': return 4;
+                    case 'video': return 5;
+                    case 'image': return 6;
+                    case 'audio': return 7;
+                    default: return 50;
+                }
+            }
+            
+            return fieldPriority.default;
+        };
+        
+        // Sort fields by priority only when no user selection exists
+        sortedFields = fieldsToShow.slice().sort((a, b) => {
+            const priorityA = getFieldPriority(a, fields[a]);
+            const priorityB = getFieldPriority(b, fields[b]);
+            
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
+            }
+            
+            // If same priority, sort alphabetically
+            return a.localeCompare(b);
+        });
+        
+        console.log(`📊 Showing fields in automatic priority order:`, sortedFields);
+    }
     
-    // Sort fields by priority
-    const sortedFields = fieldsToShow.slice().sort((a, b) => {
-        const priorityA = getFieldPriority(a, fields[a]);
-        const priorityB = getFieldPriority(b, fields[b]);
-        
-        if (priorityA !== priorityB) {
-            return priorityA - priorityB;
-        }
-        
-        // If same priority, sort alphabetically
-        return a.localeCompare(b);
-    });
-    
-    // Render fields in professional order
+    // Render fields in determined order (user selection or automatic priority)
     sortedFields.forEach(key => {
         let value = fields[key];
         
@@ -864,12 +900,13 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
         
-        // Get field priority for styling
-        const priority = getFieldPriority(key, value);
-        const isLocationField = priority <= 2;
-        const isMediaField = priority >= 3 && priority <= 7;
+        // Detect if this is a media field (but don't auto-prioritize when user has made selections)
+        const mediaType = detectURLMediaType(value, layerConfig?.name, key);
+        const isMediaField = !!mediaType;
+        const isLocationField = ['latitude', 'lat', 'longitude', 'lng', 'lon'].some(locField => 
+            key.toLowerCase().includes(locField.toLowerCase()));
         
-        // Format value with enhanced media detection
+        // Format value appropriately
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
@@ -880,19 +917,21 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
             fieldClass += ' location-field';
         } else if (isMediaField) {
             fieldClass += ' media-popup-field';
+        } else {
+            fieldClass += ' data-field'; // Regular data field
         }
         
-        // Add priority indicator for professional styling
-        const priorityClass = isLocationField ? 'priority-high' : isMediaField ? 'priority-media' : 'priority-normal';
+        // Priority class for styling (but don't use for sorting when user has selected fields)
+        const priorityClass = isLocationField ? 'priority-high' : 
+                            isMediaField ? 'priority-media' : 'priority-normal';
         
-        content += `<div class="${fieldClass} ${priorityClass}" data-field="${key}" data-priority="${priority}">`;
+        content += `<div class="${fieldClass} ${priorityClass}" data-field="${key}">`;
         
         // Enhanced label with better formatting
         let labelText = key;
         if (isLocationField) {
             labelText = `📍 ${key}`;
         } else if (isMediaField) {
-            const mediaType = detectURLMediaType(value, layerConfig?.name, key);
             switch (mediaType) {
                 case 'pdf': labelText = `📄 ${key}`; break;
                 case '360': labelText = `🌐 ${key}`; break;
@@ -901,13 +940,25 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
                 case 'audio': labelText = `🎵 ${key}`; break;
                 default: labelText = `🔗 ${key}`;
             }
+        } else {
+            // Regular data field - show icon based on field type
+            const dataIcons = {
+                'Name': '🏷️', 'name': '🏷️',
+                'Width': '📏', 'width': '📏',
+                'Height': '📐', 'height': '📐', 
+                'Dimension': '📐', 'dimension': '📐',
+                'Area': '📐', 'area': '📐', 'Area_in_sq': '📐',
+                'Status': '📊', 'status': '📊'
+            };
+            const icon = dataIcons[key] || '📝';
+            labelText = `${icon} ${key}`;
         }
         
         content += `<div class="field-label mb-1">
                       <strong class="field-title">${permissionIndicator}${fieldIcon}${labelText}</strong>
                     </div>`;
         
-        content += `<div class="field-value ${isLocationField ? 'location-value' : isMediaField ? 'media-value' : 'standard-value'}">${formattedValue}</div>`;
+        content += `<div class="field-value ${isLocationField ? 'location-value' : isMediaField ? 'media-value' : 'data-value'}">${formattedValue}</div>`;
         
         if (showCopyButtons && !isMediaField) {
             content += `<button class="btn btn-xs btn-outline-secondary mt-1 copy-btn" onclick="copyToClipboard('${value?.replace(/'/g, "\\'")}')" title="Copy ${key}">
@@ -4447,10 +4498,14 @@ function applyProperties() {
     layer.properties.popup.fields = selectedPopupFields;
     layer.properties.popup.configured = true; // Always mark as configured after clicking Apply
     
-    console.log(`Applying popup configuration for layer "${layer.name}"`);
-    console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
-    console.log(`Total selected fields: ${selectedPopupFields.length}`);
-    console.log(`Configuration marked as applied: ${layer.properties.popup.configured}`);
+    console.log(`🎯 Applying iTool popup configuration for layer "${layer.name}"`);
+    console.log(`📋 Selected popup fields (${selectedPopupFields.length}): ${selectedPopupFields.join(', ') || 'NONE SELECTED'}`);
+    console.log(`✅ Configuration marked as applied: ${layer.properties.popup.configured}`);
+    
+    // Force immediate update of field configuration in the layer properties
+    if (selectedPopupFields.length === 0) {
+        console.log(`⚠️ No fields selected - popups will show "No fields to display" message`);
+    }
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
