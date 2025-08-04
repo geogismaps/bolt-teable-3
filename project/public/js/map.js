@@ -3077,20 +3077,35 @@ function detectURLMediaType(url, layerName = null, fieldName = null) {
     
     // Enhanced 360 image detection - check field name first (highest priority)
     if (fieldName) {
-        const fieldLower = fieldName.toLowerCase();
+        const fieldLower = fieldName.toLowerCase().trim();
+        const fieldNoSpaces = fieldLower.replace(/[\s_-]+/g, '');
         
-        // Check for various 360° field name patterns
-        if (fieldLower === '360' ||
-            fieldLower === '360 url' ||
-            fieldLower === '360url' ||
-            fieldLower === '360_url' ||
-            fieldLower.includes('360') || 
-            fieldLower.includes('panorama') || 
-            fieldLower.includes('pano') ||
-            fieldLower.includes('equirectangular') ||
-            fieldLower.includes('spherical') ||
-            fieldLower.includes('vr')) {
-            console.log(`Field "${fieldName}" detected as 360° based on field name pattern`);
+        // Comprehensive 360° field name patterns
+        const patterns360 = [
+            '360', '360url', '360image', '360photo', '360pic', '360view',
+            'panorama', 'panoramaurl', 'panoramicimage', 'panoramicphoto',
+            'pano', 'panourl', 'panoimage', 'panophoto',
+            'equirectangular', 'spherical', 'sphericalimage',
+            'vr', 'vrimage', 'virtualreality',
+            '360degree', '360degrees', 'threesixty'
+        ];
+        
+        // Check exact matches and contains patterns
+        const isMatch360 = patterns360.some(pattern => 
+            fieldLower === pattern || 
+            fieldNoSpaces === pattern ||
+            fieldLower.includes(pattern) ||
+            fieldNoSpaces.includes(pattern)
+        );
+        
+        if (isMatch360) {
+            console.log(`✅ Field "${fieldName}" detected as 360° based on field name pattern`);
+            return '360';
+        }
+        
+        // Special handling for common variations
+        if (fieldLower.match(/^360[\s_-]*(url|link|image|photo|pic|view)$/)) {
+            console.log(`✅ Field "${fieldName}" detected as 360° (variation pattern)`);
             return '360';
         }
     }
@@ -3337,100 +3352,167 @@ function open360ImageModal(url, title = '') {
 
 function initializePannellumViewer(url) {
     try {
+        console.log('🌐 Initializing Pannellum 360° viewer with URL:', url);
+        
         // Destroy existing viewer if it exists
         if (window.pannellumViewer) {
             try {
                 window.pannellumViewer.destroy();
+                console.log('Previous viewer destroyed');
             } catch (e) {
                 console.log('Previous viewer cleanup:', e.message);
             }
             window.pannellumViewer = null;
         }
         
-        // Clear the container first
+        // Get the container
         const container = document.getElementById('panorama360');
         if (!container) {
             throw new Error('Panorama container not found');
         }
         
+        // Clear the container and set proper dimensions
         container.innerHTML = '';
+        container.style.width = '100%';
+        container.style.height = '500px';
+        container.style.position = 'relative';
+        container.style.overflow = 'hidden';
         
-        console.log('Initializing Pannellum 360° viewer with URL:', url);
-        
-        // Check if Pannellum is available
+        // Check if Pannellum is available - if not, load it
         if (typeof pannellum === 'undefined') {
-            throw new Error('Pannellum library not loaded');
+            console.log('Pannellum library not found, loading...');
+            loadPannellumLibrary(url);
+            return;
         }
         
-        // Create Pannellum viewer
-        window.pannellumViewer = pannellum.viewer('panorama360', {
-            "type": "equirectangular",
-            "panorama": url,
-            "autoLoad": true,
-            "autoRotate": -2, // Slow auto-rotation
-            "showZoomCtrl": true,
-            "showFullscreenCtrl": true,
-            "showControls": true,
-            "keyboardZoom": true,
-            "mouseZoom": true,
-            "draggable": true,
-            "disableKeyboardCtrl": false,
-            "showZoomCtrl": true,
-            "compass": true,
-            "northOffset": 0,
-            "preview": url,
-            "previewTitle": "360° Panoramic View",
-            "previewAuthor": "GIS System",
-            "hfov": 100, // Horizontal field of view
-            "pitch": 0, // Initial pitch
-            "yaw": 0, // Initial yaw
-            "minHfov": 50,
-            "maxHfov": 120,
-            "minPitch": -90,
-            "maxPitch": 90,
-            "haov": 360, // Horizontal angle of view (full 360°)
-            "vaov": 180, // Vertical angle of view (full 180°)
-            "backgroundColor": [0, 0, 0],
-            "hotSpots": [], // Can add hot spots later if needed
-            "strings": {
-                "loadButtonLabel": "Click to Load 360° View",
-                "loadingLabel": "Loading 360° Image...",
-                "bylineLabel": "360° Panoramic Image",
-                "noPanoramaError": "No 360° panorama image was specified.",
-                "fileAccessError": "The file %s could not be accessed.",
-                "malformedURLError": "The panorama URL is malformed.",
-                "iOS8WebGLError": "WebGL is not supported in iOS 8.",
-                "genericWebGLError": "WebGL is not supported.",
-                "textureSizeError": "The panorama is too large for your device/browser. It's %spx wide, but your device/browser only supports images up to %spx wide. Try another device/browser or use a smaller image."
-            }
-        });
+        // Show loading indicator
+        container.innerHTML = `
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                background: #000;
+                color: white;
+                font-family: Arial, sans-serif;
+            ">
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">🌐</div>
+                    <div>Loading 360° Panorama...</div>
+                    <div style="margin-top: 10px; font-size: 12px; opacity: 0.7;">Please wait</div>
+                </div>
+            </div>
+        `;
         
-        // Add event listeners for better user experience
-        window.pannellumViewer.on('load', function() {
-            console.log('✅ 360° panorama loaded successfully');
-            showSuccess('360° panoramic view loaded! Use mouse to explore, scroll to zoom, click fullscreen for immersive experience.');
-        });
-        
-        window.pannellumViewer.on('error', function(err) {
-            console.error('Pannellum error:', err);
-            displayPannellumError(url, err.message || 'Unknown error loading panorama');
-        });
-        
-        window.pannellumViewer.on('animatefinished', function() {
-            console.log('360° animation finished');
-        });
-        
-        // Add custom controls overlay
+        // Small delay to ensure container is ready
         setTimeout(() => {
-            addCustomPanoramaControls();
-        }, 1000);
-        
-        console.log('✅ Pannellum 360° viewer initialized successfully');
+            try {
+                // Create Pannellum viewer with robust configuration
+                window.pannellumViewer = pannellum.viewer('panorama360', {
+                    "type": "equirectangular",
+                    "panorama": url,
+                    "autoLoad": true,
+                    "autoRotate": 0, // Disable auto-rotate initially
+                    "showZoomCtrl": true,
+                    "showFullscreenCtrl": true,
+                    "showControls": true,
+                    "keyboardZoom": true,
+                    "mouseZoom": true,
+                    "draggable": true,
+                    "disableKeyboardCtrl": false,
+                    "compass": true,
+                    "northOffset": 0,
+                    "hfov": 90, // Initial horizontal field of view
+                    "pitch": 0, // Initial pitch (up/down)
+                    "yaw": 0, // Initial yaw (left/right)
+                    "minHfov": 30,
+                    "maxHfov": 120,
+                    "minPitch": -85,
+                    "maxPitch": 85,
+                    "backgroundColor": [0, 0, 0],
+                    "crossOrigin": "anonymous",
+                    "orientationOnByDefault": false,
+                    "showControlsOnLoad": true,
+                    "strings": {
+                        "loadButtonLabel": "🌐 Click to Load 360° View",
+                        "loadingLabel": "Loading 360° Image...",
+                        "bylineLabel": "360° Panoramic Image",
+                        "noPanoramaError": "No 360° panorama image was specified.",
+                        "fileAccessError": "The file %s could not be accessed.",
+                        "malformedURLError": "The panorama URL is malformed.",
+                        "iOS8WebGLError": "WebGL is not supported in iOS 8.",
+                        "genericWebGLError": "WebGL is not supported.",
+                        "textureSizeError": "The panorama is too large for your device/browser."
+                    }
+                });
+                
+                // Add comprehensive event listeners
+                window.pannellumViewer.on('load', function() {
+                    console.log('✅ 360° panorama loaded successfully');
+                    showSuccess('360° panoramic view loaded! Drag to explore, scroll to zoom.');
+                    
+                    // Add custom controls after successful load
+                    setTimeout(() => {
+                        addCustomPanoramaControls();
+                    }, 500);
+                });
+                
+                window.pannellumViewer.on('error', function(err) {
+                    console.error('❌ Pannellum viewer error:', err);
+                    displayPannellumError(url, err.message || 'Failed to load 360° image');
+                });
+                
+                window.pannellumViewer.on('errorcleared', function() {
+                    console.log('Pannellum error cleared');
+                });
+                
+                window.pannellumViewer.on('animatefinished', function() {
+                    console.log('360° animation finished');
+                });
+                
+                window.pannellumViewer.on('zoomchange', function() {
+                    // Optional: handle zoom changes
+                });
+                
+                console.log('✅ Pannellum 360° viewer configuration completed');
+                
+            } catch (viewerError) {
+                console.error('❌ Error creating Pannellum viewer:', viewerError);
+                displayPannellumError(url, 'Failed to initialize 360° viewer: ' + viewerError.message);
+            }
+        }, 100);
         
     } catch (error) {
-        console.error('Error initializing Pannellum 360° viewer:', error);
+        console.error('❌ Error in Pannellum initialization:', error);
         displayPannellumError(url, error.message);
     }
+}
+
+// Function to dynamically load Pannellum library if not available
+function loadPannellumLibrary(url) {
+    console.log('Loading Pannellum library dynamically...');
+    
+    // Load CSS first
+    const cssLink = document.createElement('link');
+    cssLink.rel = 'stylesheet';
+    cssLink.href = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css';
+    document.head.appendChild(cssLink);
+    
+    // Load JavaScript
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js';
+    script.onload = function() {
+        console.log('✅ Pannellum library loaded successfully');
+        // Retry initialization
+        setTimeout(() => {
+            initializePannellumViewer(url);
+        }, 200);
+    };
+    script.onerror = function() {
+        console.error('❌ Failed to load Pannellum library');
+        displayPannellumError(url, 'Failed to load 360° viewer library');
+    };
+    document.head.appendChild(script);
 }
 
 // Add custom controls for Pannellum viewer
@@ -3712,30 +3794,124 @@ function displayPannellumError(url, error) {
     const container = document.getElementById('panorama360');
     if (container) {
         container.innerHTML = `
-            <div class="alert alert-warning text-center p-4" style="margin: 20px;">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <h5>360° Viewer Error</h5>
-                <p>Could not load the 360° panoramic image.</p>
-                <p class="small text-muted">Error: ${error}</p>
-                <div class="mt-3">
-                    <a href="${url}" target="_blank" class="btn btn-primary me-2">
-                        <i class="fas fa-external-link-alt me-1"></i>View Image Directly
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                text-align: center;
+                border-radius: 8px;
+                margin: 20px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            ">
+                <div style="font-size: 48px; margin-bottom: 15px;">🌐</div>
+                <h5 style="margin-bottom: 15px; color: #fff;">360° Viewer Issue</h5>
+                <p style="margin-bottom: 10px; opacity: 0.9;">Could not load the 360° panoramic image.</p>
+                <p style="font-size: 12px; opacity: 0.7; margin-bottom: 20px;">Error: ${error}</p>
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <a href="${url}" target="_blank" style="
+                        background: #4CAF50;
+                        color: white;
+                        padding: 10px 20px;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                    ">
+                        🔗 View Image Directly
                     </a>
-                    <button class="btn btn-outline-secondary" onclick="retry360Init('${url}')">
-                        <i class="fas fa-redo me-1"></i>Retry
+                    <button onclick="retry360Init('${url}')" style="
+                        background: #2196F3;
+                        color: white;
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                    ">
+                        🔄 Retry Viewer
                     </button>
+                    <button onclick="viewAs2DImage('${url}')" style="
+                        background: #FF9800;
+                        color: white;
+                        padding: 10px 20px;
+                        border: none;
+                        border-radius: 5px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                    ">
+                        🖼️ View as 2D Image
+                    </button>
+                </div>
+                <div style="margin-top: 15px; font-size: 11px; opacity: 0.6;">
+                    Tip: Ensure the image is in equirectangular format for 360° viewing
                 </div>
             </div>
         `;
     }
-    showError('Failed to load 360° image viewer: ' + error);
+    console.error('360° Viewer Error:', error);
 }
 
 function retry360Init(url) {
-    console.log('Retrying 360° viewer initialization...');
+    console.log('🔄 Retrying 360° viewer initialization...');
+    
+    // Clear any existing viewer
+    if (window.pannellumViewer) {
+        try {
+            window.pannellumViewer.destroy();
+        } catch (e) {
+            console.log('Cleanup during retry:', e.message);
+        }
+        window.pannellumViewer = null;
+    }
+    
+    // Show loading state
+    const container = document.getElementById('panorama360');
+    if (container) {
+        container.innerHTML = `
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                background: #000;
+                color: white;
+            ">
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
+                    <div>Retrying 360° Viewer...</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Retry after a short delay
     setTimeout(() => {
         initializePannellumViewer(url);
-    }, 100);
+    }, 500);
+}
+
+// Fallback function to view 360° image as regular 2D image
+function viewAs2DImage(url) {
+    console.log('📸 Falling back to 2D image view for:', url);
+    
+    // Close the 360° modal
+    const modal360 = bootstrap.Modal.getInstance(document.getElementById('image360Modal'));
+    if (modal360) {
+        modal360.hide();
+    }
+    
+    // Open as regular image
+    setTimeout(() => {
+        openImageModal(url, '360° Image (2D View)');
+    }, 300);
 }
 
 // PDF loading function
