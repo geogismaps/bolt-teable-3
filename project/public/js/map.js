@@ -321,6 +321,7 @@ async function loadTableFields() {
     const tableId = document.getElementById('newLayerTable').value;
     const geometrySelector = document.getElementById('newLayerGeometry');
     const linkedTablesInfo = document.getElementById('linkedTablesInfo');
+    const layerNameInput = document.getElementById('newLayerName');
 
     if (!tableId) {
         if (geometrySelector) {
@@ -329,7 +330,25 @@ async function loadTableFields() {
 	if(linkedTablesInfo) {
 	    linkedTablesInfo.innerHTML = 'Select a table to see linked information';
 	}
+        if (layerNameInput) {
+            layerNameInput.value = '';
+        }
         return;
+    }
+
+    // Auto-populate layer name with table name
+    if (layerNameInput) {
+        try {
+            const tablesData = await window.teableAPI.getTables();
+            const tables = tablesData.tables || tablesData || [];
+            const selectedTable = tables.find(t => t.id === tableId);
+            if (selectedTable) {
+                layerNameInput.value = selectedTable.name;
+                console.log(`Auto-populated layer name: ${selectedTable.name}`);
+            }
+        } catch (error) {
+            console.error('Error getting table name for auto-population:', error);
+        }
     }
 
     try {
@@ -413,12 +432,29 @@ async function addNewLayer() {
 async function addLayerFromTable() {
     try {
         const tableId = document.getElementById('newLayerTable').value;
-        const layerName = document.getElementById('newLayerName').value.trim();
+        let layerName = document.getElementById('newLayerName').value.trim();
         const layerColor = document.getElementById('newLayerColor').value;
         const geometryField = document.getElementById('newLayerGeometry').value;
 
-        if (!tableId || !layerName) {
-            throw new Error('Please select a table and enter a layer name');
+        if (!tableId) {
+            throw new Error('Please select a table');
+        }
+
+        // If layer name is empty, use table name as fallback
+        if (!layerName) {
+            try {
+                const tablesData = await window.teableAPI.getTables();
+                const tables = tablesData.tables || tablesData || [];
+                const selectedTable = tables.find(t => t.id === tableId);
+                if (selectedTable) {
+                    layerName = selectedTable.name;
+                    console.log(`Using table name as layer name: ${layerName}`);
+                } else {
+                    throw new Error('Could not determine layer name from table');
+                }
+            } catch (nameError) {
+                throw new Error('Please enter a layer name or ensure table information is available');
+            }
         }
 
         // Get table data
