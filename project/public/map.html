@@ -194,8 +194,22 @@
 
         /* Layer Properties Modal Styles */
         .properties-modal {
-            max-width: 90vw;
-            max-height: 90vh;
+            max-width: 85vw;
+            max-height: 85vh;
+            margin: 2vh auto;
+        }
+
+        .properties-modal .modal-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties-modal .modal-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .properties-tabs {
@@ -223,8 +237,9 @@
 
         .tab-content {
             padding: 20px;
-            max-height: 60vh;
+            flex: 1;
             overflow-y: auto;
+            max-height: calc(85vh - 200px);
         }
 
         .symbology-controls {
@@ -1047,7 +1062,7 @@
 
     <!-- Layer Properties Modal -->
     <div class="modal fade" id="layerPropertiesModal" tabindex="-1">
-        <div class="modal-dialog modal-xl properties-modal">
+        <div class="modal-dialog modal-xl properties-modal modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
