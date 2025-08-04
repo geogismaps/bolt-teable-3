@@ -723,8 +723,8 @@ function createFeaturePopup(fields, layerConfig) {
     const selectedFields = layerConfig.properties?.popup?.fields;
     let fieldsToShow = [];
     
-    // Check if popup fields have been specifically configured
-    if (selectedFields && Array.isArray(selectedFields)) {
+    // Check if popup fields have been specifically configured and the configuration has been applied
+    if (selectedFields && Array.isArray(selectedFields) && selectedFields.length > 0 && layerConfig.properties?.popup?.configured) {
         // Only show the specifically selected fields that user has permission to see
         fieldsToShow = selectedFields.filter(field => 
             field !== layerConfig.geometryField && 
@@ -732,6 +732,11 @@ function createFeaturePopup(fields, layerConfig) {
             fields.hasOwnProperty(field)
         );
         console.log(`Popup configured for layer "${layerConfig.name}": showing ${fieldsToShow.length} permitted selected fields:`, fieldsToShow);
+        
+        // If no valid fields after filtering, show a message
+        if (fieldsToShow.length === 0 && selectedFields.length > 0) {
+            console.log(`All selected fields were filtered out due to permissions or missing data`);
+        }
     } else {
         // If popup fields haven't been configured yet, show all permitted fields
         fieldsToShow = permittedFields;
@@ -4430,7 +4435,7 @@ function applyProperties() {
     // Apply all popup settings
     updateLayerPopupSettings(layer);
     
-    // Collect selected popup fields from checkboxes
+    // Collect selected popup fields from checkboxes - ALWAYS collect them, even if none selected
     const selectedPopupFields = [];
     const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
     popupCheckboxes.forEach(checkbox => {
@@ -4440,11 +4445,12 @@ function applyProperties() {
     
     // Update popup fields in layer properties and mark as configured
     layer.properties.popup.fields = selectedPopupFields;
-    layer.properties.popup.configured = true;
+    layer.properties.popup.configured = true; // Always mark as configured after clicking Apply
     
     console.log(`Applying popup configuration for layer "${layer.name}"`);
     console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
     console.log(`Total selected fields: ${selectedPopupFields.length}`);
+    console.log(`Configuration marked as applied: ${layer.properties.popup.configured}`);
 
     // Update the actual layer reference in mapLayers array
     const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
