@@ -3133,15 +3133,23 @@ function detectURLMediaType(url, layerName = null, fieldName = null) {
     
     // Enhanced 360 image detection - check field name first (highest priority)
     if (fieldName) {
-        const fieldLower = fieldName.toLowerCase().replace(/\s+/g, ''); // Remove spaces for comparison
+        const fieldLower = fieldName.toLowerCase();
+        const fieldNoSpaces = fieldLower.replace(/\s+/g, ''); // Remove spaces for comparison
+        const fieldWithUnderscores = fieldLower.replace(/\s+/g, '_'); // Replace spaces with underscores
+        
+        // Check various 360 field name patterns
         if (fieldLower.includes('360') || 
+            fieldNoSpaces.includes('360') ||
+            fieldWithUnderscores.includes('360') ||
             fieldLower.includes('panorama') || 
             fieldLower.includes('pano') ||
             fieldLower.includes('equirectangular') ||
             fieldLower.includes('spherical') ||
             fieldLower.includes('vr') ||
+            fieldLower === '360 url' ||
             fieldLower === '360url' ||
-            fieldName.toLowerCase() === '360 url') {
+            fieldNoSpaces === '360url' ||
+            fieldWithUnderscores === '360_url') {
             console.log(`Field "${fieldName}" detected as 360° based on field name pattern`);
             return '360';
         }
