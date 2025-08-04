@@ -788,10 +788,15 @@ body {
 
 .media-view-btn {
     font-size: 0.75rem;
-    padding: 2px 8px;
+    padding: 4px 12px;
     border-radius: 4px;
     white-space: nowrap;
     transition: all 0.2s ease;
+    cursor: pointer;
+    border: 1px solid #0d6efd;
+    background-color: white;
+    color: #0d6efd;
+    font-weight: 500;
 }
 
 .media-view-btn:hover {
@@ -799,7 +804,12 @@ body {
     border-color: #0d6efd;
     color: white;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+}
+
+.media-view-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(13, 110, 253, 0.3);
 }
 
 .media-field-container .text-muted {
