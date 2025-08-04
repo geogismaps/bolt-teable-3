@@ -3077,15 +3077,19 @@ function detectURLMediaType(url, layerName = null, fieldName = null) {
     
     // Enhanced 360 image detection - check field name first (highest priority)
     if (fieldName) {
-        const fieldLower = fieldName.toLowerCase().replace(/\s+/g, ''); // Remove spaces for comparison
-        if (fieldLower.includes('360') || 
+        const fieldLower = fieldName.toLowerCase();
+        
+        // Check for various 360° field name patterns
+        if (fieldLower === '360' ||
+            fieldLower === '360 url' ||
+            fieldLower === '360url' ||
+            fieldLower === '360_url' ||
+            fieldLower.includes('360') || 
             fieldLower.includes('panorama') || 
             fieldLower.includes('pano') ||
             fieldLower.includes('equirectangular') ||
             fieldLower.includes('spherical') ||
-            fieldLower.includes('vr') ||
-            fieldLower === '360url' ||
-            fieldName.toLowerCase() === '360 url') {
+            fieldLower.includes('vr')) {
             console.log(`Field "${fieldName}" detected as 360° based on field name pattern`);
             return '360';
         }
@@ -6526,6 +6530,37 @@ window.testCustomTiles = async function() {
     } else {
         showWarning('Custom drone imagery tiles are not available or accessible for this customer.');
     }
+};
+
+// Debug function to test 360° functionality
+window.test360Functionality = function() {
+    console.log('🧪 Testing 360° functionality...');
+    
+    // Test field detection
+    const testCases = [
+        { field: '360', expected: '360' },
+        { field: '360 url', expected: '360' },
+        { field: '360_url', expected: '360' },
+        { field: 'panorama', expected: '360' },
+        { field: 'video_url', expected: null },
+        { field: 'image_url', expected: null }
+    ];
+    
+    testCases.forEach(test => {
+        const result = detectURLMediaType('https://example.com/test.jpg', null, test.field);
+        const status = result === test.expected ? '✅' : '❌';
+        console.log(`${status} Field "${test.field}" → Expected: ${test.expected}, Got: ${result}`);
+    });
+    
+    // Check if Pannellum is loaded
+    const pannellumStatus = typeof pannellum !== 'undefined' ? '✅ Loaded' : '❌ Not loaded';
+    console.log(`Pannellum library: ${pannellumStatus}`);
+    
+    // Check if 360° modal exists
+    const modalExists = document.getElementById('image360Modal') ? '✅ Found' : '❌ Missing';
+    console.log(`360° Modal: ${modalExists}`);
+    
+    showInfo('360° functionality test completed. Check console for detailed results.');
 };
 
 // Media modal utility functions
