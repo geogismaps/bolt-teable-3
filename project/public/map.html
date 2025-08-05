@@ -890,15 +890,34 @@
                                 <div class="mb-3">
                                     <h6 class="small text-muted mb-2">MEASUREMENT TOOLS</h6>
                                     <div class="d-grid gap-2">
-                                        <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
+                                        <button class="btn btn-outline-primary btn-sm measurement-btn" onclick="startMeasurement('distance')">
                                             <i class="fas fa-ruler me-1"></i>Distance
                                         </button>
-                                        <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
+                                        <button class="btn btn-outline-success btn-sm measurement-btn" onclick="startMeasurement('area')">
                                             <i class="fas fa-vector-square me-1"></i>Area
                                         </button>
                                         <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
                                             <i class="fas fa-trash me-1"></i>Clear
                                         </button>
+                                    </div>
+                                    
+                                    <!-- Distance Unit Selector -->
+                                    <div id="distanceUnitSelector" class="mt-2" style="display: none;">
+                                        <label class="form-label small text-muted">Distance Unit:</label>
+                                        <div class="btn-group w-100" role="group">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm unit-btn active" onclick="changeDistanceUnit('m')">
+                                                <i class="fas fa-ruler-horizontal me-1"></i>m
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm unit-btn" onclick="changeDistanceUnit('km')">
+                                                <i class="fas fa-road me-1"></i>km
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm unit-btn" onclick="changeDistanceUnit('ft')">
+                                                <i class="fas fa-ruler me-1"></i>ft
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">
+                                            <span id="unitDescription">Meters - Standard metric unit</span>
+                                        </small>
                                     </div>
                                 </div>
 

@@ -49,29 +49,29 @@ function getCustomerContext() {
     // Detect customer context from current URL or configuration
     const hostname = window.location.hostname;
     const pathname = window.location.pathname;
-    
+
     // Try to extract customer ID from various sources
     let customerId = null;
-    
+
     // Method 1: Check for customer subdirectory in path
     const pathMatch = pathname.match(/\/customer(\d+)\//);
     if (pathMatch) {
         customerId = pathMatch[1];
     }
-    
+
     // Method 2: Check for customer subdomain
     const subdomainMatch = hostname.match(/^customer(\d+)\./);
     if (subdomainMatch) {
         customerId = subdomainMatch[1];
     }
-    
+
     // Method 3: Check localStorage or configuration
     if (!customerId) {
         customerId = localStorage.getItem('customer_id') || 
                     window.teableAuth?.getCurrentSession()?.customerId ||
                     'default';
     }
-    
+
     return customerId;
 }
 
@@ -101,17 +101,17 @@ async function checkCustomTilesAvailability(customerId) {
 async function initializeCustomerBaseMaps() {
     const customerId = getCustomerContext();
     console.log('Detected customer context:', customerId);
-    
+
     // Check if customer has custom drone imagery tiles
     const hasCustomTiles = await checkCustomTilesAvailability(customerId);
-    
+
     if (hasCustomTiles) {
         // Update drone imagery basemap with customer-specific URL
         baseMaps.drone_imagery.url = getCustomerTileUrl(customerId);
         baseMaps.drone_imagery.attribution = `© Customer ${customerId} Drone Imagery`;
-        
+
         console.log(`Custom drone imagery tiles enabled for customer ${customerId}`);
-        
+
         // Update basemap selector to show drone imagery option
         updateBasemapSelector(true);
     } else {
@@ -125,27 +125,27 @@ async function initializeCustomerBaseMaps() {
 function updateBasemapSelector(showDroneImagery) {
     const basemapSelector = document.getElementById('basemapSelector');
     if (!basemapSelector) return;
-    
+
     // Check if drone imagery option already exists
     const droneOption = basemapSelector.querySelector('option[value="drone_imagery"]');
-    
+
     if (showDroneImagery && !droneOption) {
         // Add drone imagery option
         const option = document.createElement('option');
         option.value = 'drone_imagery';
         option.textContent = 'Drone Imagery (High Detail)';
         basemapSelector.appendChild(option);
-        
+
         // Add zoom level indicator
         const zoomInfo = document.createElement('small');
         zoomInfo.className = 'text-muted d-block';
         zoomInfo.textContent = 'Available at zoom levels 18-25';
         basemapSelector.parentNode.appendChild(zoomInfo);
-        
+
     } else if (!showDroneImagery && droneOption) {
         // Remove drone imagery option if it exists
         droneOption.remove();
-        
+
         // Remove zoom info if it exists
         const zoomInfo = basemapSelector.parentNode.querySelector('small');
         if (zoomInfo) zoomInfo.remove();
@@ -183,7 +183,7 @@ async function initializeMap() {
                 return;
             }
             window.teableAPI.init(clientConfig);
-            
+
             // Wait for API to be ready
             await new Promise(resolve => setTimeout(resolve, 200));
         }
@@ -219,7 +219,7 @@ async function initializeMap() {
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
-        
+
         // Setup modal event listeners
         setupModalEventListeners();
 
@@ -234,7 +234,7 @@ async function initializeMap() {
 // Add zoom level display to map
 function addZoomLevelDisplay() {
     const zoomDisplay = L.control({ position: 'bottomleft' });
-    
+
     zoomDisplay.onAdd = function(map) {
         const div = L.DomUtil.create('div', 'zoom-display');
         div.style.cssText = `
@@ -248,9 +248,9 @@ function addZoomLevelDisplay() {
         div.innerHTML = `Zoom: ${map.getZoom()}`;
         return div;
     };
-    
+
     zoomDisplay.addTo(map);
-    
+
     // Update zoom display on zoom change
     map.on('zoomend', function() {
         const zoomElements = document.querySelectorAll('.zoom-display');
@@ -265,7 +265,7 @@ function handleZoomChange() {
     const currentZoom = map.getZoom();
     const basemapSelector = document.getElementById('basemapSelector');
     const droneOption = basemapSelector?.querySelector('option[value="drone_imagery"]');
-    
+
     // Show recommendation for drone imagery at high zoom levels
     if (currentZoom >= 18 && droneOption) {
         // Highlight drone imagery option if available and not selected
@@ -273,7 +273,7 @@ function handleZoomChange() {
             showInfo(`🚁 High-detail drone imagery is available at this zoom level! Switch to "Drone Imagery" for maximum detail.`);
         }
     }
-    
+
     // Show warning if zoomed beyond standard basemap capabilities
     if (currentZoom > 21 && basemapSelector?.value !== 'drone_imagery') {
         showWarning(`⚠️ Current zoom level (${currentZoom}) exceeds standard basemap detail. Consider switching to Drone Imagery for better resolution.`);
@@ -282,7 +282,7 @@ function handleZoomChange() {
 
 async function loadAvailableTables() {
     const tableSelector = document.getElementById('newLayerTable');
-    
+
     if (!tableSelector) {
         console.error('Table selector not found');
         return;
@@ -320,7 +320,7 @@ async function loadAvailableTables() {
 
         // Clear and populate table selector
         tableSelector.innerHTML = '';
-        
+
         // Add default option
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
@@ -334,9 +334,9 @@ async function loadAvailableTables() {
             option.textContent = table.name;
             tableSelector.appendChild(option);
         });
-        
+
         tableSelector.disabled = false;
-        
+
         console.log(`✅ Populated table selector with ${userTables.length} tables`);
 
         if (userTables.length === 0) {
@@ -347,11 +347,11 @@ async function loadAvailableTables() {
 
     } catch (error) {
         console.error('Error loading tables:', error);
-        
+
         // Show error in selector
         tableSelector.innerHTML = '<option value="">Error loading tables - click to retry</option>';
         tableSelector.disabled = false;
-        
+
         showError(`Failed to load tables: ${error.message}. Please check your API configuration and try again.`);
         throw error; // Re-throw to be handled by caller
     }
@@ -458,28 +458,28 @@ function showAddLayerModal() {
     try {
         // Reset modal content before showing
         resetAddLayerModal();
-        
+
         // Clear any existing errors
         clearErrors();
-        
+
         const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
-        
+
         // Load tables before showing the modal
         loadAvailableTables().then(() => {
             modal.show();
-            
+
             // Ensure the "From Table" tab is active by default
             setTimeout(() => {
                 const tableTab = document.getElementById('table-tab');
                 const geoJsonTab = document.getElementById('geojson-tab');
                 const tablePane = document.getElementById('table-pane');
                 const geoJsonPane = document.getElementById('geojson-pane');
-                
+
                 if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
                     // Activate table tab
                     tableTab.classList.add('active');
                     geoJsonTab.classList.remove('active');
-                    
+
                     // Show table pane
                     tablePane.classList.add('show', 'active');
                     geoJsonPane.classList.remove('show', 'active');
@@ -506,7 +506,7 @@ function resetAddLayerModal() {
             'newLayerGeometry',
             'geoJSONTableName'
         ];
-        
+
         fields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) {
@@ -521,41 +521,41 @@ function resetAddLayerModal() {
                 }
             }
         });
-        
+
         // Reset color picker
         const colorField = document.getElementById('newLayerColor');
         if (colorField) {
             colorField.value = '#3498db';
         }
-        
+
         // Reset geometry selector
         const geometrySelector = document.getElementById('newLayerGeometry');
         if (geometrySelector) {
             geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
         }
-        
+
         // Reset linked tables info
         const linkedTablesInfo = document.getElementById('linkedTablesInfo');
         if (linkedTablesInfo) {
             linkedTablesInfo.innerHTML = 'Select a table to see linked information';
         }
-        
+
         // Hide GeoJSON preview
         const geoJSONPreview = document.getElementById('geoJSONPreview');
         if (geoJSONPreview) {
             geoJSONPreview.style.display = 'none';
         }
-        
+
         // Reset upload progress
         const uploadProgress = document.getElementById('uploadProgress');
         if (uploadProgress) {
             uploadProgress.style.display = 'none';
         }
-        
+
         // Reset button visibility
         const addLayerBtn = document.getElementById('addLayerBtn');
         const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-        
+
         if (addLayerBtn) {
             addLayerBtn.style.display = 'inline-block';
             addLayerBtn.disabled = false;
@@ -564,13 +564,13 @@ function resetAddLayerModal() {
             uploadGeoJSONBtn.style.display = 'none';
             uploadGeoJSONBtn.disabled = true;
         }
-        
+
         // Clear any global variables
         geoJSONData = null;
-        
+
         // Clear any error states
         clearModalErrors();
-        
+
     } catch (error) {
         console.error('Error in resetAddLayerModal:', error);
     }
@@ -612,7 +612,7 @@ async function addLayerFromTable() {
     try {
         // Clear any previous errors
         clearModalErrors();
-        
+
         const tableId = document.getElementById('newLayerTable').value;
         let layerName = document.getElementById('newLayerName').value.trim();
         const layerColor = document.getElementById('newLayerColor').value;
@@ -684,7 +684,7 @@ async function addLayerFromTable() {
 
         // Load field permissions for this table
         const fieldPermissions = await loadFieldPermissionsForTable(tableId);
-        
+
         // Create layer configuration with safe defaults
         const layerConfig = {
             id: Date.now().toString(),
@@ -696,7 +696,7 @@ async function addLayerFromTable() {
             type: 'table',
             fieldPermissions: fieldPermissions
         };
-        
+
         // Create layer
         const layer = await createLayerFromData(records, layerConfig);
 
@@ -706,7 +706,7 @@ async function addLayerFromTable() {
                 addLayerBtn.disabled = false;
                 addLayerBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add Layer';
             }
-            
+
             // Close modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('addLayerModal'));
             if (modal) {
@@ -741,14 +741,14 @@ async function addLayerFromTable() {
 
     } catch (error) {
         console.error('Error adding layer:', error);
-        
+
         // Restore button state
         const addLayerBtn = document.getElementById('addLayerBtn');
         if (addLayerBtn) {
             addLayerBtn.disabled = false;
             addLayerBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add Layer';
         }
-        
+
         showError('Failed to add layer: ' + error.message);
     }
 }
@@ -839,18 +839,18 @@ async function createLayerFromData(records, layerConfig) {
 
         // Detect media layer type
         const mediaType = detectMediaLayerType(layerConfig.name, records);
-        
+
         function detectMediaLayerType(layerName, records) {
             if (!records || records.length === 0) return null;
-            
+
             const mediaTypes = new Set();
             let mediaCount = 0;
-            
+
             records.forEach(record => {
                 if (record.fields) {
                     Object.values(record.fields).forEach(value => {
                         if (typeof value === 'string' && value.match(/^https?:\/\//)) {
-                            const mediaType = detectURLMediaType(value, layerName);
+                            const mediaType = detectURLMediaType(value, layerName, fieldName); // Corrected: pass fieldName
                             if (mediaType) {
                                 mediaTypes.add(mediaType);
                                 mediaCount++;
@@ -859,7 +859,7 @@ async function createLayerFromData(records, layerConfig) {
                     });
                 }
             });
-            
+
             // If more than 50% of records have media URLs, consider it a media layer
             if (mediaCount > records.length * 0.5) {
                 if (mediaTypes.size === 1) {
@@ -868,10 +868,10 @@ async function createLayerFromData(records, layerConfig) {
                     return 'mixed'; // Mixed media types
                 }
             }
-            
+
             return null;
         }
-        
+
         // Store layer configuration with media type
         const layer = {
             ...layerConfig,
@@ -903,7 +903,7 @@ async function createLayerFromData(records, layerConfig) {
                 }
             }
         };
-        
+
         // Log media type detection
         if (mediaType) {
             console.log(`Detected media layer type "${mediaType}" for layer "${layerConfig.name}"`);
@@ -939,13 +939,13 @@ async function createLayerFromData(records, layerConfig) {
 
 function createFeaturePopup(fields, layerConfig) {
     const popupSettings = layerConfig.properties?.popup || {};
-    
+
     // Check if popups are enabled for this layer
     if (popupSettings.enabled === false) {
         console.log(`Popups disabled for layer "${layerConfig.name}" - not creating popup`);
         return '<div class="popup-disabled"><em>Popups disabled for this layer</em></div>';
     }
-    
+
     const template = popupSettings.template || 'default';
     const maxWidth = popupSettings.maxWidth || 300;
     const maxFieldLength = popupSettings.maxFieldLength || 100;
@@ -956,12 +956,12 @@ function createFeaturePopup(fields, layerConfig) {
     const enableSearch = popupSettings.enableSearch || false;
 
     let content = `<div class="feature-popup" style="max-width: ${maxWidth}px;">`;
-    
+
     // Simple popup header
     content += `<div class="popup-header">`;
     content += `<h6 class="popup-title">${layerConfig.name}</h6>`;
     content += `</div>`;
-    
+
     // Add search if enabled
     if (enableSearch) {
         content += `<input type="text" class="form-control form-control-sm" placeholder="Search..." 
@@ -972,13 +972,13 @@ function createFeaturePopup(fields, layerConfig) {
     // Get fields to display - filter by permissions first
     const allFields = Object.keys(fields).filter(field => field !== layerConfig.geometryField);
     console.log(`Creating popup for layer "${layerConfig.name}" - all fields:`, allFields);
-    
+
     const permittedFields = filterFieldsByPermissions(allFields, layerConfig);
     console.log(`Permitted fields after filtering:`, permittedFields);
-    
+
     const selectedFields = layerConfig.properties?.popup?.fields;
     let fieldsToShow = [];
-    
+
     // Check if popup fields have been specifically configured
     if (selectedFields && Array.isArray(selectedFields)) {
         // Only show the specifically selected fields that user has permission to see
@@ -993,7 +993,7 @@ function createFeaturePopup(fields, layerConfig) {
         fieldsToShow = permittedFields;
         console.log(`Popup not configured for layer "${layerConfig.name}": showing all ${fieldsToShow.length} permitted fields`);
     }
-    
+
     if (fieldsToShow.length !== allFields.length) {
         console.log(`🔒 Field permissions active: ${allFields.length - fieldsToShow.length} field(s) hidden from ${fieldsToShow.length} visible`);
     }
@@ -1022,39 +1022,39 @@ function createFeaturePopup(fields, layerConfig) {
 
 function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-fields professional-popup">';
-    
+
     // Define professional field order with priority
     const fieldPriority = {
         // Location fields (highest priority)
         'latitude': 1, 'lat': 1, 'Latitude': 1, 'LAT': 1,
         'longitude': 2, 'lng': 2, 'lon': 2, 'Longitude': 2, 'LON': 2, 'LNG': 2,
-        
+
         // Media fields (ordered as requested)
         'pdf': 3, 'PDF': 3, 'pdf_link': 3, 'pdf_url': 3, 'document': 3,
         '360': 4, '360_image': 4, '360_degree': 4, 'panorama': 4, 'pano': 4,
         'video': 5, 'Video': 5, 'video_link': 5, 'video_url': 5,
-        
+
         // Other media types
         'image': 6, 'Image': 6, 'photo': 6, 'picture': 6,
         'audio': 7, 'Audio': 7, 'sound': 7,
-        
+
         // Regular fields get default priority
         'default': 100
     };
-    
+
     // Function to get field priority and detect media type
     const getFieldPriority = (key, value) => {
         // Check explicit field name matches first
         if (fieldPriority[key] !== undefined) {
             return fieldPriority[key];
         }
-        
+
         // Enhanced field name pattern detection for 360°
         const keyLower = key.toLowerCase();
         if (keyLower.includes('lat')) return 1;
         if (keyLower.includes('lng') || keyLower.includes('lon')) return 2;
         if (keyLower.includes('pdf') || keyLower.includes('document')) return 3;
-        
+
         // Enhanced 360° field detection with more patterns
         if (keyLower.includes('360') || 
             keyLower.includes('panorama') || 
@@ -1066,16 +1066,14 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
             keyLower === '360url') {
             return 4;
         }
-        
+
         if (keyLower.includes('video')) return 5;
         if (keyLower.includes('image') || keyLower.includes('photo') || keyLower.includes('picture')) return 6;
         if (keyLower.includes('audio') || keyLower.includes('sound')) return 7;
-        
+
         // Check if it's a URL and detect media type
         if (typeof value === 'string' && value.match(/^https?:\/\//)) {
-            const layerName = layerConfig ? layerConfig.name : null;
-            const mediaType = detectURLMediaType(value, layerName, key);
-            
+            const mediaType = detectURLMediaType(value, layerConfig ? layerConfig.name : null, key);
             switch (mediaType) {
                 case 'pdf': return 3;
                 case '360': return 4;
@@ -1085,46 +1083,46 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
                 default: return 50;
             }
         }
-        
+
         return fieldPriority.default;
     };
-    
+
     // Sort fields by priority
     const sortedFields = fieldsToShow.slice().sort((a, b) => {
         const priorityA = getFieldPriority(a, fields[a]);
         const priorityB = getFieldPriority(b, fields[b]);
-        
+
         if (priorityA !== priorityB) {
             return priorityA - priorityB;
         }
-        
+
         // If same priority, sort alphabetically
         return a.localeCompare(b);
     });
-    
+
     // Render fields in professional order
     sortedFields.forEach(key => {
         let value = fields[key];
-        
+
         // Skip empty fields if not showing them
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-        
+
         // Get field permission for styling
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
-        
+
         // Get field priority for styling
         const priority = getFieldPriority(key, value);
         const isLocationField = priority <= 2;
         const isMediaField = priority >= 3 && priority <= 7;
-        
+
         // Format value with enhanced media detection
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
-        
+
         // Determine field styling class
         let fieldClass = 'popup-field';
         if (isLocationField) {
@@ -1132,12 +1130,12 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
         } else if (isMediaField) {
             fieldClass += ' media-popup-field';
         }
-        
+
         // Add priority indicator for professional styling
         const priorityClass = isLocationField ? 'priority-high' : isMediaField ? 'priority-media' : 'priority-normal';
-        
+
         content += `<div class="${fieldClass} ${priorityClass}" data-field="${key}" data-priority="${priority}">`;
-        
+
         // Enhanced label with better formatting
         let labelText = key;
         if (isLocationField) {
@@ -1153,27 +1151,27 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
                 default: labelText = `🔗 ${key}`;
             }
         }
-        
+
         content += `<div class="field-label mb-1">
                       <strong class="field-title">${permissionIndicator}${fieldIcon}${labelText}</strong>
                     </div>`;
-        
+
         content += `<div class="field-value ${isLocationField ? 'location-value' : isMediaField ? 'media-value' : 'standard-value'}">${formattedValue}</div>`;
-        
+
         if (showCopyButtons && !isMediaField) {
             content += `<button class="btn btn-xs btn-outline-secondary mt-1 copy-btn" onclick="copyToClipboard('${value?.replace(/'/g, "\\'")}')" title="Copy ${key}">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div>`;
     });
-    
+
     if (sortedFields.length === 0) {
         content += `<div class="text-muted text-center py-3">
                       <i class="fas fa-info-circle fa-2x mb-2"></i>
                       <p><em>No accessible fields to display</em></p>
                     </div>`;
     }
-    
+
     content += '</div>';
     return content;
 }
@@ -1181,81 +1179,81 @@ function renderDefaultTemplate(fields, fieldsToShow, showEmptyFields, showFieldI
 function renderTableTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-table-wrapper" style="max-height: 300px; overflow-y: auto;">';
     content += '<table class="table table-sm table-bordered mb-0">';
-    
+
     fieldsToShow.forEach(key => {
         let value = fields[key];
-        
+
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-        
+
         // Get field permission for styling
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
-        
+
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-1"></i>` : '';
-        
+
         content += `<tr data-field="${key}">`;
         content += `<td class="fw-bold" style="width: 40%;">${permissionIndicator}${fieldIcon}${key}</td>`;
         content += `<td>${formattedValue}`;
-        
+
         if (showCopyButtons) {
             content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</td></tr>`;
     });
-    
+
     content += '</table></div>';
     return content;
 }
 
 function renderCardTemplate(fields, fieldsToShow, showEmptyFields, showFieldIcons, highlightLinks, showCopyButtons, maxFieldLength, layerConfig = null) {
     let content = '<div class="popup-cards">';
-    
+
     fieldsToShow.forEach(key => {
         let value = fields[key];
-        
+
         if (!showEmptyFields && (value === null || value === undefined || value === '')) {
             return;
         }
-        
+
         // Get field permission for styling
         const permission = layerConfig ? getFieldPermission(key, layerConfig) : 'view';
         const permissionIndicator = getFieldPermissionIndicator(permission);
-        
+
         const formattedValue = formatFieldValue(value, highlightLinks, maxFieldLength, layerConfig, key);
         const fieldType = getFieldType(value);
         const fieldIcon = showFieldIcons ? `<i class="${getFieldIcon(fieldType)} me-2"></i>` : '';
-        
+
         content += `<div class="card mb-2" data-field="${key}">`;
         content += `<div class="card-body p-2">`;
         content += `<h6 class="card-title mb-1">${permissionIndicator}${fieldIcon}${key}</h6>`;
         content += `<div class="card-text">${formattedValue}`;
-        
+
         if (showCopyButtons) {
             content += ` <button class="btn btn-xs btn-outline-secondary float-end" onclick="copyToClipboard('${value}')" title="Copy">
                         <i class="fas fa-copy"></i></button>`;
         }
         content += `</div></div></div>`;
     });
-    
+
     content += '</div>';
     return content;
 }
 
 function renderCustomTemplate(template, fields, fieldsToShow) {
     let content = template;
-    
+
     // Replace field placeholders
     fieldsToShow.forEach(field => {
         const placeholder = `{{${field}}}`;
         const value = formatFieldValue(fields[field], true, 200);
         content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
     });
-    
+
     return content;
 }
 
@@ -1263,35 +1261,35 @@ function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null, 
     if (value === null || value === undefined) {
         return '<em class="text-muted">No data</em>';
     }
-    
+
     if (value === '') {
         return '<em class="text-muted">Empty</em>';
     }
-    
+
     let formattedValue = String(value);
-    
+
     // Check if this is a media URL and enhance the display
     if (highlightLinks && typeof value === 'string' && value.match(/^https?:\/\//)) {
         const layerName = layerConfig ? layerConfig.name : null;
         const mediaType = detectURLMediaType(value, layerName, fieldName);
-        
+
         if (mediaType) {
             // Get media type icon and action text
             const mediaInfo = getMediaTypeInfo(mediaType);
-            
+
             // Create shortened URL for display
             let displayUrl = formattedValue;
             if (maxLength && formattedValue.length > maxLength) {
                 displayUrl = formattedValue.substring(0, maxLength - 3) + '...';
             }
-            
+
             // Create enhanced media field display - NO AUTO-PLAY
             return `
                 <div class="media-field-container">
                     <div class="d-flex align-items-center gap-2">
                         <span class="media-type-icon">${mediaInfo.icon}</span>
                         <button class="btn btn-sm btn-outline-primary media-view-btn" 
-                                onclick="event.stopPropagation(); openMediaFromURL('${value.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${mediaType}', '${mediaInfo.title}')"
+                                onclick="openMediaFromURL('${value.replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${mediaType}', '${mediaInfo.title}')"
                                 title="View ${mediaInfo.title}">
                             ${mediaInfo.buttonText}
                         </button>
@@ -1307,24 +1305,24 @@ function formatFieldValue(value, highlightLinks, maxLength, layerConfig = null, 
             return `<a href="${value}" target="_blank" class="text-primary" onclick="event.stopPropagation()">${formattedValue}</a>`;
         }
     }
-    
+
     // Handle email addresses
     if (highlightLinks && typeof value === 'string' && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
         return `<a href="mailto:${value}" class="text-primary" onclick="event.stopPropagation()">${formattedValue}</a>`;
     }
-    
+
     // Regular text value - truncate if needed
     if (maxLength && formattedValue.length > maxLength) {
         formattedValue = formattedValue.substring(0, maxLength) + '...';
     }
-    
+
     return formattedValue;
 }
 
 function createPopupControls(controls) {
     let content = '<div class="popup-controls mt-3 pt-2 border-top">';
     content += '<div class="d-flex gap-1 flex-wrap">';
-    
+
     if (controls.showZoomControls !== false) {
         content += `
             <button class="btn btn-xs btn-outline-primary" onclick="window.zoomToCurrentPopupFeature('close')" title="Zoom Close">
@@ -1335,7 +1333,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-    
+
     if (controls.showCenterControl !== false) {
         content += `
             <button class="btn btn-xs btn-outline-info" onclick="window.centerCurrentPopupFeature()" title="Center">
@@ -1343,7 +1341,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-    
+
     if (controls.showExportControl) {
         content += `
             <button class="btn btn-xs btn-outline-success" onclick="exportCurrentFeature()" title="Export Feature">
@@ -1351,7 +1349,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-    
+
     if (controls.showEditControl) {
         content += `
             <button class="btn btn-xs btn-outline-warning" onclick="editCurrentFeature()" title="Edit Feature">
@@ -1359,7 +1357,7 @@ function createPopupControls(controls) {
             </button>
         `;
     }
-    
+
     content += '</div></div>';
     return content;
 }
@@ -1631,7 +1629,7 @@ function getGeometryIcon(layer) {
             case '360': return 'fas fa-globe text-primary';
         }
     }
-    
+
     // Fallback to geometry type
     switch (layer.type) {
         case 'point': return 'fas fa-map-marker-alt text-danger';
@@ -1733,12 +1731,12 @@ function zoomToLayer(layerId) {
 
 function zoomToLayerBounds(layer) {
     const bounds = layer.bounds;
-    
+
     // Calculate appropriate zoom level and padding based on layer size
     const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
-    
+
     let maxZoom, padding;
-    
+
     if (boundsSize < 50) { // Very small layer (< 50 meters)
         maxZoom = 25;
         padding = 0.4;
@@ -1755,7 +1753,7 @@ function zoomToLayerBounds(layer) {
         maxZoom = 19;
         padding = 0.05;
     }
-    
+
     map.fitBounds(bounds.pad(padding), {
         maxZoom: maxZoom,
         animate: true,
@@ -1795,7 +1793,7 @@ function showLayerProperties(layerId) {
     try {
         // Clear any existing state to prevent conflicts
         clearModalState();
-        
+
         // Store current layer for properties modal
         window.currentPropertiesLayer = layer;
 
@@ -1805,7 +1803,7 @@ function showLayerProperties(layerId) {
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
         modal.show();
-        
+
         // Add event listener for when properties modal is hidden
         const propertiesModal = document.getElementById('layerPropertiesModal');
         propertiesModal.addEventListener('hidden.bs.modal', function() {
@@ -1814,7 +1812,7 @@ function showLayerProperties(layerId) {
                 resetModalStates();
             }, 100);
         }, { once: true });
-        
+
     } catch (error) {
         console.error('Error opening layer properties:', error);
         showError('Failed to open layer properties: ' + error.message);
@@ -1835,10 +1833,10 @@ function clearModalState() {
 function resetModalStates() {
     // Reset global state
     window.currentPropertiesLayer = null;
-    
+
     // Ensure add layer modal is ready for next use
     resetAddLayerModal();
-    
+
     // Re-establish event listeners if needed
     ensureModalEventListeners();
 }
@@ -1860,7 +1858,7 @@ async function createDockedAttributeTable(layer) {
         console.log('Could not load field permissions, using defaults:', error.message);
         fieldPermissions = {};
     }
-    
+
     // Store permissions on layer for later use
     layer.fieldPermissions = fieldPermissions;
 
@@ -1907,7 +1905,7 @@ async function createDockedAttributeTable(layer) {
                                     <button class="btn btn-sm btn-success" onclick="saveTableEditing('${layer.id}')" id="saveEditingBtn" style="display: none;">
                                         <i class="fas fa-save me-1"></i>Save Editing
                                     </button>
-                                    
+
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteSelectedRecords('${layer.id}')" id="deleteSelectedBtn" disabled>
                                         <i class="fas fa-trash me-1"></i>Delete Selected
                                     </button>
@@ -1947,7 +1945,7 @@ async function createDockedAttributeTable(layer) {
 
     // Adjust map height to accommodate the docked table
     adjustMapForDockedTable();
-    
+
     // Setup inline editing handlers
     setupInlineEditing(layer);
 }
@@ -2008,16 +2006,16 @@ function getFieldPermission(fieldName, layer) {
     if (!layer.fieldPermissions) {
         return getDefaultPermissionByRole();
     }
-    
+
     return layer.fieldPermissions[fieldName] || getDefaultPermissionByRole();
 }
 
 function getDefaultPermissionByRole() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return 'view';
-    
+
     const role = currentUser.role?.toLowerCase() || 'viewer';
-    
+
     // Map roles to permissions - matches table.js logic
     const rolePermissions = {
         'creator': 'edit',
@@ -2026,14 +2024,14 @@ function getDefaultPermissionByRole() {
         'commenter': 'view',
         'viewer': 'view'
     };
-    
+
     return rolePermissions[role] || 'view';
 }
 
 function canEditRecords() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return false;
-    
+
     const role = currentUser.role?.toLowerCase() || 'viewer';
     return role === 'creator' || role === 'owner' || role === 'editor';
 }
@@ -2041,7 +2039,7 @@ function canEditRecords() {
 function getUserRoleBadge() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return 'Unknown';
-    
+
     const role = currentUser.role || 'Viewer';
     const roleColors = {
         'creator': 'danger',
@@ -2050,7 +2048,7 @@ function getUserRoleBadge() {
         'commenter': 'warning',
         'viewer': 'secondary'
     };
-    
+
     const colorClass = roleColors[role.toLowerCase()] || 'secondary';
     return `<span class="badge bg-${colorClass}">${role}</span>`;
 }
@@ -2059,7 +2057,7 @@ function getPermissionIndicator() {
     const editCount = document.querySelectorAll('.field-editable').length;
     const viewCount = document.querySelectorAll('.field-viewonly').length;
     const hiddenCount = document.querySelectorAll('.field-hidden').length;
-    
+
     return `
         <span class="text-success" title="Editable fields"><i class="fas fa-edit"></i> ${editCount}</span>
         <span class="text-info ms-2" title="View-only fields"><i class="fas fa-eye"></i> ${viewCount}</span>
@@ -2081,7 +2079,7 @@ function filterFieldsByPermissions(fields, layer) {
         console.log('No field permissions configured, showing all fields');
         return fields; // Return all fields if no permissions configured
     }
-    
+
     const filteredFields = fields.filter(fieldName => {
         const permission = getFieldPermission(fieldName, layer);
         const isVisible = permission !== 'hidden';
@@ -2090,7 +2088,7 @@ function filterFieldsByPermissions(fields, layer) {
         }
         return isVisible;
     });
-    
+
     console.log(`Filtered ${fields.length} fields to ${filteredFields.length} visible fields`);
     return filteredFields;
 }
@@ -2099,16 +2097,16 @@ function getFieldPermission(fieldName, layer) {
     if (!layer.fieldPermissions) {
         return getDefaultPermissionByRole();
     }
-    
+
     return layer.fieldPermissions[fieldName] || getDefaultPermissionByRole();
 }
 
 function getDefaultPermissionByRole() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return 'view';
-    
+
     const role = currentUser.role?.toLowerCase() || 'viewer';
-    
+
     // Map roles to permissions
     const rolePermissions = {
         'creator': 'edit',
@@ -2117,14 +2115,14 @@ function getDefaultPermissionByRole() {
         'commenter': 'view',
         'viewer': 'view'
     };
-    
+
     return rolePermissions[role] || 'view';
 }
 
 function canEditRecords() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return false;
-    
+
     const role = currentUser.role?.toLowerCase() || 'viewer';
     return role === 'creator' || role === 'owner' || role === 'editor';
 }
@@ -2132,7 +2130,7 @@ function canEditRecords() {
 function getUserRoleBadge() {
     const currentUser = window.teableAuth.getCurrentSession();
     if (!currentUser) return 'Unknown';
-    
+
     const role = currentUser.role || 'Viewer';
     const roleColors = {
         'creator': 'danger',
@@ -2141,7 +2139,7 @@ function getUserRoleBadge() {
         'commenter': 'warning',
         'viewer': 'secondary'
     };
-    
+
     const colorClass = roleColors[role.toLowerCase()] || 'secondary';
     return `<span class="badge bg-${colorClass}">${role}</span>`;
 }
@@ -2150,7 +2148,7 @@ function getPermissionIndicator() {
     const editCount = document.querySelectorAll('.field-editable').length;
     const viewCount = document.querySelectorAll('.field-viewonly').length;
     const hiddenCount = document.querySelectorAll('.field-hidden').length;
-    
+
     return `
         <span class="text-success" title="Editable fields"><i class="fas fa-edit"></i> ${editCount}</span>
         <span class="text-info ms-2" title="View-only fields"><i class="fas fa-eye"></i> ${viewCount}</span>
@@ -2170,16 +2168,16 @@ async function createEnhancedTableHeader(layer) {
     // Get all fields except geometry field
     const allFields = fields.filter(f => f !== layer.geometryField);
     console.log('All fields before permission filtering:', allFields);
-    
+
     // Filter out hidden fields based on permissions
     const permittedFields = filterFieldsByPermissions(allFields, layer);
     console.log('Permitted fields after filtering:', permittedFields);
-    
+
     permittedFields.forEach(field => {
         const permission = getFieldPermission(field, layer);
         const permissionClass = permission === 'edit' ? 'field-editable' : 'field-viewonly';
         const permissionIndicator = getFieldPermissionIndicator(permission);
-        
+
         headerHTML += `
             <th class="${permissionClass}">
                 <div class="d-flex align-items-center">
@@ -2203,7 +2201,7 @@ async function createEnhancedTableBody(layer) {
     const allFields = Object.keys(layer.records[0].fields || {});
     const nonGeometryFields = allFields.filter(f => f !== layer.geometryField);
     console.log('All non-geometry fields:', nonGeometryFields);
-    
+
     const permittedFields = filterFieldsByPermissions(nonGeometryFields, layer);
     console.log('Permitted fields for table body:', permittedFields);
     let bodyHTML = '';
@@ -2217,20 +2215,20 @@ async function createEnhancedTableBody(layer) {
         // Add field data with permission-based editing - only show permitted fields
         permittedFields.forEach(field => {
             const permission = getFieldPermission(field, layer);
-            
+
             let value = record.fields[field];
             const originalValue = value;
-            
+
             if (value === null || value === undefined) {
                 value = '';
             }
-            
+
             const displayValue = typeof value === 'string' && value.length > 50 ? 
                 value.substring(0, 50) + '...' : value;
-            
+
             const cellClass = permission === 'edit' ? 'editable-cell' : 'readonly-cell';
             const borderColor = permission === 'edit' ? 'border-success' : 'border-info';
-            
+
             bodyHTML += `
                 <td class="${cellClass} ${borderColor}" 
                     data-field="${field}" 
@@ -2285,7 +2283,7 @@ function populatePropertiesModal(layer) {
         const propDataSource = document.getElementById('propDataSource');
         const propGeometryType = document.getElementById('propGeometryType');
         const propFeatureCount = document.getElementById('propFeatureCount');
-        
+
         if (propLayerName) propLayerName.value = layer.name || '';
         if (propDataSource) propDataSource.value = layer.tableId || '';
         if (propGeometryType) propGeometryType.value = determineGeometryType(layer);
@@ -2296,7 +2294,7 @@ function populatePropertiesModal(layer) {
 
     // Symbology tab - ensure defaults are set
         let symbology = layer.properties?.symbology || {};
-        
+
         // Initialize symbology with defaults if missing
         if (!layer.properties) layer.properties = {};
         if (!layer.properties.symbology) {
@@ -2310,7 +2308,7 @@ function populatePropertiesModal(layer) {
             symbology = layer.properties.symbology;
             console.log('Initialized default symbology for layer:', layer.name);
         }
-        
+
         const propSymbologyType = document.getElementById('propSymbologyType');
         const propFillColor = document.getElementById('propFillColor');
         const propBorderColor = document.getElementById('propBorderColor');
@@ -2318,7 +2316,7 @@ function populatePropertiesModal(layer) {
         const propFillOpacity = document.getElementById('propFillOpacity');
         const fillOpacityValue = document.getElementById('fillOpacityValue');
         const borderWidthValue = document.getElementById('borderWidthValue');
-        
+
         if (propSymbologyType) {
             propSymbologyType.value = symbology.type || 'single';
             console.log('Set symbology type to:', symbology.type || 'single');
@@ -2340,7 +2338,7 @@ function populatePropertiesModal(layer) {
         const propLabelColor = document.getElementById('propLabelColor');
         const propLabelBackground = document.getElementById('propLabelBackground');
         const propLabelControls = document.getElementById('propLabelControls');
-        
+
         if (propEnableLabels) propEnableLabels.checked = labels.enabled || false;
         if (propLabelField) propLabelField.value = labels.field || '';
         if (propLabelSize) propLabelSize.value = labels.fontSize || 12;
@@ -2353,20 +2351,20 @@ function populatePropertiesModal(layer) {
     // iTool tab
         populatePopupFieldsSelector(layer);
         const popup = layer.properties?.popup || {};
-        
+
         // Basic popup settings
         const propEnablePopups = document.getElementById('propEnablePopups');
         const propPopupTemplate = document.getElementById('propPopupTemplate');
         const propMaxPopupWidth = document.getElementById('propMaxPopupWidth');
         const propMaxFieldLength = document.getElementById('propMaxFieldLength');
         const propPopupPosition = document.getElementById('propPopupPosition');
-        
+
         if (propEnablePopups) propEnablePopups.checked = popup.enabled !== false;
         if (propPopupTemplate) propPopupTemplate.value = popup.template || 'default';
         if (propMaxPopupWidth) propMaxPopupWidth.value = popup.maxWidth || 300;
         if (propMaxFieldLength) propMaxFieldLength.value = popup.maxFieldLength || 100;
         if (propPopupPosition) propPopupPosition.value = popup.position || 'auto';
-        
+
         // Advanced settings
         const propShowEmptyFields = document.getElementById('propShowEmptyFields');
         const propShowFieldIcons = document.getElementById('propShowFieldIcons');
@@ -2376,7 +2374,7 @@ function populatePropertiesModal(layer) {
         const propShowCopyButtons = document.getElementById('propShowCopyButtons');
         const propEnableFieldSorting = document.getElementById('propEnableFieldSorting');
         const propCustomTemplate = document.getElementById('propCustomTemplate');
-        
+
         if (propShowEmptyFields) propShowEmptyFields.checked = popup.showEmptyFields || false;
         if (propShowFieldIcons) propShowFieldIcons.checked = popup.showFieldIcons !== false;
         if (propHighlightLinks) propHighlightLinks.checked = popup.highlightLinks !== false;
@@ -2385,23 +2383,23 @@ function populatePropertiesModal(layer) {
         if (propShowCopyButtons) propShowCopyButtons.checked = popup.showCopyButtons || false;
         if (propEnableFieldSorting) propEnableFieldSorting.checked = popup.enableFieldSorting || false;
         if (propCustomTemplate) propCustomTemplate.value = popup.customTemplate || '';
-        
+
         // Control settings
         const controls = popup.controls || {};
         const propShowZoomControls = document.getElementById('propShowZoomControls');
         const propShowCenterControl = document.getElementById('propShowCenterControl');
         const propShowExportControl = document.getElementById('propShowExportControl');
         const propShowEditControl = document.getElementById('propShowEditControl');
-        
+
         if (propShowZoomControls) propShowZoomControls.checked = controls.showZoomControls !== false;
         if (propShowCenterControl) propShowCenterControl.checked = controls.showCenterControl !== false;
         if (propShowExportControl) propShowExportControl.checked = controls.showExportControl || false;
         if (propShowEditControl) propShowEditControl.checked = controls.showEditControl || false;
-        
+
         // Handle template change and popup toggle
         handleTemplateChange();
         handlePopupToggle();
-        
+
         // Ensure popup toggle state is correctly reflected in UI
         const popupEnabled = popup.enabled !== false;
         const propEnablePopupsCheckbox = document.getElementById('propEnablePopups');
@@ -2415,7 +2413,7 @@ function populatePropertiesModal(layer) {
         setTimeout(() => {
             updateSymbologyType();
         }, 100);
-        
+
     } catch (error) {
         console.error('Error populating properties modal:', error);
         showError('Failed to load layer properties: ' + error.message);
@@ -2449,12 +2447,12 @@ function populateFieldSelectors(layer) {
     if (graduatedFieldSelect) {
         const currentValue = graduatedFieldSelect.value;
         graduatedFieldSelect.innerHTML = '<option value="">Select numeric field...</option>';
-        
+
         permittedFields.forEach(field => {
             // Check if field contains numeric values
             let numericCount = 0;
             let totalCount = 0;
-            
+
             layer.records.forEach(record => {
                 const value = record.fields[field];
                 if (value !== null && value !== undefined && value !== '') {
@@ -2465,10 +2463,10 @@ function populateFieldSelectors(layer) {
                     }
                 }
             });
-            
+
             // Consider field numeric if at least 80% of values are numeric
             const isNumeric = totalCount > 0 && (numericCount / totalCount) >= 0.8;
-            
+
             if (isNumeric) {
                 const permission = getFieldPermission(field, layer);
                 const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
@@ -2478,7 +2476,7 @@ function populateFieldSelectors(layer) {
                 graduatedFieldSelect.appendChild(option);
             }
         });
-        
+
         if (currentValue) graduatedFieldSelect.value = currentValue;
     }
 
@@ -2496,7 +2494,7 @@ function populateFieldSelectors(layer) {
                     uniqueValues.add(value);
                 }
             });
-            
+
             const permission = getFieldPermission(field, layer);
             const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
             const option = document.createElement('option');
@@ -2506,53 +2504,6 @@ function populateFieldSelectors(layer) {
         });
         if (currentValue) categorizedFieldSelect.value = currentValue;
     }
-}
-
-function populatePopupFieldsSelector(layer) {
-    const container = document.getElementById('propPopupFields');
-    if (!container || !layer.records || layer.records.length === 0) return;
-
-    const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-    const permittedFields = filterFieldsByPermissions(allFields, layer);
-    const selectedFields = layer.properties?.popup?.fields || [];
-
-    let html = '';
-    
-    if (permittedFields.length === 0) {
-        html = `
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                No fields available for popup display based on your permissions.
-            </div>
-        `;
-    } else {
-        permittedFields.forEach(field => {
-            const isSelected = selectedFields.includes(field);
-            const fieldType = getFieldType(layer.records[0].fields[field]);
-            const fieldIcon = getFieldIcon(fieldType);
-            const permission = getFieldPermission(field, layer);
-            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
-            const permissionIndicator = getFieldPermissionIndicator(permission);
-            
-            html += `
-                <div class="field-checkbox d-flex align-items-center mb-2">
-                    <input class="form-check-input me-2" type="checkbox" id="popup_field_${field}" 
-                           ${isSelected ? 'checked' : ''} onchange="updatePopupFieldSelection('${field}', this.checked)">
-                    ${permissionIndicator}
-                    <i class="${fieldIcon} me-2 text-muted" title="${fieldType}"></i>
-                    <label class="form-check-label flex-grow-1" for="popup_field_${field}">
-                        ${permissionIcon} ${field}
-                    </label>
-                    <small class="text-muted">(${fieldType})</small>
-                </div>
-            `;
-        });
-    }
-
-    container.innerHTML = html;
-    
-    // Update available fields for custom template - only permitted fields
-    updateAvailableFieldsHelp(permittedFields);
 }
 
 function getFieldType(value) {
@@ -2587,14 +2538,14 @@ function getFieldIcon(fieldType) {
 function updateAvailableFieldsHelp(fields) {
     const container = document.getElementById('availableFieldsHelp');
     if (!container) return;
-    
+
     let html = '<div class="row">';
     fields.forEach((field, index) => {
         if (index > 0 && index % 3 === 0) html += '</div><div class="row">';
         html += `<div class="col-md-4"><code>{{${field}}}</code></div>`;
     });
     html += '</div>';
-    
+
     container.innerHTML = html;
 }
 
@@ -2691,11 +2642,11 @@ function updateSelectionCount() {
     if (zoomButton) {
         zoomButton.disabled = selectedFeatures.length === 0;
     }
-    
+
     if (deleteButton) {
         deleteButton.disabled = selectedFeatures.length === 0;
     }
-    
+
     // Update selection info text
     updateSelectionInfo();
 }
@@ -2704,7 +2655,7 @@ function updateSelectionInfo() {
     const selectedCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector:checked');
     const selectedCount = selectedCheckboxes.length;
     const totalFeatures = document.querySelectorAll('#dockedAttributeTable tbody tr').length;
-    
+
     // Update selection counter in the toolbar
     const selectionInfo = document.querySelector('.docked-table-toolbar .text-muted div');
     if (selectionInfo) {
@@ -2714,11 +2665,11 @@ function updateSelectionInfo() {
             selectionInfo.innerHTML = `<span id="selectedCount">${selectedCount}</span> of ${totalFeatures} features selected`;
         }
     }
-    
+
     // Enable/disable action buttons based on selection
     const deleteBtn = document.getElementById('deleteSelectedBtn');
     const zoomBtn = document.getElementById('zoomToSelectionBtn');
-    
+
     if (deleteBtn) {
         deleteBtn.disabled = selectedCount === 0;
         if (selectedCount > 0) {
@@ -2727,7 +2678,7 @@ function updateSelectionInfo() {
             deleteBtn.title = 'Select records to delete';
         }
     }
-    
+
     if (zoomBtn) {
         zoomBtn.disabled = selectedCount === 0;
         if (selectedCount > 0) {
@@ -2796,19 +2747,19 @@ function zoomToFeature(layerId, featureIndex, options = null) {
         if (feature.getBounds) {
             // Polygon or complex geometry
             const bounds = feature.getBounds();
-            
+
             if (!bounds.isValid()) {
                 showError('Invalid bounds for feature');
                 return;
             }
-            
+
             // Calculate the size of the feature
             const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
-            
+
             // Enhanced zoom levels for maximum detail viewing
             let targetZoom;
             let padding;
-            
+
             if (boundsSize < 1) { // Extremely small features (< 1 meter)
                 targetZoom = 25; // Maximum zoom
                 padding = 0.5;   // More padding for very small features
@@ -2843,30 +2794,30 @@ function zoomToFeature(layerId, featureIndex, options = null) {
                 targetZoom = 17;
                 padding = 0.03;
             }
-            
+
             // Apply zoom with calculated parameters - always use maximum zoom possible
             map.fitBounds(bounds.pad(padding), {
                 maxZoom: targetZoom, // Use calculated target zoom for maximum detail
                 animate: zoomOptions.animate,
                 duration: zoomOptions.duration
             });
-            
+
         } else if (feature.getLatLng) {
             // Point geometry - use maximum zoom for points
             const latlng = feature.getLatLng();
-            
+
             if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
                 showError('Invalid coordinates for point feature');
                 return;
             }
-            
+
             // For points, use maximum zoom level for ultimate detail
             const targetZoom = 25; // Maximum possible zoom
             map.setView(latlng, targetZoom, {
                 animate: zoomOptions.animate,
                 duration: zoomOptions.duration
             });
-            
+
         } else {
             showError('Feature does not have valid geometry for zooming');
             return;
@@ -2890,7 +2841,7 @@ function zoomToFeature(layerId, featureIndex, options = null) {
             (boundsSize < 1000 ? Math.round(boundsSize) + 'm' : (boundsSize / 1000).toFixed(1) + 'km') : 
             'point';
         showSuccess(`Zoomed to feature with maximum detail (size: ${sizeText}, zoom: ${feature.getBounds ? targetZoom : 25})`);
-        
+
     } catch (error) {
         console.error('Error zooming to feature:', error);
         showError('Failed to zoom to feature: ' + error.message);
@@ -2921,7 +2872,7 @@ function showFeatureInfo(layerId, featureIndex) {
     if (!selectedFeatures.includes(feature)) {
         selectedFeatures.push(feature);
         updateSelectionCount();
-        
+
         // Update the corresponding checkbox in attribute table if visible
         const checkbox = document.querySelector(`tr[data-feature-index="${featureIndex}"] .row-selector`);
         if (checkbox) {
@@ -2947,7 +2898,7 @@ function showFeatureInfo(layerId, featureIndex) {
     } else if (feature.getLatLng) {
         feature.bindPopup(popupContent).openPopup();
     }
-    
+
     console.log(`Feature info displayed for feature ${featureIndex} in layer "${layer.name}" with ${layer.properties?.popup?.fields?.length || 0} configured popup fields`);
 }
 
@@ -3040,18 +2991,18 @@ function changeBasemap() {
             attribution: basemap.attribution,
             maxZoom: basemap.maxZoom || 25
         };
-        
+
         // Add minZoom for custom tiles like drone imagery
         if (basemap.minZoom) {
             tileLayerOptions.minZoom = basemap.minZoom;
         }
-        
+
         // Special handling for drone imagery
         if (basemapType === 'drone_imagery') {
             tileLayerOptions.errorTileUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='; // Transparent 1x1 pixel
-            
+
             const currentZoom = map.getZoom();
-            
+
             // Show info about zoom requirements for drone imagery
             if (currentZoom < basemap.minZoom) {
                 showInfo(`🚁 Drone imagery is available at zoom level ${basemap.minZoom} and above. Current zoom: ${currentZoom}`);
@@ -3059,10 +3010,10 @@ function changeBasemap() {
                 showSuccess(`🚁 High-resolution drone imagery activated! Zoom levels ${basemap.minZoom}-${basemap.maxZoom} available.`);
             }
         }
-        
+
         // Create and add the tile layer
         const tileLayer = L.tileLayer(basemap.url, tileLayerOptions);
-        
+
         // Add error handling for missing tiles
         tileLayer.on('tileerror', function(error) {
             console.warn('Tile loading error:', error);
@@ -3074,14 +3025,14 @@ function changeBasemap() {
                 }
             }
         });
-        
+
         tileLayer.addTo(map);
-        
+
         // Update map's max zoom if necessary
         if (basemap.maxZoom) {
             map.options.maxZoom = Math.max(map.options.maxZoom, basemap.maxZoom);
         }
-        
+
         console.log(`Switched to ${basemapType} basemap (zoom: ${basemap.minZoom || 0}-${basemap.maxZoom || 25})`);
     }
 }
@@ -3113,24 +3064,24 @@ function setupModalEventListeners() {
         // Handle tab clicks
         const tableTab = document.getElementById('table-tab');
         const geoJsonTab = document.getElementById('geojson-tab');
-        
+
         if (tableTab) {
             tableTab.addEventListener('click', function(e) {
                 e.preventDefault();
                 switchToTableTab();
             });
         }
-        
+
         if (geoJsonTab) {
             geoJsonTab.addEventListener('click', function(e) {
                 e.preventDefault();
                 switchToGeoJSONTab();
             });
         }
-        
+
         // Handle modal shown event using named function
         addLayerModal.addEventListener('shown.bs.modal', handleAddLayerModalShown);
-        
+
         // Add click handler to table selector for retry
         const tableSelector = document.getElementById('newLayerTable');
         if (tableSelector) {
@@ -3143,7 +3094,7 @@ function setupModalEventListeners() {
                 }
             });
         }
-        
+
         // Handle modal hidden event using named function
         addLayerModal.addEventListener('hidden.bs.modal', handleAddLayerModalHidden);
     }
@@ -3156,16 +3107,16 @@ function switchToTableTab() {
     const geoJsonPane = document.getElementById('geojson-pane');
     const addLayerBtn = document.getElementById('addLayerBtn');
     const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-    
+
     if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
         // Update tab states
         tableTab.classList.add('active');
         geoJsonTab.classList.remove('active');
-        
+
         // Update pane visibility
         tablePane.classList.add('show', 'active');
         geoJsonPane.classList.remove('show', 'active');
-        
+
         // Update button visibility
         if (addLayerBtn) {
             addLayerBtn.style.display = 'inline-block';
@@ -3183,16 +3134,16 @@ function switchToGeoJSONTab() {
     const geoJsonPane = document.getElementById('geojson-pane');
     const addLayerBtn = document.getElementById('addLayerBtn');
     const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-    
+
     if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
         // Update tab states
         tableTab.classList.remove('active');
         geoJsonTab.classList.add('active');
-        
+
         // Update pane visibility
         tablePane.classList.remove('show', 'active');
         geoJsonPane.classList.add('show', 'active');
-        
+
         // Update button visibility
         if (addLayerBtn) {
             addLayerBtn.style.display = 'none';
@@ -3461,72 +3412,49 @@ function setupLayerSorting() {
 // Media detection and viewing functions
 function detectURLMediaType(url, layerName = null, fieldName = null) {
     if (!url || typeof url !== 'string') return null;
-    
+
     const urlLower = url.toLowerCase();
-    
-    // Enhanced 360 image detection - check field name first (highest priority)
-    if (fieldName) {
-        const fieldLower = fieldName.toLowerCase().replace(/\s+/g, ''); // Remove spaces for comparison
-        if (fieldLower.includes('360') || 
-            fieldLower.includes('panorama') || 
-            fieldLower.includes('pano') ||
-            fieldLower.includes('equirectangular') ||
-            fieldLower.includes('spherical') ||
-            fieldLower.includes('vr') ||
-            fieldLower === '360url' ||
-            fieldName.toLowerCase() === '360 url') {
-            console.log(`Field "${fieldName}" detected as 360° based on field name pattern`);
-            return '360';
-        }
-    }
-    
-    // Check URL content for 360 patterns
-    if (urlLower.includes('360') || 
-        urlLower.includes('panorama') || 
-        urlLower.includes('pano') ||
-        urlLower.includes('equirectangular') ||
-        urlLower.includes('streetview')) {
+    const nameCheck = layerName ? layerName.toLowerCase() : '';
+
+    // 360° detection (highest priority) - check both URL and layer name
+    if (nameCheck.includes('360') || nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+        console.log(`URL detected as 360° content: ${url}`);
         return '360';
     }
-    
-    // Check layer name for 360 patterns
-    if (layerName && (
-        layerName.toLowerCase().includes('360') ||
-        layerName.toLowerCase().includes('panorama') ||
-        layerName.toLowerCase().includes('pano')
-    )) {
-        return '360';
-    }
-    
+
     // Video detection
-    if (urlLower.includes('video') || urlLower.match(/\.(mp4|avi|mov|wmv|flv|webm)(\?|$)/)) {
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || 
+        urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.avi') ||
+        urlLower.includes('vimeo.com') || urlLower.includes('video')) {
         return 'video';
     }
-    
+
     // Audio detection
-    if (urlLower.includes('audio') || urlLower.match(/\.(mp3|wav|ogg|aac|flac)(\?|$)/)) {
+    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') ||
+        urlLower.includes('soundcloud.com') || urlLower.includes('audio')) {
         return 'audio';
     }
-    
+
     // PDF detection
-    if (urlLower.includes('pdf') || urlLower.match(/\.pdf(\?|$)/)) {
+    if (urlLower.includes('.pdf') || urlLower.includes('document')) {
         return 'pdf';
     }
-    
-    // Regular image detection (after 360 detection)
-    if (urlLower.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)/)) {
+
+    // Image detection - but not if layer is named "360" or contains "360"
+    if (!nameCheck.includes('360') && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
         return 'image';
     }
-    
+
     return null;
 }
 
 function getMediaTypeInfo(mediaType) {
-    const mediaInfo = {
+    const mediaTypes = {
         'video': {
             icon: '🎥',
             title: 'Video',
-            buttonText: 'Play Video'
+            buttonText: 'View Video'
         },
         'audio': {
             icon: '🎵',
@@ -3534,7 +3462,7 @@ function getMediaTypeInfo(mediaType) {
             buttonText: 'Play Audio'
         },
         'image': {
-            icon: '🖼️',
+            icon: '📷',
             title: 'Image',
             buttonText: 'View Image'
         },
@@ -3545,21 +3473,20 @@ function getMediaTypeInfo(mediaType) {
         },
         '360': {
             icon: '🌐',
-            title: '360° Image',
+            title: '360° View',
             buttonText: 'View 360°'
         }
     };
-    
-    return mediaInfo[mediaType] || {
+
+    return mediaTypes[mediaType] || {
         icon: '🔗',
         title: 'Link',
         buttonText: 'Open Link'
     };
 }
 
-function openMediaFromURL(url, mediaType, title = '') {
-    console.log(`Opening ${mediaType} media:`, url);
-    
+// Open media from URL with appropriate modal
+window.openMediaFromURL = function(url, mediaType, title = 'Media') {
     try {
         switch (mediaType) {
             case 'video':
@@ -3572,689 +3499,2431 @@ function openMediaFromURL(url, mediaType, title = '') {
                 openImageModal(url, title);
                 break;
             case 'pdf':
-                openPDFModal(url, title);
+                openPdfModal(url, title);
                 break;
             case '360':
-                open360ImageModal(url, title);
+                open360Modal(url, title);
                 break;
             default:
+                // Fallback to opening in new tab
                 window.open(url, '_blank');
         }
+
+        console.log(`Opened ${mediaType} modal for URL: ${url}`);
     } catch (error) {
         console.error('Error opening media:', error);
         showError('Failed to open media: ' + error.message);
         // Fallback to opening in new tab
         window.open(url, '_blank');
     }
+};
+
+// Enhanced media layer detection function
+function detectMediaLayerType(layerName, records) {
+    const name = layerName.toLowerCase();
+
+    // Check layer name first - prioritize 360 detection
+    if (name.includes('360') || name === '360' || name.includes('panorama') || name.includes('streetview')) {
+        console.log(`Layer "${layerName}" detected as 360° layer based on name`);
+        return '360';
+    }
+    if (name.includes('video')) return 'video';
+    if (name.includes('audio')) return 'audio';
+    if (name.includes('pdf') || name.includes('document')) return 'pdf';
+
+    // If name doesn't match, analyze URL patterns from data
+    if (records && records.length > 0) {
+        for (const record of records.slice(0, 5)) { // Check first 5 records
+            const fields = record.fields || {};
+
+            for (const fieldName of Object.keys(fields)) {
+                const fieldValue = fields[fieldName];
+
+                if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
+                    const url = fieldValue.toLowerCase();
+
+                    // 360 detection (check first for priority)
+                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        console.log(`URL contains 360° indicators: ${url}`);
+                        return '360';
+                    }
+
+                    // Video detection
+                    if (url.includes('youtube.com') || url.includes('youtu.be') || 
+                        url.includes('.mp4') || url.includes('.webm') || url.includes('.avi') ||
+                        url.includes('vimeo.com') || url.includes('video')) {
+                        return 'video';
+                    }
+
+                    // Audio detection
+                    if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg') ||
+                        url.includes('soundcloud.com') || url.includes('audio')) {
+                        return 'audio';
+                    }
+
+                    // PDF detection
+                    if (url.includes('.pdf') || url.includes('document')) {
+                        return 'pdf';
+                    }
+
+                    // Image detection - but only if layer name doesn't contain "360"
+                    if (!name.includes('360') && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
+                        return 'image';
+                    }
+                }
+            }
+        }
+
+        // Special case: If layer name contains "360", always treat as 360 layer
+        if (name.includes('360') || name === '360') {
+            console.log(`Layer containing "360" will use Pannellum viewer regardless of URL content`);
+            return '360';
+        }
+    }
+
+    return null; // Standard layer
 }
 
-function openVideoModal(url, title = '') {
-    const videoPlayer = document.getElementById('videoPlayer');
+// Function to find URL field in record data
+function findUrlField(recordData) {
+    const urlFieldNames = ['360_url', 'url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url', 'src', 'source', 'panorama_url'];
+
+    for (const fieldName of urlFieldNames) {
+        if (recordData[fieldName] && typeof recordData[fieldName] === 'string' && recordData[fieldName].startsWith('http')) {
+            return recordData[fieldName];
+        }
+    }
+
+    // Check all fields for URL-like values (prioritize 360-related fields)
+    for (const [fieldName, value] of Object.entries(recordData)) {
+        if (typeof value === 'string' && value.startsWith('http')) {
+            // Prioritize 360-related URLs
+            if (fieldName.toLowerCase().includes('360') || fieldName.toLowerCase().includes('panorama')) {
+                return value;
+            }
+        }
+    }
+
+    // Fallback to any HTTP URL
+    for (const [fieldName, value] of Object.entries(recordData)) {
+        if (typeof value === 'string' && value.startsWith('http')) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+// Video player modal
+function openVideoModal(url, title = 'Video Player') {
+    const modal = document.getElementById('videoModal');
+    const videoElement = document.getElementById('videoPlayer');
     const videoSource = document.getElementById('videoSource');
     const videoInfo = document.getElementById('videoInfo');
-    
-    if (videoPlayer && videoSource) {
-        videoSource.src = url;
-        videoPlayer.load();
-        
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-play-circle me-2"></i>${title}`;
+    }
+
+    if (videoSource && videoElement) {
+        // Handle different video URL types
+        let finalUrl = url;
+
+        // Convert YouTube URLs to embed format
+        if (url.includes('youtube.com/watch?v=')) {
+            const videoId = url.split('v=')[1].split('&')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            // For YouTube, we'll use an iframe instead
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else if (url.includes('youtu.be/')) {
+            const videoId = url.split('youtu.be/')[1].split('?')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else {
+            // Regular video file
+            videoSource.src = finalUrl;
+            videoElement.load();
+            videoElement.style.display = 'block';
+        }
+
         if (videoInfo) {
-            videoInfo.innerHTML = `
-                <strong>Video:</strong> ${title || 'Media File'}<br>
-                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
-                <strong>Type:</strong> Video Media
-            `;
+            videoInfo.innerHTML = `<strong>Source:</strong> ${url}`;
         }
-        
-        const modal = new bootstrap.Modal(document.getElementById('videoModal'));
-        modal.show();
-        
-        // Store current media URL for download
-        window.currentMediaURL = url;
     }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened video modal for: ${title}`);
 }
 
-function openAudioModal(url, title = '') {
-    const audioPlayer = document.getElementById('audioPlayer');
-    const audioSource = document.getElementById('audioSource');
+// Audio player modal
+function openAudioModal(url, title = 'Audio Player') {
+    const modal = document.getElementById('audioModal');
+    const audioElements = modal.querySelectorAll('audio source');
     const audioInfo = document.getElementById('audioInfo');
-    
-    if (audioPlayer && audioSource) {
-        audioSource.src = url;
-        audioPlayer.load();
-        
-        if (audioInfo) {
-            audioInfo.innerHTML = `
-                <strong>Audio:</strong> ${title || 'Media File'}<br>
-                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
-                <strong>Type:</strong> Audio Media
-            `;
-        }
-        
-        const modal = new bootstrap.Modal(document.getElementById('audioModal'));
-        modal.show();
-        
-        // Store current media URL for download
-        window.currentMediaURL = url;
-    }
-}
+    const modalTitle = modal.querySelector('.modal-title');
 
-function openImageModal(url, title = '') {
-    const imageViewer = document.getElementById('imageViewer');
-    const imageInfo = document.getElementById('imageInfo');
-    
-    if (imageViewer) {
-        imageViewer.src = url;
-        imageViewer.alt = title || 'Image';
-        
-        if (imageInfo) {
-            imageInfo.innerHTML = `
-                <strong>Image:</strong> ${title || 'Media File'}<br>
-                <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
-                <strong>Type:</strong> Image Media
-            `;
-        }
-        
-        const modal = new bootstrap.Modal(document.getElementById('imageModal'));
-        modal.show();
-        
-        // Store current media URL for download
-        window.currentMediaURL = url;
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-music me-2"></i>${title}`;
     }
-}
 
-function openPDFModal(url, title = '') {
-    const pdfInfo = document.getElementById('pdfInfo');
-    
-    if (pdfInfo) {
-        pdfInfo.innerHTML = `
-            <strong>PDF:</strong> ${title || 'PDF Document'}<br>
-            <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
-            <strong>Type:</strong> PDF Document
-        `;
-    }
-    
-    // Load PDF using PDF.js
-    loadPDFDocument(url);
-    
-    const modal = new bootstrap.Modal(document.getElementById('pdfModal'));
-    modal.show();
-    
-    // Store current media URL for download
-    window.currentMediaURL = url;
-}
-
-function open360ImageModal(url, title = '') {
-    const image360Info = document.getElementById('image360Info');
-    
-    if (image360Info) {
-        image360Info.innerHTML = `
-            <strong>360° Image:</strong> ${title || '360° Image'}<br>
-            <strong>Source:</strong> <a href="${url}" target="_blank">${url}</a><br>
-            <strong>Type:</strong> 360° Panoramic Image<br>
-            <small class="text-muted">Use mouse to drag and explore the 360° view</small>
-        `;
-    }
-    
-    const modal = new bootstrap.Modal(document.getElementById('image360Modal'));
-    
-    // Initialize Pannellum viewer when modal is shown
-    modal._element.addEventListener('shown.bs.modal', function () {
-        initializePannellumViewer(url);
+    // Update all audio source elements
+    audioElements.forEach(source => {
+        source.src = url;
     });
-    
-    // Clean up viewer when modal is hidden
-    modal._element.addEventListener('hidden.bs.modal', function () {
-        if (window.pannellumViewer) {
+
+    // Load the audio
+    const audioElement = modal.querySelector('audio');
+    if (audioElement) {
+        audioElement.load();
+    }
+
+    if (audioInfo) {
+        audioInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened audio modal for: ${title}`);
+}
+
+// Image viewer modal
+function openImageModal(url, title = 'Image Viewer') {
+    const modal = document.getElementById('imageModal');
+    const imageElement = modal.querySelector('img');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-image me-2"></i>${title}`;
+    }
+
+    if (imageElement) {
+        imageElement.src = url;
+        imageElement.alt = title;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened image modal for: ${title}`);
+}
+
+// PDF viewer modal
+function openPdfModal(url, title = 'PDF Viewer') {
+    const modal = document.getElementById('pdfModal');
+    const iframeElement = modal.querySelector('iframe');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${title}`;
+    }
+
+    if (iframeElement) {
+        iframeElement.src = url;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened PDF modal for: ${title}`);
+}
+
+// 360° viewer modal (using Pannellum)
+function open360Modal(url, title = '360° Viewer') {
+    const modal = document.getElementById('image360Modal');
+    const pannellumContainer = document.getElementById('panorama360');
+    const modalTitle = modal ? modal.querySelector('.modal-title') : null;
+
+    if (!modal) {
+        console.error('360° modal not found with ID "image360Modal"');
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+        return;
+    }
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    let viewer = null;
+    let autoRotateInterval = null;
+
+    // Initialize 360 viewer when modal is shown
+    modal.addEventListener('shown.bs.modal', function() {
+        if (typeof pannellum !== 'undefined' && pannellumContainer) {
             try {
-                window.pannellumViewer.destroy();
-                window.pannellumViewer = null;
-            } catch (e) {
-                console.log('Viewer cleanup:', e.message);
+                viewer = pannellum.viewer('panorama360', {
+                    type: 'equirectangular',
+                    panorama: url,
+                    autoLoad: true,
+                    showControls: true,
+                    showZoomCtrl: true,
+                    showFullscreenCtrl: true,
+                    mouseZoom: true,
+                    compass: true,
+                    northOffset: 0,
+                    pitch: 0,
+                    yaw: 0,
+                    hfov: 100,
+                    minHfov: 50,
+                    maxHfov: 120,
+                    autoRotate: 0, // Start with auto-rotation off
+                    keyboardZoom: true,
+                    mouseZoom: true,
+                    draggable: true
+                });
+
+                // Add custom navigation and control buttons
+                addPannellumControls(viewer);
+
+                console.log('Pannellum 360 viewer initialized with enhanced controls');
+            } catch (error) {
+                console.error('Error initializing Pannellum:', error);
+                pannellumContainer.innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        360° viewer could not be initialized.
+                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View image directly
+                        </a>
+                    </div>
+                `;
+            }
+        } else {
+            // Fallback to regular image display
+            if (pannellumContainer) {
+                pannellumContainer.innerHTML = `
+                    <div class="text-center">
+                        <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            360° viewer library not loaded. Displaying as regular image.
+                            <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>View original
+                            </a>
+                        </div>
+                    </div>
+                `;
             }
         }
     });
-    
-    modal.show();
-    
-    // Store current media URL for download
-    window.currentMediaURL = url;
+
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function() {
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+        if (viewer) {
+            viewer.destroy();
+            viewer = null;
+        }
+        // Remove custom controls
+        const customControls = document.querySelector('.pannellum-custom-controls');
+        if (customControls) {
+            customControls.remove();
+        }
+    });
+
+    bootstrapModal.show();
+    console.log(`Opened 360° modal for: ${title}`);
 }
 
-function initializePannellumViewer(url) {
-    try {
-        // Destroy existing viewer if it exists
-        if (window.pannellumViewer) {
-            try {
-                window.pannellumViewer.destroy();
-            } catch (e) {
-                console.log('Previous viewer cleanup:', e.message);
-            }
-            window.pannellumViewer = null;
-        }
-        
-        // Clear the container first
-        const container = document.getElementById('panorama360');
-        if (!container) {
-            throw new Error('Panorama container not found');
-        }
-        
-        container.innerHTML = '';
-        
-        console.log('Initializing Pannellum 360° viewer with URL:', url);
-        
-        // Check if Pannellum is available
-        if (typeof pannellum === 'undefined') {
-            throw new Error('Pannellum library not loaded');
-        }
-        
-        // Create Pannellum viewer
-        window.pannellumViewer = pannellum.viewer('panorama360', {
-            "type": "equirectangular",
-            "panorama": url,
-            "autoLoad": true,
-            "autoRotate": -2, // Slow auto-rotation
-            "showZoomCtrl": true,
-            "showFullscreenCtrl": true,
-            "showControls": true,
-            "keyboardZoom": true,
-            "mouseZoom": true,
-            "draggable": true,
-            "disableKeyboardCtrl": false,
-            "showZoomCtrl": true,
-            "compass": true,
-            "northOffset": 0,
-            "preview": url,
-            "previewTitle": "360° Panoramic View",
-            "previewAuthor": "GIS System",
-            "hfov": 100, // Horizontal field of view
-            "pitch": 0, // Initial pitch
-            "yaw": 0, // Initial yaw
-            "minHfov": 50,
-            "maxHfov": 120,
-            "minPitch": -90,
-            "maxPitch": 90,
-            "haov": 360, // Horizontal angle of view (full 360°)
-            "vaov": 180, // Vertical angle of view (full 180°)
-            "backgroundColor": [0, 0, 0],
-            "hotSpots": [], // Can add hot spots later if needed
-            "strings": {
-                "loadButtonLabel": "Click to Load 360° View",
-                "loadingLabel": "Loading 360° Image...",
-                "bylineLabel": "360° Panoramic Image",
-                "noPanoramaError": "No 360° panorama image was specified.",
-                "fileAccessError": "The file %s could not be accessed.",
-                "malformedURLError": "The panorama URL is malformed.",
-                "iOS8WebGLError": "WebGL is not supported in iOS 8.",
-                "genericWebGLError": "WebGL is not supported.",
-                "textureSizeError": "The panorama is too large for your device/browser. It's %spx wide, but your device/browser only supports images up to %spx wide. Try another device/browser or use a smaller image."
-            }
-        });
-        
-        // Add event listeners for better user experience
-        window.pannellumViewer.on('load', function() {
-            console.log('✅ 360° panorama loaded successfully');
-            showSuccess('360° panoramic view loaded! Use mouse to explore, scroll to zoom, click fullscreen for immersive experience.');
-        });
-        
-        window.pannellumViewer.on('error', function(err) {
-            console.error('Pannellum error:', err);
-            displayPannellumError(url, err.message || 'Unknown error loading panorama');
-        });
-        
-        window.pannellumViewer.on('animatefinished', function() {
-            console.log('360° animation finished');
-        });
-        
-        // Add custom controls overlay
-        setTimeout(() => {
-            addCustomPanoramaControls();
-        }, 1000);
-        
-        console.log('✅ Pannellum 360° viewer initialized successfully');
-        
-    } catch (error) {
-        console.error('Error initializing Pannellum 360° viewer:', error);
-        displayPannellumError(url, error.message);
-    }
-}
+// Add custom navigation and control buttons to Pannellum viewer
+function addPannellumControls(viewer) {
+    // Wait for viewer to be ready
+    setTimeout(() => {
+        const pannellumContainer = document.getElementById('panorama360');
+        if (!pannellumContainer) return;
 
-// Add custom controls for Pannellum viewer
-function addCustomPanoramaControls() {
-    const container = document.getElementById('panorama360');
-    if (!container || !window.pannellumViewer) return;
-    
-    // Create custom controls overlay
-    const controlsHTML = `
-        <div id="panorama-custom-controls" style="
+        // Create custom controls container
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'pannellum-custom-controls';
+        controlsContainer.style.cssText = `
             position: absolute;
             top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.8);
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
             padding: 15px;
             border-radius: 8px;
             color: white;
-            font-size: 12px;
-            z-index: 1000;
-            min-width: 200px;
-        ">
-            <div style="text-align: center; margin-bottom: 10px;">
-                <strong>360° Controls</strong>
-            </div>
-            <div style="margin-bottom: 8px;">
-                <button onclick="resetPannellumView()" style="
-                    background: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    margin-right: 5px;
-                    font-size: 11px;
-                ">Reset View</button>
-                <button onclick="togglePannellumAutoRotate()" id="autoRotateBtn" style="
-                    background: #28a745;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 11px;
-                ">Auto Rotate</button>
-            </div>
-            <div style="margin-bottom: 8px;">
-                <button onclick="pannellumLookUp()" style="
-                    background: #17a2b8;
-                    color: white;
-                    border: none;
-                    padding: 6px 10px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    margin-right: 3px;
-                    font-size: 10px;
-                ">Look Up</button>
-                <button onclick="pannellumLookDown()" style="
-                    background: #17a2b8;
-                    color: white;
-                    border: none;
-                    padding: 6px 10px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    margin-right: 3px;
-                    font-size: 10px;
-                ">Look Down</button>
-                <button onclick="pannellumCenter()" style="
-                    background: #6c757d;
-                    color: white;
-                    border: none;
-                    padding: 6px 10px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    font-size: 10px;
-                ">Center</button>
-            </div>
-            <div style="text-align: center; color: #ccc; font-size: 10px; line-height: 1.3;">
-                🖱️ Drag to rotate<br>
-                🔍 Scroll to zoom<br>
-                ⌨️ Arrow keys to navigate<br>
-                📱 Touch gestures supported
-            </div>
-        </div>
-    `;
-    
-    // Remove existing custom controls
-    const existingControls = container.querySelector('#panorama-custom-controls');
-    if (existingControls) {
-        existingControls.remove();
-    }
-    
-    // Add new custom controls
-    container.insertAdjacentHTML('beforeend', controlsHTML);
-}
-
-// Global control functions for Pannellum
-window.resetPannellumView = function() {
-    if (window.pannellumViewer) {
-        window.pannellumViewer.setPitch(0);
-        window.pannellumViewer.setYaw(0);
-        window.pannellumViewer.setHfov(100);
-        showSuccess('360° view reset to center');
-    }
-};
-
-window.togglePannellumAutoRotate = function() {
-    if (window.pannellumViewer) {
-        const currentAutoRotate = window.pannellumViewer.getConfig().autoRotate;
-        if (currentAutoRotate) {
-            window.pannellumViewer.setAutoRotate(false);
-            document.getElementById('autoRotateBtn').textContent = 'Auto Rotate';
-            document.getElementById('autoRotateBtn').style.background = '#28a745';
-        } else {
-            window.pannellumViewer.setAutoRotate(-2);
-            document.getElementById('autoRotateBtn').textContent = 'Stop Rotate';
-            document.getElementById('autoRotateBtn').style.background = '#dc3545';
-        }
-    }
-};
-
-window.pannellumLookUp = function() {
-    if (window.pannellumViewer) {
-        const currentPitch = window.pannellumViewer.getPitch();
-        window.pannellumViewer.setPitch(Math.min(90, currentPitch + 15));
-    }
-};
-
-window.pannellumLookDown = function() {
-    if (window.pannellumViewer) {
-        const currentPitch = window.pannellumViewer.getPitch();
-        window.pannellumViewer.setPitch(Math.max(-90, currentPitch - 15));
-    }
-};
-
-window.pannellumCenter = function() {
-    if (window.pannellumViewer) {
-        window.pannellumViewer.setPitch(0);
-        showSuccess('360° view centered horizontally');
-    }
-};
-
-// Setup panorama interaction (legacy function - now handled by Pannellum)
-function setupPanoramaInteraction() {
-    const viewer = document.getElementById('panorama-viewer');
-    const image = document.getElementById('panorama-image');
-    
-    if (!viewer || !image) return;
-    
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let currentRotationX = 0;
-    let currentRotationY = 0;
-    let currentScale = 1;
-    let autoRotateInterval = null;
-    
-    // Mouse events
-    viewer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        viewer.style.cursor = 'grabbing';
-        e.preventDefault();
-        
-        // Stop auto-rotate when user interacts
-        if (autoRotateInterval) {
-            clearInterval(autoRotateInterval);
-            autoRotateInterval = null;
-        }
-    });
-    
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        
-        currentRotationY += deltaX * 0.5;
-        currentRotationX -= deltaY * 0.3;
-        
-        // Limit vertical rotation
-        currentRotationX = Math.max(-45, Math.min(45, currentRotationX));
-        
-        updateImageTransform();
-        
-        startX = e.clientX;
-        startY = e.clientY;
-    });
-    
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        viewer.style.cursor = 'grab';
-    });
-    
-    // Touch events for mobile
-    viewer.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-            isDragging = true;
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            e.preventDefault();
-        }
-    });
-    
-    viewer.addEventListener('touchmove', (e) => {
-        if (!isDragging || e.touches.length !== 1) return;
-        
-        const deltaX = e.touches[0].clientX - startX;
-        const deltaY = e.touches[0].clientY - startY;
-        
-        currentRotationY += deltaX * 0.5;
-        currentRotationX -= deltaY * 0.3;
-        
-        currentRotationX = Math.max(-45, Math.min(45, currentRotationX));
-        
-        updateImageTransform();
-        
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        
-        e.preventDefault();
-    });
-    
-    viewer.addEventListener('touchend', () => {
-        isDragging = false;
-    });
-    
-    // Zoom with mouse wheel
-    viewer.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        currentScale *= zoomFactor;
-        currentScale = Math.max(0.5, Math.min(3, currentScale));
-        
-        updateImageTransform();
-    });
-    
-    function updateImageTransform() {
-        image.style.transform = `
-            scale(${currentScale}) 
-            rotateY(${currentRotationY}deg) 
-            rotateX(${currentRotationX}deg)
         `;
-    }
-    
-    // Global functions for controls
-    window.resetPanoramaView = function() {
-        currentRotationX = 0;
-        currentRotationY = 0;
-        currentScale = 1;
-        updateImageTransform();
-        
-        if (autoRotateInterval) {
-            clearInterval(autoRotateInterval);
-            autoRotateInterval = null;
-        }
-    };
-    
-    window.toggleAutoRotate = function() {
-        if (autoRotateInterval) {
-            clearInterval(autoRotateInterval);
-            autoRotateInterval = null;
-        } else {
-            autoRotateInterval = setInterval(() => {
-                currentRotationY += 0.5;
-                updateImageTransform();
-            }, 50);
-        }
-    };
-    
-    // Start with a slight auto-rotation
-    setTimeout(() => {
-        window.toggleAutoRotate();
-    }, 1000);
+
+        // Navigation controls
+        const navigationSection = document.createElement('div');
+        navigationSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-arrows-alt me-1"></i>Navigation
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px; justify-content: center;">
+                <div></div>
+                <button id="pan-up" class="pan-btn" title="Look Up">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <div></div>
+                <button id="pan-left" class="pan-btn" title="Look Left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button id="pan-center" class="pan-btn" title="Reset View">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+                <button id="pan-right" class="pan-btn" title="Look Right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div></div>
+                <button id="pan-down" class="pan-btn" title="Look Down">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div></div>
+            </div>
+        `;
+
+        // Auto-rotation controls
+        const autoRotateSection = document.createElement('div');
+        autoRotateSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-sync-alt me-1"></i>Auto Rotation
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation" style="position: relative;">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation" style="position: relative;">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction" style="position: relative;">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; text-align: center;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span>Speed:</span>
+                    <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
+                           style="width: 80px; height: 15px; cursor: pointer;">
+                    <span id="speed-value">2x</span>
+                </label>
+            </div>
+            <div id="rotation-status" style="margin-top: 5px; font-size: 10px; text-align: center; color: rgba(255,255,255,0.8);">
+                Status: Stopped
+            </div>
+        `;
+
+        // Zoom controls
+        const zoomSection = document.createElement('div');
+        zoomSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-search me-1"></i>Zoom
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="zoom-in" class="control-btn" title="Zoom In">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button id="zoom-out" class="control-btn" title="Zoom Out">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="zoom-reset" class="control-btn" title="Reset Zoom">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        `;
+
+        controlsContainer.appendChild(navigationSection);
+        controlsContainer.appendChild(autoRotateSection);
+        controlsContainer.appendChild(zoomSection);
+
+        // Add styles for buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            .pan-btn, .control-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                width: 40px;
+                height: 35px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+            .pan-btn:hover, .control-btn:hover {
+                background: rgba(255, 255, 255, 0.4);
+                border-color: rgba(255, 255, 255, 0.6);
+                transform: scale(1.05);
+            }
+            .pan-btn:active, .control-btn:active {
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0.95);
+            }
+            #rotation-speed {
+                background: rgba(255, 255, 255, 0.3);
+                border: none;
+                border-radius: 10px;
+            }
+            #rotation-speed::-webkit-slider-thumb {
+                background: white;
+                border-radius: 50%;
+                width: 12px;
+                height: 12px;
+                cursor: pointer;
+            }
+        `;
+        document.head.appendChild(style);
+
+        pannellumContainer.appendChild(controlsContainer);
+
+        // Add event listeners
+        let isAutoRotating = false;
+        let rotationDirection = 1; // 1 for right, -1 for left
+
+        // Navigation controls
+        document.getElementById('pan-up').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.min(currentPitch + 10, 90));
+        });
+
+        document.getElementById('pan-down').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.max(currentPitch - 10, -90));
+        });
+
+        document.getElementById('pan-left').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw - 15);
+        });
+
+        document.getElementById('pan-right').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw + 15);
+        });
+
+        document.getElementById('pan-center').addEventListener('click', () => {
+            viewer.setPitch(0);
+            viewer.setYaw(0);
+            viewer.setHfov(100);
+        });
+
+        // Auto-rotation controls
+        document.getElementById('auto-rotate-start').addEventListener('click', () => {
+            const speed = parseFloat(document.getElementById('rotation-speed').value);
+            const rotationSpeed = speed * rotationDirection;
+            viewer.setAutoRotate(rotationSpeed);
+            isAutoRotating = true;
+            console.log(`Started auto-rotation at ${speed}x speed (direction: ${rotationDirection > 0 ? 'right' : 'left'})`);
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(0, 255, 0, 0.4)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 255, 255, 0.2)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = `Status: Rotating ${rotationDirection > 0 ? 'Right' : 'Left'} at ${speed}x`;
+                statusEl.style.color = 'rgba(0, 255, 0, 0.9)';
+            }
+        });
+
+        document.getElementById('auto-rotate-stop').addEventListener('click', () => {
+            viewer.setAutoRotate(0);
+            isAutoRotating = false;
+            console.log('Stopped auto-rotation');
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(255, 255, 255, 0.2)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 0, 0, 0.4)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = 'Status: Stopped';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.8)';
+            }
+        });
+
+        document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
+            rotationDirection *= -1;
+            if (isAutoRotating) {
+                const speed = parseFloat(document.getElementById('rotation-speed').value);
+                viewer.setAutoRotate(speed * rotationDirection);
+            }
+            console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);
+
+            // Visual feedback for direction change
+            const reverseBtn = document.getElementById('auto-rotate-reverse');
+            const originalBg = reverseBtn.style.background;
+            reverseBtn.style.background = 'rgba(255, 255, 0, 0.6)';
+            setTimeout(() => {
+                reverseBtn.style.background = originalBg;
+            }, 300);
+        });
+
+        // Speed control
+        document.getElementById('rotation-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = speed + 'x';
+            if (isAutoRotating) {
+                viewer.setAutoRotate(speed * rotationDirection);
+                console.log(`Updated rotation speed to ${speed}x`);
+            }
+        });
+
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.max(currentHfov - 10, 50));
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.min(currentHfov + 10, 120));
+        });
+
+        document.getElementById('zoom-reset').addEventListener('click', () => {
+            viewer.setHfov(100);
+        });
+
+        console.log('Pannellum custom controls added successfully');
+
+    }, 500); // Wait for Pannellum to fully initialize
 }
 
-function displayPannellumError(url, error) {
-    const container = document.getElementById('panorama360');
-    if (container) {
-        container.innerHTML = `
-            <div class="alert alert-warning text-center p-4" style="margin: 20px;">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <h5>360° Viewer Error</h5>
-                <p>Could not load the 360° panoramic image.</p>
-                <p class="small text-muted">Error: ${error}</p>
-                <div class="mt-3">
-                    <a href="${url}" target="_blank" class="btn btn-primary me-2">
-                        <i class="fas fa-external-link-alt me-1"></i>View Image Directly
-                    </a>
-                    <button class="btn btn-outline-secondary" onclick="retry360Init('${url}')">
-                        <i class="fas fa-redo me-1"></i>Retry
+function handleFeatureClick(feature, featureIndex, layerConfig) {
+    // Check if the feature is already selected
+    const isSelected = selectedFeatures.includes(feature);
+
+    // Toggle selection state
+    toggleRowSelection(layerConfig.id, featureIndex, !isSelected);
+
+    // Highlight if selected, reset style if deselected
+    if (!isSelected) {
+        // Highlight in yellow
+        if (feature.setStyle) {
+            feature.setStyle({
+                fillColor: '#ffff00',   // Yellow highlight
+                color: '#000000',       // Black border
+                weight: 3,              // Thicker border
+                fillOpacity: 0.8        // More opaque when selected
+            });
+        }
+
+        // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
+        const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
+
+        // Ensure we have the record data for this feature
+        let recordData = feature.recordData;
+        if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
+            recordData = currentLayer.records[featureIndex].fields;
+            feature.recordData = recordData; // Cache for future use
+        }
+
+        if (recordData) {
+            // Detect media layer type and handle accordingly
+            const mediaType = detectMediaLayerType(currentLayer.name, currentLayer.records);
+            const mediaUrl = findUrlField(recordData);
+
+            if (mediaType && mediaUrl) {
+                // Handle media layers with modals
+                const title = recordData.title || recordData.name || `${currentLayer.name} Media`;
+
+                switch (mediaType) {
+                    case 'video':
+                        openVideoModal(mediaUrl, title);
+                        break;
+                    case 'audio':
+                        openAudioModal(mediaUrl, title);
+                        break;
+                    case 'image':
+                        openImageModal(mediaUrl, title);
+                        break;
+                    case 'pdf':
+                        openPdfModal(mediaUrl, title);
+                        break;
+                    case '360':
+                        open360Modal(mediaUrl, title);
+                        break;
+                    default:
+                        // Fallback to regular popup
+                        showRegularPopup(feature, recordData, currentLayer);
+                }
+
+                console.log(`Opened ${mediaType} modal for feature ${featureIndex} in layer "${currentLayer.name}"`);
+            } else {
+                // Regular layer - show popup
+                showRegularPopup(feature, recordData, currentLayer);
+            }
+        }
+    } else {
+        // Reset to original style
+        if (feature.setStyle) {
+            const originalStyle = layerConfig.properties?.symbology || {};
+            feature.setStyle({
+                fillColor: originalStyle.fillColor || '#3498db',
+                color: originalStyle.borderColor || '#2c3e50',
+                weight: originalStyle.borderWidth || 2,
+                fillOpacity: originalStyle.fillOpacity || 0.7
+            });
+        }
+    }
+}
+
+function showRegularPopup(feature, recordData, currentLayer) {
+    // Check if popups are enabled for this layer
+    const popupEnabled = currentLayer.properties?.popup?.enabled !== false;
+
+    if (popupEnabled) {
+        // Create popup content using the current layer configuration (which includes updated popup fields)
+        const popupContent = createFeaturePopup(recordData, currentLayer);
+
+        // Update the popup with the new content that respects field selection
+        if (feature.getPopup()) {
+            feature.getPopup().setContent(popupContent);
+            feature.openPopup();
+        } else {
+            feature.bindPopup(popupContent).openPopup();
+        }
+
+        console.log(`Regular popup opened for feature in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
+    } else {
+        console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
+        showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
+    }
+}
+
+// Additional zoom control functions
+window.resetMapView = function() {
+    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
+    showInfo('Map view reset to default');
+};
+
+window.zoomToAllLayers = function() {
+    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
+
+    if (visibleLayers.length === 0) {
+        showWarning('No visible layers to zoom to');
+        return;
+    }
+
+    // Collect all features from visible layers
+    const allFeatures = [];
+    visibleLayers.forEach(layer => {
+        layer.features.forEach(feature => {
+            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
+                allFeatures.push(feature);
+            }
+        });
+    });
+
+    if (allFeatures.length === 0) {
+        showWarning('No valid features found to zoom to');
+        return;
+    }
+
+    // Create feature group and fit bounds
+    const group = new L.featureGroup(allFeatures);
+    const bounds = group.getBounds();
+
+    // Calculate adaptive padding and zoom level
+    const latSpan = bounds.getNorth() - bounds.getSouth();
+    const lngSpan = bounds.getEast() - bounds.getWest();
+    const maxSpan = Math.max(latSpan, lngSpan);
+
+    let padding, maxZoom;
+    if (maxSpan < 0.001) { // Very small area
+        padding = 0.5;
+        maxZoom = 25;
+    } else if (maxSpan < 0.01) { // Small area
+        padding = 0.3;
+        maxZoom = 23;
+    } else if (maxSpan < 0.1) { // Medium area
+        padding = 0.15;
+        maxZoom = 21;
+    } else { // Large area
+        padding = 0.05;
+        maxZoom = 19;
+    }
+
+    map.fitBounds(bounds.pad(padding), { 
+        animate: true, 
+        duration: 1,
+        maxZoom: maxZoom
+    });
+
+    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features at enhanced detail level`);
+};
+
+// Event listeners for property controls
+document.addEventListener('DOMContentLoaded', function() {
+    // Opacity slider
+    const opacitySlider = document.getElementById('propFillOpacity');
+    if (opacitySlider) {
+        opacitySlider.addEventListener('input', function() {
+            const fillOpacityValue = document.getElementById('fillOpacityValue');
+            if (fillOpacityValue) {
+                fillOpacityValue.textContent = Math.round(this.value * 100) + '%';
+            }
+        });
+    }
+
+    // Border width slider
+    const borderSlider = document.getElementById('propBorderWidth');
+    if (borderSlider) {
+        borderSlider.addEventListener('input', function() {
+            const borderWidthValue = document.getElementById('borderWidthValue');
+            if (borderWidthValue) {
+                borderWidthValue.textContent = this.value + 'px';
+            }
+        });
+    }
+
+    // Labels checkbox
+    const labelsCheckbox = document.getElementById('propEnableLabels');
+    if (labelsCheckbox) {
+        labelsCheckbox.addEventListener('change', function() {
+            const propLabelControls = document.getElementById('propLabelControls');
+            if (propLabelControls) {
+                propLabelControls.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+    }
+
+    // iTool event listeners
+    const popupEnableCheckbox = document.getElementById('propEnablePopups');
+    if (popupEnableCheckbox) {
+        popupEnableCheckbox.addEventListener('change', function(e) {
+            console.log('Popup checkbox changed:', e.target.checked);
+            handlePopupToggle();
+            // Mark as having unsaved changes
+            if (window.currentPropertiesLayer) {
+                console.log('Popup toggle changed for layer:', window.currentPropertiesLayer.name);
+
+                // Immediately update the layer properties to reflect the change
+                if (!window.currentPropertiesLayer.properties) {
+                    window.currentPropertiesLayer.properties = {};
+                }
+                if (!window.currentPropertiesLayer.properties.popup) {
+                    window.currentPropertiesLayer.properties.popup = {};
+                }
+                window.currentPropertiesLayer.properties.popup.enabled = e.target.checked;
+            }
+        });
+    }
+
+    const popupTemplateSelect = document.getElementById('propPopupTemplate');
+    if (popupTemplateSelect) {
+        popupTemplateSelect.addEventListener('change', handleTemplateChange);
+    }
+
+    // Symbology type change listener
+    const symbologyTypeSelect = document.getElementById('propSymbologyType');
+    if (symbologyTypeSelect) {
+        symbologyTypeSelect.addEventListener('change', updateSymbologyType);
+    }
+
+     // Tab switching for layer source
+    const tabButtons = document.querySelectorAll('#layerSourceTabs .nav-link');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-bs-target');
+
+            // Update button visibility based on active tab
+            const addLayerBtn = document.getElementById('addLayerBtn');
+            const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+
+            if (targetTab === '#geojson-pane') {
+                if (addLayerBtn) addLayerBtn.style.display = 'none';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'inline-block';
+            } else {
+                if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
+            }
+        });
+    });
+});
+
+// Measurement tools
+let currentDistanceUnit = 'm'; // Default unit: meters
+
+function startMeasurement(type) {
+    clearMeasurements();
+
+    // Update button states
+    document.querySelectorAll('.measurement-btn').forEach(btn => btn.classList.remove('active'));
+
+    currentMeasurement = type;
+
+    if (type === 'distance') {
+        map.on('click', onDistanceMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        showDistanceUnitSelector();
+    } else if (type === 'area') {
+        map.on('click', onAreaMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        hideDistanceUnitSelector();
+    }
+}
+
+function showDistanceUnitSelector() {
+    // Show unit selector when distance measurement is active
+    const unitSelector = document.getElementById('distanceUnitSelector');
+    if (unitSelector) {
+        unitSelector.style.display = 'block';
+    }
+}
+
+function hideDistanceUnitSelector() {
+    // Hide unit selector when not measuring distance
+    const unitSelector = document.getElementById('distanceUnitSelector');
+    if (unitSelector) {
+        unitSelector.style.display = 'none';
+    }
+}
+
+function changeDistanceUnit(unit) {
+    currentDistanceUnit = unit;
+    // Update button states
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.unit-btn[onclick="changeDistanceUnit('${unit}')"]`).classList.add('active');
+
+    // Recalculate and update existing distance measurements
+    updateExistingDistanceMeasurements();
+}
+
+function calculateDistance(points, unit = null) {
+    if (points.length < 2) return '0 m';
+
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+        totalDistance += points[i - 1].distanceTo(points[i]);
+    }
+
+    // Use provided unit or current selected unit
+    const selectedUnit = unit || currentDistanceUnit;
+
+    return formatDistance(totalDistance, selectedUnit);
+}
+
+function formatDistance(distanceInMeters, unit) {
+    let value, unitLabel;
+
+    switch (unit) {
+        case 'km':
+            value = distanceInMeters / 1000;
+            unitLabel = 'km';
+            // Show more precision for smaller values
+            if (value < 0.01) {
+                return Math.round(distanceInMeters) + ' m';
+            } else if (value < 1) {
+                return value.toFixed(3) + ' km';
+            } else {
+                return value.toFixed(2) + ' km';
+            }
+            break;
+        case 'ft':
+            value = distanceInMeters * 3.28084;
+            unitLabel = 'ft';
+            if (value < 1000) {
+                return Math.round(value) + ' ft';
+            } else {
+                return (value / 5280).toFixed(2) + ' mi'; // Convert to miles for large distances
+            }
+            break;
+        case 'm':
+        default:
+            value = distanceInMeters;
+            unitLabel = 'm';
+            if (value < 1000) {
+                return Math.round(value) + ' m';
+            } else {
+                return (value / 1000).toFixed(2) + ' km'; // Auto-convert to km for large distances
+            }
+    }
+}
+
+function updateExistingDistanceMeasurements() {
+    // Update all existing distance labels with new unit
+    measurementGroup.eachLayer(layer => {
+        if (layer.options && layer.options.isDistanceLabel && layer.measurementPoints) {
+            const newDistance = calculateDistance(layer.measurementPoints);
+            layer.setIcon(L.divIcon({
+                className: 'distance-label',
+                html: `<div class="measurement-label distance-label-content">${newDistance}</div>`,
+                iconSize: [80, 25],
+                iconAnchor: [40, 12]
+            }));
+        }
+    });
+}
+
+function onDistanceMeasureClick(e) {
+    measurementPoints.push(e.latlng);
+
+    // Add point marker with enhanced styling
+    const pointMarker = L.circleMarker(e.latlng, {
+        radius: 5,
+        fillColor: '#e74c3c',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    // Add point number label
+    const pointNumber = L.marker(e.latlng, {
+        icon: L.divIcon({
+            className: 'point-label',
+            html: `<div class="point-number">${measurementPoints.length}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 25]
+        }),
+        interactive: false
+    }).addTo(measurementGroup);
+
+    if (measurementPoints.length > 1) {
+        // Draw line segment
+        const lineSegment = L.polyline([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ], {
+            color: '#e74c3c',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 5'
+        }).addTo(measurementGroup);
+
+        // Calculate segment distance
+        const segmentDistance = calculateDistance([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ]);
+
+        // Add distance label at midpoint
+        const midpoint = L.latLng(
+            (measurementPoints[measurementPoints.length - 2].lat + e.latlng.lat) / 2,
+            (measurementPoints[measurementPoints.length - 2].lng + e.latlng.lng) / 2
+        );
+
+        const distanceLabel = L.marker(midpoint, {
+            icon: L.divIcon({
+                className: 'distance-label',
+                html: `<div class="measurement-label distance-label-content">${segmentDistance}</div>`,
+                iconSize: [80, 25],
+                iconAnchor: [40, 12]
+            }),
+            interactive: false,
+            isDistanceLabel: true,
+            measurementPoints: [
+                measurementPoints[measurementPoints.length - 2],
+                measurementPoints[measurementPoints.length - 1]
+            ]
+        }).addTo(measurementGroup);
+
+        // Store reference for unit updates
+        distanceLabel.options.isDistanceLabel = true;
+        distanceLabel.measurementPoints = [
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ];
+
+        // Calculate and show total distance
+        const totalDistance = calculateDistance(measurementPoints);
+        updateMeasurementDisplay('distance', totalDistance);
+
+        // Show instruction for continuing or finishing measurement
+        showMeasurementInfo(`Total distance: ${totalDistance}. Click to continue, or double-click to finish.`);
+    } else {
+        showMeasurementInfo('Click on the map to set the next point.');
+    }
+}
+
+function onAreaMeasureClick(e) {
+    measurementPoints.push(e.latlng);
+
+    // Add point marker with enhanced styling
+    const pointMarker = L.circleMarker(e.latlng, {
+        radius: 5,
+        fillColor: '#27ae60',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    // Add point number label
+    const pointNumber = L.marker(e.latlng, {
+        icon: L.divIcon({
+            className: 'point-label',
+            html: `<div class="point-number" style="background: #27ae60;">${measurementPoints.length}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 25]
+        }),
+        interactive: false
+    }).addTo(measurementGroup);
+
+    // Draw lines connecting points
+    if (measurementPoints.length > 1) {
+        const line = L.polyline([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ], {
+            color: '#27ae60',
+            weight: 2,
+            opacity: 0.8,
+            dashArray: '3, 3'
+        }).addTo(measurementGroup);
+    }
+
+    // Draw polygon if we have at least 3 points
+    if (measurementPoints.length >= 3) {
+        // Remove previous polygon
+        measurementGroup.eachLayer(layer => {
+            if (layer instanceof L.Polygon && layer.options.isAreaPolygon) {
+                measurementGroup.removeLayer(layer);
+            }
+        });
+
+        // Add new polygon
+        const polygon = L.polygon(measurementPoints, {
+            color: '#27ae60',
+            weight: 3,
+            fillColor: '#27ae60',
+            fillOpacity: 0.2,
+            isAreaPolygon: true
+        }).addTo(measurementGroup);
+
+        // Calculate and show area
+        const area = calculateArea(measurementPoints);
+        updateMeasurementDisplay('area', area);
+
+        // Remove previous area label
+        measurementGroup.eachLayer(layer => {
+            if (layer.options && layer.options.isAreaLabel) {
+                measurementGroup.removeLayer(layer);
+            }
+        });
+
+        // Add area label at centroid
+        const centroid = polygon.getBounds().getCenter();
+        const areaLabel = L.marker(centroid, {
+            icon: L.divIcon({
+                className: 'area-label',
+                html: `<div class="measurement-label" style="background: linear-gradient(135deg, #27ae60, #1e8449); color: white; border: 2px solid #fff;">${area}</div>`,
+                iconSize: [100, 30],
+                iconAnchor: [50, 15]
+            }),
+            interactive: false,
+            isAreaLabel: true
+        }).addTo(measurementGroup);
+
+        // Show instruction
+        showMeasurementInfo(`Area: ${area}. Click to add more points, or double-click to finish.`);
+
+        // Enable double-click to finish
+        map.on('dblclick', finishAreaMeasurement);
+    } else {
+        showMeasurementInfo(`Point ${measurementPoints.length} added. Add ${3 - measurementPoints.length} more point(s) to start measuring area.`);
+    }
+}
+
+function calculateArea(points) {
+    if (points.length < 3) return '0 m²';
+
+    // Calculate area using shoelace formula with proper Earth geometry
+    let area = 0;
+    const R = 6371000; // Earth's radius in meters
+
+    // Convert to radians and calculate using spherical excess
+    const coords = points.map(point => ({
+        lat: point.lat * Math.PI / 180,
+        lng: point.lng * Math.PI / 180
+    }));
+
+    // Shoelace formula adapted for spherical coordinates
+    for (let i = 0; i < coords.length; i++) {
+        const j = (i + 1) % coords.length;
+        area += coords[i].lng * Math.sin(coords[j].lat);
+        area -= coords[j].lng * Math.sin(coords[i].lat);
+    }
+
+    area = Math.abs(area) * R * R / 2;
+
+    return formatArea(area);
+}
+
+function formatArea(areaInSquareMeters) {
+    if (areaInSquareMeters < 1) {
+        return '< 1 m²';
+    } else if (areaInSquareMeters < 10000) {
+        return Math.round(areaInSquareMeters) + ' m²';
+    } else if (areaInSquareMeters < 1000000) {
+        return (areaInSquareMeters / 10000).toFixed(2) + ' ha';
+    } else {
+        return (areaInSquareMeters / 1000000).toFixed(2) + ' km²';
+    }
+}
+
+function clearMeasurements() {
+    measurementGroup.clearLayers();
+    measurementPoints = [];
+    currentMeasurement = null;
+
+    // Reset button states
+    document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+
+    // Hide unit selector
+    hideDistanceUnitSelector();
+
+    // Reset cursor
+    map.getContainer().style.cursor = '';
+
+    // Remove event listeners
+    map.off('click', onDistanceMeasureClick);
+    map.off('click', onAreaMeasureClick);
+    map.off('dblclick', finishAreaMeasurement);
+
+    // Clear measurement display
+    updateMeasurementDisplay('', '');
+    hideMeasurementInfo();
+}
+
+function updateMeasurementDisplay(type, value) {
+    // Update measurement display if it exists
+    const display = document.getElementById('measurementDisplay');
+    if (display) {
+        if (type && value) {
+            display.innerHTML = `<strong>${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${value}`;
+            display.style.display = 'block';
+        } else {
+            display.style.display = 'none';
+        }
+    }
+}
+
+function showMeasurementInfo(message) {
+    // Remove existing info if any
+    hideMeasurementInfo();
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'measurement-info';
+    infoDiv.id = 'measurementInfo';
+    infoDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>${message}`;
+
+    document.body.appendChild(infoDiv);
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        hideMeasurementInfo();
+    }, 5000);
+}
+
+function hideMeasurementInfo() {
+    const existingInfo = document.getElementById('measurementInfo');
+    if (existingInfo) {
+        existingInfo.remove();
+    }
+}
+
+function updateUnitDescription(unit) {
+    const descriptions = {
+        'm': 'Meters - Standard metric unit',
+        'km': 'Kilometers - For longer distances',
+        'ft': 'Feet - Imperial unit system'
+    };
+
+    const descElement = document.getElementById('unitDescription');
+    if (descElement) {
+        descElement.textContent = descriptions[unit] || 'Distance measurement unit';
+    }
+}
+
+// Enhanced changeDistanceUnit function
+function changeDistanceUnit(unit) {
+    currentDistanceUnit = unit;
+
+    // Update button states
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.unit-btn[onclick="changeDistanceUnit('${unit}')"]`).classList.add('active');
+
+    // Update description
+    updateUnitDescription(unit);
+
+    // Recalculate and update existing distance measurements
+    updateExistingDistanceMeasurements();
+
+    // Show unit change feedback
+    const unitNames = { 'm': 'Meters', 'km': 'Kilometers', 'ft': 'Feet' };
+    showSuccess(`Distance unit changed to ${unitNames[unit]}`);
+}
+
+// Load filter fields based on selected layer
+function loadFilterFields() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldSelect = document.getElementById('filterField');
+
+    if (fieldSelect) {
+        fieldSelect.innerHTML = '<option value="">Select field...</option>';
+
+        if (!layerId) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records || layer.records.length === 0) return;
+
+        // Get all fields except geometry field
+        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        console.log(`Loading filter fields for layer "${layer.name}" - all fields:`, allFields);
+
+        // Filter out hidden fields based on permissions
+        const permittedFields = filterFieldsByPermissions(allFields, layer);
+        console.log(`Permitted fields for filtering:`, permittedFields);
+
+        permittedFields.forEach(field => {
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = `${permissionIcon} ${field}`;
+            fieldSelect.appendChild(option);
+        });
+
+        if (permittedFields.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No accessible fields for filtering";
+            option.disabled = true;
+            fieldSelect.appendChild(option);
+        }
+
+        console.log(`Filter field selector populated with ${permittedFields.length} permitted fields`);
+    }
+}
+
+// Load filter values based on selected field
+function loadFilterValues() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldName = document.getElementById('filterField').value;
+    const valueSelect = document.getElementById('filterValue');
+
+    if (valueSelect) {
+        valueSelect.innerHTML = '<option value="">Select value...</option>';
+
+        if (!layerId || !fieldName) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records) return;
+
+        // Check if user has permission to access this field
+        const permission = getFieldPermission(fieldName, layer);
+        if (permission === 'hidden') {
+            console.log(`Field "${fieldName}" is hidden - not loading values`);
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "Field not accessible";
+            option.disabled = true;
+            valueSelect.appendChild(option);
+            return;
+        }
+
+        // Get unique values for the field
+        const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
+        uniqueValues.forEach(value => {
+            if (value !== null && value !== undefined) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                valueSelect.appendChild(option);
+            }
+        });
+
+        console.log(`Loaded ${uniqueValues.length} unique values for permitted field "${fieldName}"`);
+    }
+}
+
+// Add a new filter rule
+function addFilterRule() {
+    const layerId = document.getElementById('filterLayer').value;
+    const field = document.getElementById('filterField').value;
+    const operator = document.getElementById('filterOperator').value;
+    const value = document.getElementById('filterValue').value;
+
+    if (!layerId || !field || !operator || !value) {
+        showWarning('Please fill in all filter fields');
+        return;
+    }
+
+    // Validate field permissions before adding filter
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (layer) {
+        const permission = getFieldPermission(field, layer);
+        if (permission === 'hidden') {
+            showError(`Cannot filter on field "${field}" - field is not accessible due to permissions`);
+            return;
+        }
+    }
+
+    const filter = {
+        id: Date.now().toString(),
+        layerId: layerId,
+        field: field,
+        operator: operator,
+        value: value
+    };
+
+    currentFilters.push(filter);
+    updateFilterRulesDisplay();
+
+    // Clear form
+    const filterLayer = document.getElementById('filterLayer');
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+
+    if (filterLayer) filterLayer.value = '';
+    if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
+    if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
+
+    console.log(`Added filter rule for permitted field "${field}" with ${operator} "${value}"`);
+}
+
+// Update the display of applied filter rules
+function updateFilterRulesDisplay() {
+    const container = document.getElementById('filterRules');
+
+    if (!container) return;
+
+    if (currentFilters.length === 0) {
+        container.innerHTML = '<p class="text-muted">No filters applied</p>';
+        return;
+    }
+
+    let html = '';
+    currentFilters.forEach(filter => {
+        const layer = mapLayers.find(l => l.id === filter.layerId);
+        const layerName = layer ? layer.name : 'Unknown Layer';
+
+        html += `
+            <div class="filter-rule">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${layerName}</strong> → ${filter.field} ${filter.operator} "${filter.value}"
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFilterRule('${filter.id}')">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
         `;
-    }
-    showError('Failed to load 360° image viewer: ' + error);
+    });
+
+    container.innerHTML = html;
 }
 
-function retry360Init(url) {
-    console.log('Retrying 360° viewer initialization...');
+// Remove a specific filter rule
+function removeFilterRule(filterId) {
+    const index = currentFilters.findIndex(f => f.id === filterId);
+    if (index !== -1) {
+        currentFilters.splice(index, 1);
+        updateFilterRulesDisplay();
+        applyFilters(); // Re-apply remaining filters
+    }
+}
+
+// Apply all active filters
+function applyFilters() {
+    if (currentFilters.length === 0) {
+        // Show all features
+        mapLayers.forEach(layer => {
+            if (layer.visible && layer.leafletLayer) {
+                layer.features.forEach(feature => {
+                    if (!layer.leafletLayer.hasLayer(feature)) {
+                        layer.leafletLayer.addLayer(feature);
+                    }
+                });
+            }
+        });
+        showSuccess('All filters cleared - showing all features');
+        return;
+    }
+
+    let filteredCount = 0;
+    let totalCount = 0;
+    let skippedFilters = 0;
+
+    mapLayers.forEach(layer => {
+        if (!layer.visible) return;
+
+        const layerFilters = currentFilters.filter(f => f.layerId === layer.id);
+
+        layer.features.forEach(feature => {
+            totalCount++;
+            let showFeature = true;
+
+            // Apply all filters for this layer
+            layerFilters.forEach(filter => {
+                // Check if user still has permission to access this field
+                const permission = getFieldPermission(filter.field, layer);
+                if (permission === 'hidden') {
+                    console.warn(`Skipping filter on hidden field "${filter.field}"`);
+                    skippedFilters++;
+                    return; // Skip this filter - don't apply it
+                }
+
+                const fieldValue = feature.recordData[filter.field];
+
+                switch (filter.operator) {
+                    case 'equals':
+                        if (String(fieldValue) !== String(filter.value)) showFeature = false;
+                        break;
+                    case 'contains':
+                        if (!String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'starts_with':
+                        if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'greater_than':
+                        if (!(parseFloat(fieldValue) > parseFloat(filter.value))) showFeature = false;
+                        break;
+                    case 'less_than':
+                        if (!(parseFloat(fieldValue) < parseFloat(filter.value))) showFeature = false;
+                        break;
+                }
+            });
+
+            // Show/hide feature based on filter result
+            if (showFeature) {
+                if (!layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.addLayer(feature);
+                }
+                filteredCount++;
+            } else {
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+            }
+        });
+    });
+
+    let message = `Filters applied: showing ${filteredCount} of ${totalCount} features`;
+    if (skippedFilters > 0) {
+        message += ` (${skippedFilters} filter(s) skipped due to field permissions)`;
+    }
+    showSuccess(message);
+}
+
+// Clear all active filters
+function clearAllFilters() {
+    currentFilters = [];
+    updateFilterRulesDisplay();
+    applyFilters(); // This will show all features
+}
+
+// Populate layer selector in filters
+function updateLayerSelectors() {
+    const filterLayerSelect = document.getElementById('filterLayer');
+
+    if (filterLayerSelect) {
+        filterLayerSelect.innerHTML = '<option value="">Select layer...</option>';
+        mapLayers.forEach(layer => {
+            const option = document.createElement('option');
+            option.value = layer.id;
+            option.textContent = layer.name;
+            filterLayerSelect.appendChild(option);
+        });
+    }
+}
+
+// Update map statistics displayed in the sidebar
+function updateMapStatistics() {
+    const totalLayers = mapLayers.length;
+    const visibleLayers = mapLayers.filter(l => l.visible).length;
+    const totalFeatures = mapLayers.reduce((sum, layer) => sum + layer.featureCount, 0);
+    const visibleFeatures = mapLayers.filter(l => l.visible).reduce((sum, layer) => {
+        if (layer.leafletLayer) {
+            return sum + layer.leafletLayer.getLayers().length;
+        }
+        return sum;
+    }, 0);
+
+    const totalLayersElement = document.getElementById('totalLayers');
+    const totalFeaturesElement = document.getElementById('totalFeatures');
+    const visibleFeaturesElement = document.getElementById('visibleFeatures');
+    const filteredFeaturesElement = document.getElementById('filteredFeatures');
+
+    if (totalLayersElement) totalLayersElement.textContent = totalLayers;
+    if (totalFeaturesElement) totalFeaturesElement.textContent = totalFeatures;
+    if (visibleFeaturesElement) visibleFeaturesElement.textContent = visibleFeatures;
+    if (filteredFeaturesElement) filteredFeaturesElement.textContent = totalFeatures - visibleFeatures;
+
+    // Update layer selectors
+    updateLayerSelectors();
+}
+
+// Export functionality
+function exportMap() {
+    showInfo('Map export functionality would be implemented here');
+}
+
+// Fullscreen map functionality
+function fullscreenMap() {
+    const mapContainer = document.getElementById('map');
+
+    if (!mapContainer) {
+        showError('Map container not found');
+        return;
+    }
+
+    try {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (mapContainer.requestFullscreen) {
+                mapContainer.requestFullscreen();
+            } else if (mapContainer.webkitRequestFullscreen) {
+                mapContainer.webkitRequestFullscreen();
+            } else if (mapContainer.msRequestFullscreen) {
+                mapContainer.msRequestFullscreen();
+            } else if (mapContainer.mozRequestFullScreen) {
+                mapContainer.mozRequestFullScreen();
+            } else {
+                showError('Fullscreen not supported by this browser');
+                return;
+            }
+
+            // Add fullscreen class for styling
+            mapContainer.classList.add('fullscreen-map');
+
+            // Show success message
+            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
+
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+
+        // Listen for fullscreen changes to update map size and remove class
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+
+    } catch (error) {
+        console.error('Fullscreen error:', error);
+        showError('Failed to toggle fullscreen: ' + error.message);
+    }
+}
+
+function handleFullscreenChange() {
+    const mapContainer = document.getElementById('map');
+
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.msFullscreenElement && 
+        !document.mozFullScreenElement) {
+
+        // Exited fullscreen
+        if (mapContainer) {
+            mapContainer.classList.remove('fullscreen-map');
+        }
+
+        showInfo('Exited fullscreen mode');
+    }
+
+    // Invalidate map size to ensure proper rendering
     setTimeout(() => {
-        initializePannellumViewer(url);
+        if (map) {
+            map.invalidateSize();
+        }
     }, 100);
 }
 
-// PDF loading function
-let pdfDocument = null;
-let currentPDFPage = 1;
-let pdfScale = 1.0;
+// Detect media type specifically from URL
+function detectURLMediaType(url, layerName = null, fieldName = null) {
+    if (!url || typeof url !== 'string') return null;
 
-async function loadPDFDocument(url) {
-    try {
-        if (typeof pdfjsLib === 'undefined') {
-            throw new Error('PDF.js library not loaded');
+    const urlLower = url.toLowerCase();
+    const nameCheck = layerName ? layerName.toLowerCase() : '';
+
+    // 360° detection (highest priority) - check both URL and layer name
+    if (nameCheck.includes('360') || nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+        console.log(`URL detected as 360° content: ${url}`);
+        return '360';
+    }
+
+    // Video detection
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || 
+        urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.avi') ||
+        urlLower.includes('vimeo.com') || urlLower.includes('video')) {
+        return 'video';
+    }
+
+    // Audio detection
+    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') ||
+        urlLower.includes('soundcloud.com') || urlLower.includes('audio')) {
+        return 'audio';
+    }
+
+    // PDF detection
+    if (urlLower.includes('.pdf') || urlLower.includes('document')) {
+        return 'pdf';
+    }
+
+    // Image detection - but not if layer is named "360" or contains "360"
+    if (!nameCheck.includes('360') && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
+        return 'image';
+    }
+
+    return null;
+}
+
+// Get media type information for display
+function getMediaTypeInfo(mediaType) {
+    const mediaTypes = {
+        'video': {
+            icon: '🎥',
+            title: 'Video',
+            buttonText: 'View Video'
+        },
+        'audio': {
+            icon: '🎵',
+            title: 'Audio',
+            buttonText: 'Play Audio'
+        },
+        'image': {
+            icon: '📷',
+            title: 'Image',
+            buttonText: 'View Image'
+        },
+        'pdf': {
+            icon: '📄',
+            title: 'PDF',
+            buttonText: 'View PDF'
+        },
+        '360': {
+            icon: '🌐',
+            title: '360° View',
+            buttonText: 'View 360°'
         }
-        
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        
-        const loadingTask = pdfjsLib.getDocument(url);
-        pdfDocument = await loadingTask.promise;
-        
-        document.getElementById('totalPages').textContent = pdfDocument.numPages;
-        currentPDFPage = 1;
-        
-        renderPDFPage(currentPDFPage);
-        
-    } catch (error) {
-        console.error('Error loading PDF:', error);
-        showError('Failed to load PDF document');
-    }
+    };
+
+    return mediaTypes[mediaType] || {
+        icon: '🔗',
+        title: 'Link',
+        buttonText: 'Open Link'
+    };
 }
 
-async function renderPDFPage(pageNumber) {
-    if (!pdfDocument) return;
-    
+// Open media from URL with appropriate modal
+window.openMediaFromURL = function(url, mediaType, title = 'Media') {
     try {
-        const page = await pdfDocument.getPage(pageNumber);
-        const canvas = document.getElementById('pdfCanvas');
-        const context = canvas.getContext('2d');
-        
-        const viewport = page.getViewport({ scale: pdfScale });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        
-        const renderContext = {
-            canvasContext: context,
-            viewport: viewport
-        };
-        
-        await page.render(renderContext).promise;
-        
-        document.getElementById('currentPage').textContent = pageNumber;
-        currentPDFPage = pageNumber;
-        
-        // Update navigation buttons
-        document.getElementById('prevPageBtn').disabled = pageNumber <= 1;
-        document.getElementById('nextPageBtn').disabled = pageNumber >= pdfDocument.numPages;
-        
+        switch (mediaType) {
+            case 'video':
+                openVideoModal(url, title);
+                break;
+            case 'audio':
+                openAudioModal(url, title);
+                break;
+            case 'image':
+                openImageModal(url, title);
+                break;
+            case 'pdf':
+                openPdfModal(url, title);
+                break;
+            case '360':
+                open360Modal(url, title);
+                break;
+            default:
+                // Fallback to opening in new tab
+                window.open(url, '_blank');
+        }
+
+        console.log(`Opened ${mediaType} modal for URL: ${url}`);
     } catch (error) {
-        console.error('Error rendering PDF page:', error);
+        console.error('Error opening media:', error);
+        showError('Failed to open media: ' + error.message);
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
     }
-}
+};
 
-function previousPDFPage() {
-    if (currentPDFPage > 1) {
-        renderPDFPage(currentPDFPage - 1);
+// Enhanced media layer detection function
+function detectMediaLayerType(layerName, records) {
+    const name = layerName.toLowerCase();
+
+    // Check layer name first - prioritize 360 detection
+    if (name.includes('360') || name === '360' || name.includes('panorama') || name.includes('streetview')) {
+        console.log(`Layer "${layerName}" detected as 360° layer based on name`);
+        return '360';
     }
-}
+    if (name.includes('video')) return 'video';
+    if (name.includes('audio')) return 'audio';
+    if (name.includes('pdf') || name.includes('document')) return 'pdf';
 
-function nextPDFPage() {
-    if (pdfDocument && currentPDFPage < pdfDocument.numPages) {
-        renderPDFPage(currentPDFPage + 1);
+    // If name doesn't match, analyze URL patterns from data
+    if (records && records.length > 0) {
+        for (const record of records.slice(0, 5)) { // Check first 5 records
+            const fields = record.fields || {};
+
+            for (const fieldName of Object.keys(fields)) {
+                const fieldValue = fields[fieldName];
+
+                if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
+                    const url = fieldValue.toLowerCase();
+
+                    // 360 detection (check first for priority)
+                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        console.log(`URL contains 360° indicators: ${url}`);
+                        return '360';
+                    }
+
+                    // Video detection
+                    if (url.includes('youtube.com') || url.includes('youtu.be') || 
+                        url.includes('.mp4') || url.includes('.webm') || url.includes('.avi') ||
+                        url.includes('vimeo.com') || url.includes('video')) {
+                        return 'video';
+                    }
+
+                    // Audio detection
+                    if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg') ||
+                        url.includes('soundcloud.com') || url.includes('audio')) {
+                        return 'audio';
+                    }
+
+                    // PDF detection
+                    if (url.includes('.pdf') || url.includes('document')) {
+                        return 'pdf';
+                    }
+
+                    // Image detection - but only if layer name doesn't contain "360"
+                    if (!name.includes('360') && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
+                        return 'image';
+                    }
+                }
+            }
+        }
+
+        // Special case: If layer name contains "360", always treat as 360 layer
+        if (name.includes('360') || name === '360') {
+            console.log(`Layer containing "360" will use Pannellum viewer regardless of URL content`);
+            return '360';
+        }
     }
+
+    return null; // Standard layer
 }
 
-function zoomPDF(factor) {
-    pdfScale *= factor;
-    document.getElementById('pdfZoomLevel').textContent = Math.round(pdfScale * 100) + '%';
-    renderPDFPage(currentPDFPage);
+// Video player modal
+function openVideoModal(url, title = 'Video Player') {
+    const modal = document.getElementById('videoModal');
+    const videoElement = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const videoInfo = document.getElementById('videoInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-play-circle me-2"></i>${title}`;
+    }
+
+    if (videoSource && videoElement) {
+        // Handle different video URL types
+        let finalUrl = url;
+
+        // Convert YouTube URLs to embed format
+        if (url.includes('youtube.com/watch?v=')) {
+            const videoId = url.split('v=')[1].split('&')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            // For YouTube, we'll use an iframe instead
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else if (url.includes('youtu.be/')) {
+            const videoId = url.split('youtu.be/')[1].split('?')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else {
+            // Regular video file
+            videoSource.src = finalUrl;
+            videoElement.load();
+            videoElement.style.display = 'block';
+        }
+
+        if (videoInfo) {
+            videoInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+        }
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened video modal for: ${title}`);
 }
 
-// Media control functions
-function downloadCurrentMedia() {
-    if (window.currentMediaURL) {
+// Audio player modal
+function openAudioModal(url, title = 'Audio Player') {
+    const modal = document.getElementById('audioModal');
+    const audioElements = modal.querySelectorAll('audio source');
+    const audioInfo = document.getElementById('audioInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-music me-2"></i>${title}`;
+    }
+
+    // Update all audio source elements
+    audioElements.forEach(source => {
+        source.src = url;
+    });
+
+    // Load the audio
+    const audioElement = modal.querySelector('audio');
+    if (audioElement) {
+        audioElement.load();
+    }
+
+    if (audioInfo) {
+        audioInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened audio modal for: ${title}`);
+}
+
+// Image viewer modal
+function openImageModal(url, title = 'Image Viewer') {
+    const modal = document.getElementById('imageModal');
+    const imageElement = modal.querySelector('img');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-image me-2"></i>${title}`;
+    }
+
+    if (imageElement) {
+        imageElement.src = url;
+        imageElement.alt = title;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened image modal for: ${title}`);
+}
+
+// PDF viewer modal
+function openPdfModal(url, title = 'PDF Viewer') {
+    const modal = document.getElementById('pdfModal');
+    const iframeElement = modal.querySelector('iframe');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${title}`;
+    }
+
+    if (iframeElement) {
+        iframeElement.src = url;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened PDF modal for: ${title}`);
+}
+
+// 360° viewer modal (using Pannellum)
+function open360Modal(url, title = '360° Viewer') {
+    const modal = document.getElementById('image360Modal');
+    const pannellumContainer = document.getElementById('panorama360');
+    const modalTitle = modal ? modal.querySelector('.modal-title') : null;
+
+    if (!modal) {
+        console.error('360° modal not found with ID "image360Modal"');
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+        return;
+    }
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    let viewer = null;
+    let autoRotateInterval = null;
+
+    // Initialize 360 viewer when modal is shown
+    modal.addEventListener('shown.bs.modal', function() {
+        if (typeof pannellum !== 'undefined' && pannellumContainer) {
+            try {
+                viewer = pannellum.viewer('panorama360', {
+                    type: 'equirectangular',
+                    panorama: url,
+                    autoLoad: true,
+                    showControls: true,
+                    showZoomCtrl: true,
+                    showFullscreenCtrl: true,
+                    mouseZoom: true,
+                    compass: true,
+                    northOffset: 0,
+                    pitch: 0,
+                    yaw: 0,
+                    hfov: 100,
+                    minHfov: 50,
+                    maxHfov: 120,
+                    autoRotate: 0, // Start with auto-rotation off
+                    keyboardZoom: true,
+                    mouseZoom: true,
+                    draggable: true
+                });
+
+                // Add custom navigation and control buttons
+                addPannellumControls(viewer);
+
+                console.log('Pannellum 360 viewer initialized with enhanced controls');
+            } catch (error) {
+                console.error('Error initializing Pannellum:', error);
+                pannellumContainer.innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        360° viewer could not be initialized.
+                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View image directly
+                        </a>
+                    </div>
+                `;
+            }
+        } else {
+            // Fallback to regular image display
+            if (pannellumContainer) {
+                pannellumContainer.innerHTML = `
+                    <div class="text-center">
+                        <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            360° viewer library not loaded. Displaying as regular image.
+                            <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>View original
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    });
+
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function() {
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+        if (viewer) {
+            viewer.destroy();
+            viewer = null;
+        }
+        // Remove custom controls
+        const customControls = document.querySelector('.pannellum-custom-controls');
+        if (customControls) {
+            customControls.remove();
+        }
+    });
+
+    bootstrapModal.show();
+    console.log(`Opened 360° modal for: ${title}`);
+}
+
+// Add custom navigation and control buttons to Pannellum viewer
+function addPannellumControls(viewer) {
+    // Wait for viewer to be ready
+    setTimeout(() => {
+        const pannellumContainer = document.getElementById('panorama360');
+        if (!pannellumContainer) return;
+
+        // Create custom controls container
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'pannellum-custom-controls';
+        controlsContainer.style.cssText = `
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        `;
+
+        // Navigation controls
+        const navigationSection = document.createElement('div');
+        navigationSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-arrows-alt me-1"></i>Navigation
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px; justify-content: center;">
+                <div></div>
+                <button id="pan-up" class="pan-btn" title="Look Up">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <div></div>
+                <button id="pan-left" class="pan-btn" title="Look Left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button id="pan-center" class="pan-btn" title="Reset View">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+                <button id="pan-right" class="pan-btn" title="Look Right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div></div>
+                <button id="pan-down" class="pan-btn" title="Look Down">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div></div>
+            </div>
+        `;
+
+        // Auto-rotation controls
+        const autoRotateSection = document.createElement('div');
+        autoRotateSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-sync-alt me-1"></i>Auto Rotation
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation" style="position: relative;">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation" style="position: relative;">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction" style="position: relative;">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; text-align: center;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span>Speed:</span>
+                    <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
+                           style="width: 80px; height: 15px; cursor: pointer;">
+                    <span id="speed-value">2x</span>
+                </label>
+            </div>
+            <div id="rotation-status" style="margin-top: 5px; font-size: 10px; text-align: center; color: rgba(255,255,255,0.8);">
+                Status: Stopped
+            </div>
+        `;
+
+        // Zoom controls
+        const zoomSection = document.createElement('div');
+        zoomSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-search me-1"></i>Zoom
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="zoom-in" class="control-btn" title="Zoom In">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button id="zoom-out" class="control-btn" title="Zoom Out">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="zoom-reset" class="control-btn" title="Reset Zoom">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        `;
+
+        controlsContainer.appendChild(navigationSection);
+        controlsContainer.appendChild(autoRotateSection);
+        controlsContainer.appendChild(zoomSection);
+
+        // Add styles for buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            .pan-btn, .control-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                width: 40px;
+                height: 35px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+            .pan-btn:hover, .control-btn:hover {
+                background: rgba(255, 255, 255, 0.4);
+                border-color: rgba(255, 255, 255, 0.6);
+                transform: scale(1.05);
+            }
+            .pan-btn:active, .control-btn:active {
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0.95);
+            }
+            #rotation-speed {
+                background: rgba(255, 255, 255, 0.3);
+                border: none;
+                border-radius: 10px;
+            }
+            #rotation-speed::-webkit-slider-thumb {
+                background: white;
+                border-radius: 50%;
+                width: 12px;
+                height: 12px;
+                cursor: pointer;
+            }
+        `;
+        document.head.appendChild(style);
+
+        pannellumContainer.appendChild(controlsContainer);
+
+        // Add event listeners
+        let isAutoRotating = false;
+        let rotationDirection = 1; // 1 for right, -1 for left
+
+        // Navigation controls
+        document.getElementById('pan-up').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.min(currentPitch + 10, 90));
+        });
+
+        document.getElementById('pan-down').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.max(currentPitch - 10, -90));
+        });
+
+        document.getElementById('pan-left').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw - 15);
+        });
+
+        document.getElementById('pan-right').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw + 15);
+        });
+
+        document.getElementById('pan-center').addEventListener('click', () => {
+            viewer.setPitch(0);
+            viewer.setYaw(0);
+            viewer.setHfov(100);
+        });
+
+        // Auto-rotation controls
+        document.getElementById('auto-rotate-start').addEventListener('click', () => {
+            const speed = parseFloat(document.getElementById('rotation-speed').value);
+            const rotationSpeed = speed * rotationDirection;
+            viewer.setAutoRotate(rotationSpeed);
+            isAutoRotating = true;
+            console.log(`Started auto-rotation at ${speed}x speed (direction: ${rotationDirection > 0 ? 'right' : 'left'})`);
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(0, 255, 0, 0.4)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 255, 255, 0.2)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = `Status: Rotating ${rotationDirection > 0 ? 'Right' : 'Left'} at ${speed}x`;
+                statusEl.style.color = 'rgba(0, 255, 0, 0.9)';
+            }
+        });
+
+        document.getElementById('auto-rotate-stop').addEventListener('click', () => {
+            viewer.setAutoRotate(0);
+            isAutoRotating = false;
+            console.log('Stopped auto-rotation');
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(255, 255, 255, 0.2)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 0, 0, 0.4)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = 'Status: Stopped';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.8)';
+            }
+        });
+
+        document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
+            rotationDirection *= -1;
+            if (isAutoRotating) {
+                const speed = parseFloat(document.getElementById('rotation-speed').value);
+                viewer.setAutoRotate(speed * rotationDirection);
+            }
+            console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);            // Visual feedback for direction change
+            const reverseBtn = document.getElementById('auto-rotate-reverse');
+            const originalBg = reverseBtn.style.background;
+            reverseBtn.style.background = 'rgba(255, 255, 0, 0.6)';
+            setTimeout(() => {
+                reverseBtn.style.background = originalBg;
+            }, 300);
+        });
+
+        // Speed control
+        document.getElementById('rotation-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = speed + 'x';
+            if (isAutoRotating) {
+                viewer.setAutoRotate(speed * rotationDirection);
+                console.log(`Updated rotation speed to ${speed}x`);
+            }
+        });
+
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.max(currentHfov - 10, 50));
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.min(currentHfov + 10, 120));
+        });
+
+        document.getElementById('zoom-reset').addEventListener('click', () => {
+            viewer.setHfov(100);
+        });
+
+        console.log('Pannellum custom controls added successfully');
+
+    }, 500); // Wait for Pannellum to fully initialize
+}
+
+// Media modal utility functions
+window.downloadCurrentMedia = function() {
+    // Get the currently active modal
+    const activeModal = document.querySelector('.modal.show');
+    if (!activeModal) {
+        showError('No active media to download');
+        return;
+    }
+
+    let mediaUrl = null;
+
+    // Extract media URL based on modal type
+    if (activeModal.id === 'videoModal') {
+        const videoElement = activeModal.querySelector('#videoPlayer source');
+        mediaUrl = videoElement ? videoElement.src : null;
+    } else if (activeModal.id === 'audioModal') {
+        const audioElement = activeModal.querySelector('audio source');
+        mediaUrl = audioElement ? audioElement.src : null;
+    } else if (activeModal.id === 'imageModal') {
+        const imageElement = activeModal.querySelector('img');
+        mediaUrl = imageElement ? imageElement.src : null;
+    } else if (activeModal.id === 'pdfModal') {
+        const iframeElement = activeModal.querySelector('iframe');
+        mediaUrl = iframeElement ? iframeElement.src : null;
+    }
+
+    if (mediaUrl) {
         const link = document.createElement('a');
-        link.href = window.currentMediaURL;
-        link.download = 'media_file';
+        link.href = mediaUrl;
+        link.download = '';
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    }
-}
-
-function fullscreen360() {
-    if (window.pannellumViewer) {
-        try {
-            window.pannellumViewer.toggleFullscreen();
-        } catch (error) {
-            console.error('Error toggling fullscreen:', error);
-            showError('Could not toggle fullscreen mode');
-        }
+        showSuccess('Download started');
     } else {
-        showError('360° viewer not initialized');
+        showError('Could not find media URL for download');
     }
-}
+};
 
-function fullscreenVideo() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    if (videoPlayer && videoPlayer.requestFullscreen) {
-        videoPlayer.requestFullscreen();
-    }
-}
-
-function fullscreenImage() {
-    const imageViewer = document.getElementById('imageViewer');
-    if (imageViewer && imageViewer.requestFullscreen) {
-        imageViewer.requestFullscreen();
-    }
-}
-
-function printPDF() {
-    if (window.currentMediaURL) {
-        window.open(window.currentMediaURL, '_blank');
-    }
-}
-
-function adjustPlaybackRate(adjustment) {
-    const audioPlayer = document.getElementById('audioPlayer');
-    if (audioPlayer) {
-        if (adjustment === 0) {
-            audioPlayer.playbackRate = 1.0;
-        } else {
-            audioPlayer.playbackRate = Math.max(0.25, Math.min(2.0, audioPlayer.playbackRate + adjustment));
+window.fullscreenVideo = function() {
+    const videoElement = document.getElementById('videoPlayer');
+    if (videoElement) {
+        if (videoElement.requestFullscreen) {
+            videoElement.requestFullscreen();
+        } else if (videoElement.webkitRequestFullscreen) {
+            videoElement.webkitRequestFullscreen();
+        } else if (videoElement.msRequestFullscreen) {
+            videoElement.msRequestFullscreen();
+        } else if (videoElement.mozRequestFullScreen) {
+            videoElement.mozRequestFullScreen();
         }
+        showSuccess('Video entered fullscreen mode');
     }
-}
+};
+
+window.fullscreenImage = function() {
+    const activeModal = document.querySelector('.modal.show');
+    const imageElement = activeModal ? activeModal.querySelector('img') : null;
+
+    if (imageElement) {
+        if (imageElement.requestFullscreen) {
+            imageElement.requestFullscreen();
+        } else if (imageElement.webkitRequestFullscreen) {
+            imageElement.webkitRequestFullscreen();
+        } else if (imageElement.msRequestFullscreen) {
+            imageElement.msRequestFullscreen();
+        } else if (imageElement.mozRequestFullScreen) {
+            imageElement.mozRequestFullScreen();
+        }
+        showSuccess('Image entered fullscreen mode');
+    }
+};
+
+window.adjustPlaybackRate = function(adjustment) {
+    const audioElement = document.querySelector('#audioModal audio');
+    if (audioElement) {
+        if (adjustment === 0) {
+            audioElement.playbackRate = 1.0;
+        } else {
+            audioElement.playbackRate = Math.max(0.25, Math.min(2.0, audioElement.playbackRate + adjustment));
+        }
+        showSuccess(`Playback rate: ${audioElement.playbackRate}x`);
+    }
+};
 
 // Image zoom functions
 let imageScale = 1;
@@ -4280,7 +5949,10 @@ function resetImageZoom() {
 function updateImageTransform() {
     const imageViewer = document.getElementById('imageViewer');
     if (imageViewer) {
-        imageViewer.style.transform = `scale(${imageScale}) translate(${imageTranslateX}px, ${imageTranslateY}px)`;
+        imageViewer.style.transform = `
+            scale(${imageScale}) 
+            translate(${imageTranslateX}px, ${imageTranslateY}px)
+        `;
     }
 }
 
@@ -4349,10 +6021,10 @@ function updateSymbologyType() {
         console.error('Symbology type selector not found');
         return;
     }
-    
+
     const symbologyType = symbologyTypeSelect.value;
     console.log('Updating symbology type to:', symbologyType);
-    
+
     // Get all symbology control sections
     const singleControls = document.getElementById('propSingleSymbol');
     const graduatedControls = document.getElementById('propGraduated');
@@ -4385,13 +6057,13 @@ function updateSymbologyType() {
             if (singleControls) {
                 singleControls.style.display = 'block';
                 console.log('✅ Showing single symbology controls');
-                
+
                 // Ensure the single symbol styling is properly initialized
                 if (window.currentPropertiesLayer) {
                     const layer = window.currentPropertiesLayer;
                     if (!layer.properties) layer.properties = {};
                     if (!layer.properties.symbology) layer.properties.symbology = {};
-                    
+
                     // Set default single symbol properties if not already set
                     if (layer.properties.symbology.type !== 'single') {
                         layer.properties.symbology.type = 'single';
@@ -4399,7 +6071,7 @@ function updateSymbologyType() {
                         layer.properties.symbology.borderColor = layer.properties.symbology.borderColor || '#2c3e50';
                         layer.properties.symbology.borderWidth = layer.properties.symbology.borderWidth || 2;
                         layer.properties.symbology.fillOpacity = layer.properties.symbology.fillOpacity || 0.7;
-                        
+
                         console.log('Initialized single symbol properties for layer:', layer.name);
                     }
                 }
@@ -4407,16 +6079,16 @@ function updateSymbologyType() {
                 console.error('❌ Single symbol controls not found - element with ID "propSingleSymbol" missing');
             }
             break;
-            
+
         case 'graduated':
             if (graduatedControls) {
                 graduatedControls.style.display = 'block';
                 console.log('✅ Showing graduated symbology controls');
-                
+
                 // Populate field selectors when switching to graduated
                 if (window.currentPropertiesLayer) {
                     populateFieldSelectors(window.currentPropertiesLayer);
-                    
+
                     // Initialize graduated properties
                     const layer = window.currentPropertiesLayer;
                     if (!layer.properties) layer.properties = {};
@@ -4427,16 +6099,16 @@ function updateSymbologyType() {
                 console.error('❌ Graduated controls not found');
             }
             break;
-            
+
         case 'categorized':
             if (categorizedControls) {
                 categorizedControls.style.display = 'block';
                 console.log('✅ Showing categorized symbology controls');
-                
+
                 // Populate field selectors when switching to categorized
                 if (window.currentPropertiesLayer) {
                     populateFieldSelectors(window.currentPropertiesLayer);
-                    
+
                     // Initialize categorized properties
                     const layer = window.currentPropertiesLayer;
                     if (!layer.properties) layer.properties = {};
@@ -4447,13 +6119,13 @@ function updateSymbologyType() {
                 console.error('❌ Categorized controls not found');
             }
             break;
-            
+
         default:
             // Default to single symbol if no valid type selected or empty
             if (singleControls) {
                 singleControls.style.display = 'block';
                 console.log('⚠️ Defaulting to single symbology controls for type:', symbologyType);
-                
+
                 // Set default to single if undefined
                 const symbologySelect = document.getElementById('propSymbologyType');
                 if (symbologySelect && (!symbologyType || symbologyType === '')) {
@@ -4462,7 +6134,7 @@ function updateSymbologyType() {
             }
             console.warn('Unknown or empty symbology type:', symbologyType, '- defaulting to single');
     }
-    
+
     // Force a UI update to ensure visibility changes take effect
     setTimeout(() => {
         console.log('Final visibility states:', {
@@ -4541,7 +6213,7 @@ function generateGraduatedSymbology() {
     const colorRamp = colorRampSelect.value || 'blues';
 
     const layer = window.currentPropertiesLayer;
-    
+
     // Extract numeric values from the selected field
     const values = [];
     layer.records.forEach(record => {
@@ -4561,12 +6233,12 @@ function generateGraduatedSymbology() {
     values.sort((a, b) => a - b);
     const min = values[0];
     const max = values[values.length - 1];
-    
+
     if (min === max) {
         showError('All values are the same, cannot create graduated symbology');
         return;
     }
-    
+
     const interval = (max - min) / classes;
     const breaks = [];
     const colors = generateColorRamp(colorRamp, classes);
@@ -4574,12 +6246,12 @@ function generateGraduatedSymbology() {
     // Create legend with proper styling
     let legendHTML = '<div class="graduated-legend mt-3">';
     legendHTML += '<h6>Legend Preview</h6>';
-    
+
     for (let i = 0; i < classes; i++) {
         const minVal = min + (i * interval);
         const maxVal = min + ((i + 1) * interval);
         breaks.push(maxVal);
-        
+
         legendHTML += `
             <div class="legend-item d-flex align-items-center mb-2">
                 <div class="legend-color me-2" style="
@@ -4603,7 +6275,7 @@ function generateGraduatedSymbology() {
     // Update layer properties
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.symbology) layer.properties.symbology = {};
-    
+
     layer.properties.symbology = {
         type: 'graduated',
         field: field,
@@ -4629,7 +6301,7 @@ function generateCategorizedSymbology() {
     }
 
     const layer = window.currentPropertiesLayer;
-    
+
     // Extract unique values with counts
     const valueCount = new Map();
     layer.records.forEach(record => {
@@ -4657,7 +6329,7 @@ function generateCategorizedSymbology() {
     // Create legend with counts and better styling
     let legendHTML = '<div class="categorized-legend mt-3">';
     legendHTML += '<h6>Legend Preview</h6>';
-    
+
     uniqueValues.forEach((value, index) => {
         const count = valueCount.get(value);
         legendHTML += `
@@ -4684,7 +6356,7 @@ function generateCategorizedSymbology() {
     // Update layer properties
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.symbology) layer.properties.symbology = {};
-    
+
     layer.properties.symbology = {
         type: 'categorized',
         field: field,
@@ -4778,18 +6450,18 @@ function applyProperties() {
     // Get current symbology type
     const symbologyType = document.getElementById('propSymbologyType').value || 'single';
     layer.properties.symbology.type = symbologyType;
-    
+
     // Update common properties
     const fillColor = document.getElementById('propFillColor').value;
     const borderColor = document.getElementById('propBorderColor').value;
     const borderWidth = parseInt(document.getElementById('propBorderWidth').value);
     const fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
-    
+
     if (fillColor) layer.properties.symbology.fillColor = fillColor;
     if (borderColor) layer.properties.symbology.borderColor = borderColor;
     if (!isNaN(borderWidth)) layer.properties.symbology.borderWidth = borderWidth;
     if (!isNaN(fillOpacity)) layer.properties.symbology.fillOpacity = fillOpacity;
-    
+
     console.log('Updated symbology properties:', {
         type: symbologyType,
         fillColor: fillColor,
@@ -4808,17 +6480,17 @@ function applyProperties() {
 
     // Update popup properties with all iTool settings
     if (!layer.properties.popup) layer.properties.popup = {};
-    
+
     // Get popup enabled state FIRST before applying other settings
     const popupEnabledCheckbox = document.getElementById('propEnablePopups');
     const popupEnabled = popupEnabledCheckbox ? popupEnabledCheckbox.checked : true;
     layer.properties.popup.enabled = popupEnabled;
-    
+
     console.log(`Applying popup enabled state: ${popupEnabled} for layer "${layer.name}"`);
-    
+
     // Apply all popup settings
     updateLayerPopupSettings(layer);
-    
+
     // Collect selected popup fields from checkboxes
     const selectedPopupFields = [];
     const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
@@ -4826,11 +6498,11 @@ function applyProperties() {
         const fieldName = checkbox.id.replace('popup_field_', '');
         selectedPopupFields.push(fieldName);
     });
-    
+
     // Update popup fields in layer properties and mark as configured
     layer.properties.popup.fields = selectedPopupFields;
     layer.properties.popup.configured = true;
-    
+
     console.log(`Applying popup configuration for layer "${layer.name}"`);
     console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
     console.log(`Total selected fields: ${selectedPopupFields.length}`);
@@ -4845,28 +6517,28 @@ function applyProperties() {
         // Force update all existing feature popups with new field configuration
         if (mapLayers[layerIndex].features && mapLayers[layerIndex].records) {
             console.log(`Updating popups for ${mapLayers[layerIndex].features.length} features`);
-            
+
             mapLayers[layerIndex].features.forEach((feature, index) => {
                 // Get the record data for this feature
                 const recordData = mapLayers[layerIndex].records[index]?.fields;
-                
+
                 if (recordData) {
                     // Update the cached record data on the feature
                     feature.recordData = recordData;
                     feature.layerId = mapLayers[layerIndex].id;
                     feature.featureIndex = index;
-                    
+
                     // Create new popup content with updated field configuration
                     const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
-                    
+
                     // Remove existing popup if it exists
                     if (feature.getPopup()) {
                         feature.unbindPopup();
                     }
-                    
+
                     // Bind new popup with updated content
                     feature.bindPopup(newPopupContent);
-                    
+
                     // Update click handler to use new configuration
                     feature.off('click');
                     feature.on('click', function(e) {
@@ -4875,7 +6547,7 @@ function applyProperties() {
                     });
                 }
             });
-            
+
             console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
         }
     }
@@ -4901,7 +6573,3208 @@ function applyProperties() {
     const message = fieldCount === 0 ? 
         'Layer properties applied! Popup will show no fields.' : 
         `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
-    
+
+    showSuccess(message);
+}
+
+function applyLayerStyling(layer) {
+    if (!layer.features || !layer.properties) {
+        console.warn('Layer missing features or properties for styling');
+        return;
+    }
+
+    // Ensure symbology exists with defaults
+    if (!layer.properties.symbology) {
+        layer.properties.symbology = {
+            type: 'single',
+            fillColor: '#3498db',
+            borderColor: '#2c3e50',
+            borderWidth: 2,
+            fillOpacity: 0.7
+        };
+        console.log('Created default symbology for layer:', layer.name);
+    }
+
+    const symbology = layer.properties.symbology;
+    console.log(`Applying ${symbology.type} symbology to layer "${layer.name}" with ${layer.features.length} features`);
+
+    let styledCount = 0;
+
+    layer.features.forEach((feature, index) => {
+        // Check if feature is a point (marker) or polygon/polyline
+        const isPoint = feature.getLatLng && !feature.setStyle;
+        const isPolygonOrLine = feature.setStyle;
+
+        if (!isPoint && !isPolygonOrLine) {
+            console.warn(`Feature ${index} has unknown geometry type`);
+            return;
+        }
+
+        // Determine style color based on symbology type
+        let fillColor = symbology.fillColor || '#3498db';
+        let borderColor = symbology.borderColor || '#2c3e50';
+
+        // Apply styling based on symbology type
+        switch (symbology.type) {
+            case 'single':
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
+                break;
+
+            case 'graduated':
+                if (symbology.field && feature.recordData && feature.recordData[symbology.field] !== undefined) {
+                    const featureValue = parseFloat(feature.recordData[symbology.field]);
+                    if (!isNaN(featureValue) && symbology.breaks && symbology.colors) {
+                        // Find which class the value belongs to
+                        let classIndex = 0;
+                        for (let i = 0; i < symbology.breaks.length; i++) {
+                            if (featureValue <= symbology.breaks[i]) {
+                                classIndex = i;
+                                break;
+                            }
+                        }
+                        fillColor = symbology.colors[classIndex] || '#3498db';
+                        borderColor = symbology.borderColor || '#2c3e50';
+                    } else {
+                        // Use default color for non-numeric values
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
+                    }
+                } else {
+                    // No field specified or no data - use default
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
+                }
+                break;
+
+            case 'categorized':
+                if (symbology.field && feature.recordData && feature.recordData[symbology.field] !== undefined) {
+                    const featureCategory = String(feature.recordData[symbology.field]);
+                    const category = symbology.categories && symbology.categories.find(cat => String(cat.value) === featureCategory);
+                    if (category) {
+                        fillColor = category.color;
+                        borderColor = symbology.borderColor || '#2c3e50';
+                    } else {
+                        // Use default color for uncategorized values
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
+                    }
+                } else {
+                    // No field specified or no data - use default
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
+                }
+                break;
+
+            default:
+                // Fallback to single symbol styling
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
+                console.warn(`Unknown symbology type "${symbology.type}", using single symbol fallback`);
+        }
+
+        try {
+            if (isPoint) {
+                // For point features (markers), we need to recreate the marker with new styling
+                const latLng = feature.getLatLng();
+                const recordData = feature.recordData;
+                const recordId = feature.recordId;
+                const layerId = feature.layerId;
+                const featureIndex = feature.featureIndex;
+
+                // Remove old marker from layer group
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+
+                // Create new styled marker
+                const newMarker = L.circleMarker(latLng, {
+                    fillColor: fillColor,
+                    color: borderColor,
+                    weight: symbology.borderWidth || 2,
+                    fillOpacity: symbology.fillOpacity || 0.7,
+                    radius: 8
+                });
+
+                // Copy properties from old marker
+                newMarker.recordData = recordData;
+                newMarker.recordId = recordId;
+                newMarker.layerId = layerId;
+                newMarker.featureIndex = featureIndex;
+
+                // Bind popup if it existed
+                if (feature.getPopup && feature.getPopup()) {
+                    newMarker.bindPopup(feature.getPopup().getContent());
+                }
+
+                // Add click handler
+                newMarker.on('click', function(e) {
+                    window.currentPopupFeature = this;
+                });
+
+                // Add to layer group
+                layer.leafletLayer.addLayer(newMarker);
+
+                // Replace in features array
+                layer.features[index] = newMarker;
+
+                styledCount++;
+
+            } else if (isPolygonOrLine) {
+                // For polygon/polyline features, use setStyle
+                const style = {
+                    fillColor: fillColor,
+                    color: borderColor,
+                    weight: symbology.borderWidth || 2,
+                    fillOpacity: symbology.fillOpacity || 0.7,
+                    opacity: 1
+                };
+
+                feature.setStyle(style);
+                styledCount++;
+            }
+
+        } catch (error) {
+            console.error(`Error applying style to feature ${index}:`, error);
+        }
+    });
+
+    console.log(`✅ Successfully styled ${styledCount}/${layer.features.length} features with ${symbology.type} symbology`);
+
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    }
+
+    // Ensure add layer functionality remains intact after styling
+    ensureAddLayerFunctionality();
+}
+
+function ensureAddLayerFunctionality() {
+    // Reset any global variables that might interfere with add layer
+    if (window.currentPropertiesLayer) {
+        // Clear the reference to avoid conflicts
+        const tempLayer = window.currentPropertiesLayer;
+        window.currentPropertiesLayer = null;
+
+        // Restore it after a short delay to allow add layer to work properly
+        setTimeout(() => {
+            if (!document.getElementById('addLayerModal').classList.contains('show')) {
+                window.currentPropertiesLayer = tempLayer;
+            }
+        }, 100);
+    }
+
+    // Ensure the add layer modal event listeners are still active
+    const addLayerBtn = document.querySelector('[onclick*="showAddLayerModal"]');
+    if (addLayerBtn && !addLayerBtn.onclick) {
+        addLayerBtn.onclick = showAddLayerModal;
+    }
+
+    // Re-enable table loading functionality
+    const tableSelector = document.getElementById('newLayerTable');
+    if (tableSelector) {
+        // Remove any disabled state that might have been applied
+        tableSelector.disabled = false;
+
+        // Ensure change event listener is active
+        if (!tableSelector.onchange) {
+            tableSelector.onchange = loadTableFields;
+        }
+    }
+}
+
+function applyLabelsToLayer(layer) {
+    // Remove existing labels
+    if (layer.labelGroup) {
+        map.removeLayer(layer.labelGroup);
+        layer.labelGroup = null;
+    }
+
+    const labels = layer.properties.labels;
+    if (!labels.enabled || !labels.field) return;
+
+    const labelElements = [];
+
+    layer.features.forEach((feature, index) => {
+        const record = layer.records[index];
+        if (!record || !record.fields[labels.field]) return;
+
+        const labelText = String(record.fields[labels.field]);
+        const fontSize = labels.fontSize || 12;
+        const color = labels.color || '#2c3e50';
+        const background = labels.background !== false;
+
+        // For polygons, use tooltip approach for better integration
+        if (feature.getBounds) {
+            // Calculate the visual center of the polygon for better label placement
+            const bounds = feature.getBounds();
+            const center = bounds.getCenter();
+
+            // Create a transparent marker at the center for label positioning
+            const labelMarker = L.marker(center, {
+                icon: L.divIcon({
+                    className: 'polygon-label-marker',
+                    html: `<div class="polygon-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -50%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                }),
+                interactive: false
+            });
+
+            labelElements.push(labelMarker);
+
+        } else if (feature.getLatLng) {
+            // For point features, use the existing approach but improved
+            const labelPosition = feature.getLatLng();
+
+            const labelMarker = L.marker(labelPosition, {
+                icon: L.divIcon({
+                    className: 'point-label-marker',
+                    html: `<div class="point-label" style="
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        font-size: ${fontSize}px;
+                        color: ${color};
+                        font-weight: 600;
+                        text-align: center;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        line-height: 1.2;
+                        position: absolute;
+                        transform: translate(-50%, -200%);
+                        z-index: 1000;
+                        ${background ? `
+                            background: rgba(255, 255, 255, 0.9);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            border: 1px solid ${color};
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                        ` : `
+                            text-shadow: 
+                                -1px -1px 0px rgba(255,255,255,0.8),
+                                1px -1px 0px rgba(255,255,255,0.8),
+                                -1px 1px 0px rgba(255,255,255,0.8),
+                                1px 1px 0px rgba(255,255,255,0.8),
+                                0px 0px 2px rgba(0,0,0,0.8);
+                        `}
+                    ">${truncateText(labelText, 10)}</div>`,
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                }),
+                interactive: false
+            });
+
+            labelElements.push(labelMarker);
+        }
+    });
+
+    if (labelElements.length > 0) {
+        layer.labelGroup = L.layerGroup(labelElements);
+        if (layer.visible) {
+            layer.labelGroup.addTo(map);
+        }
+    }
+}
+
+function calculateLabelOffset(position, index, totalLabels) {
+    // Calculate smart positioning to reduce overlap
+    const baseOffset = 15;
+    const spacing = 25;
+
+    // For small numbers of features, use center positioning
+    if (totalLabels < 10) {
+        return { x: 0, y: 0 };
+    }
+
+    // For larger numbers, create a slight offset pattern
+    const angle = (index * 45) % 360; // Rotate through different angles
+    const radius = baseOffset + (index % 3) * 5; // Vary the distance
+
+    const x = Math.cos(angle * Math.PI / 180) * radius;
+    const y = Math.sin(angle * Math.PI / 180) * radius;
+
+    return { x: Math.round(x), y: Math.round(y) };
+}
+
+function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 1) + '…';
+}
+
+// Additional iTool utility functions
+function filterPopupFields(searchTerm) {
+    const fields = document.querySelectorAll('.popup-field, tr[data-field], .card[data-field]');
+    fields.forEach(field => {
+        const fieldName = field.dataset.field || '';
+        const fieldContent = field.textContent.toLowerCase();
+        const isVisible = fieldName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         fieldContent.includes(searchTerm.toLowerCase());
+        field.style.display = isVisible ? '' : 'none';
+    });
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showSuccess('Copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showSuccess('Copied to clipboard!');
+    });
+}
+
+function previewPopup() {
+    if (!window.currentPropertiesLayer || !window.currentPropertiesLayer.records) {
+        showError('No layer selected or no data available for preview');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+    const sampleRecord = layer.records[0];
+
+    if (!sampleRecord || !sampleRecord.fields) {
+        showError('No sample data available for preview');
+        return;
+    }
+
+    // Apply current settings to layer temporarily for preview
+    updateLayerPopupSettings(layer);
+
+    // Generate preview content
+    const previewContent = createFeaturePopup(sampleRecord.fields, layer);
+
+    // Display in preview area
+    document.getElementById('popupPreview').innerHTML = previewContent;
+}
+
+function updateLayerPopupSettings(layer) {
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = {};
+
+    // Get popup enabled state - this should already be set but ensure consistency
+    const enablePopupsCheckbox = document.getElementById('propEnablePopups');
+    const popupEnabled = enablePopupsCheckbox ? enablePopupsCheckbox.checked : true;
+    layer.properties.popup.enabled = popupEnabled;
+
+    // Only update other popup settings if popups are enabled
+    if (!popupEnabled) {
+        console.log(`Popups disabled for layer "${layer.name}" - skipping detailed popup configuration`);
+        return;
+    }
+    layer.properties.popup.template = document.getElementById('propPopupTemplate')?.value || 'default';
+    layer.properties.popup.maxWidth = parseInt(document.getElementById('propMaxPopupWidth')?.value) || 300;
+    layer.properties.popup.maxFieldLength = parseInt(document.getElementById('propMaxFieldLength')?.value) || 100;
+    layer.properties.popup.position = document.getElementById('propPopupPosition')?.value || 'auto';
+    layer.properties.popup.showEmptyFields = document.getElementById('propShowEmptyFields')?.checked || false;
+    layer.properties.popup.showFieldIcons = document.getElementById('propShowFieldIcons')?.checked !== false;
+    layer.properties.popup.highlightLinks = document.getElementById('propHighlightLinks')?.checked !== false;
+    layer.properties.popup.showTooltips = document.getElementById('propShowTooltips')?.checked || false;
+    layer.properties.popup.enableSearch = document.getElementById('propEnableSearch')?.checked || false;
+    layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
+    layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
+    layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
+
+    // Controls
+    if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
+    layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
+    layer.properties.popup.controls.showCenterControl = document.getElementById('propShowCenterControl')?.checked !== false;
+    layer.properties.popup.controls.showExportControl = document.getElementById('propShowExportControl')?.checked || false;
+    layer.properties.popup.controls.showEditControl = document.getElementById('propShowEditControl')?.checked || false;
+}
+
+function exportCurrentFeature() {
+    if (!window.currentPopupFeature || !window.currentPopupFeature.recordData) {
+        showError('No feature data available for export');
+        return;
+    }
+
+    const data = window.currentPopupFeature.recordData;
+    const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'feature_data.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+
+    showSuccess('Feature data exported successfully!');
+}
+
+function editCurrentFeature() {
+    showInfo('Feature editing functionality would be implemented here based on permissions');
+}
+
+// Template change handler
+function handleTemplateChange() {
+    const template = document.getElementById('propPopupTemplate')?.value;
+    const customSection = document.getElementById('customTemplateSection');
+
+    if (template === 'custom' && customSection) {
+        customSection.style.display = 'block';
+    } else if (customSection) {
+        customSection.style.display = 'none';
+    }
+}
+
+// Handle feature click without auto-playing media
+function handleFeatureClick(feature, index, layerConfig) {
+    // This function is called when a feature is clicked
+    // It should only show the popup, not auto-play any media
+    console.log('Feature clicked, showing popup only');
+}
+
+// Global popup control functions
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for zooming');
+        return;
+    }
+
+    const feature = window.currentPopupFeature;
+
+    try {
+        if (feature.getBounds) {
+            // Polygon geometry
+            const bounds = feature.getBounds();
+
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature zoom');
+                return;
+            }
+
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+
+            let zoomConfig;
+            switch (zoomType) {
+                case 'close':
+                    // Maximum zoom configuration for closest view
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 10) {
+                        zoomConfig = { padding: 0.4, maxZoom: 25 };
+                    } else if (boundsSize < 50) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else if (boundsSize < 100) {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    } else {
+                        zoomConfig = { padding: 0.15, maxZoom: 22 };
+                    }
+                    break;
+                case 'medium':
+                    zoomConfig = { 
+                        padding: 0.3, 
+                        maxZoom: Math.max(18, Math.min(22, 25 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                case 'far':
+                    zoomConfig = { 
+                        padding: 0.5, 
+                        maxZoom: Math.max(15, Math.min(20, 23 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                default:
+                    // Default to close view for maximum detail
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 25) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    }
+            }
+
+            map.fitBounds(bounds.pad(zoomConfig.padding), {
+                maxZoom: zoomConfig.maxZoom,
+                animate: true,
+                duration: 0.8
+            });
+
+        } else if (feature.getLatLng) {
+            // Point geometry - use maximum zoom levels
+            const latlng = feature.getLatLng();
+
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point zoom');
+                return;
+            }
+
+            let targetZoom;
+            switch (zoomType) {
+                case 'close':
+                    targetZoom = 25; // Maximum possible zoom
+                    break;
+                case 'medium':
+                    targetZoom = 22;
+                    break;
+                case 'far':
+                    targetZoom = 19;
+                    break;
+                default:
+                    targetZoom = 25; // Default to maximum zoom
+            }
+
+            map.setView(latlng, targetZoom, {
+                animate: true,
+                duration: 0.8
+            });
+
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
+        }
+
+        const actualZoom = map.getZoom();
+        showSuccess(`Zoomed to feature - ${zoomType} view (zoom level: ${actualZoom})`);
+
+    } catch (error) {
+        console.error('Error in popup zoom:', error);
+        showError('Failed to zoom to feature: ' + error.message);
+    }
+};
+
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
+
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
+    }
+
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
+    }
+};
+
+// Make functions globally available
+window.toggleSection = toggleSection;
+window.showAddLayerModal = showAddLayerModal;
+window.addNewLayer = addNewLayer;
+window.loadTableFields = loadTableFields;
+window.toggleLayerVisibility = toggleLayerVisibility;
+window.zoomToLayer = zoomToLayer;
+window.showAttributeTable = showAttributeTable;
+window.showLayerProperties = showLayerProperties;
+window.removeLayer = removeLayer;
+window.changeBasemap = changeBasemap;
+window.toggleDockedTableSize = toggleDockedTableSize;
+window.closeDockedTable = closeDockedTable;
+window.startMeasurement = startMeasurement;
+window.clearMeasurements = clearMeasurements;
+window.loadFilterFields = loadFilterFields;
+window.loadFilterValues = loadFilterValues;
+window.addFilterRule = addFilterRule;
+window.removeFilterRule = removeFilterRule;
+window.applyFilters = applyFilters;
+window.clearAllFilters = clearAllFilters;
+window.exportMap = exportMap;
+window.fullscreenMap = fullscreenMap;
+window.switchPropertiesTab = switchPropertiesTab;
+window.updateSymbologyType = updateSymbologyType;
+window.applyProperties = applyProperties;
+window.applyAndCloseProperties = applyAndCloseProperties;
+window.cancelProperties = cancelProperties;
+window.selectAllRows = selectAllRows;
+window.toggleRowSelection = toggleRowSelection;
+window.zoomToSelection = zoomToSelection;
+window.generateGraduatedSymbology = generateGraduatedSymbology;
+window.generateCategorizedSymbology = generateCategorizedSymbology;
+window.selectAllPopupFields = selectAllPopupFields;
+window.deselectAllPopupFields = deselectAllPopupFields;
+window.zoomToFeature = zoomToFeature;
+window.showFeatureInfo = showFeatureInfo;
+window.exportTableData = exportTableData;
+window.clearSelection = clearSelection;
+window.toggleAllRows = toggleAllRows;
+window.startInlineEdit = startInlineEdit;
+window.saveInlineEdit = saveInlineEdit;
+window.cancelInlineEdit = cancelInlineEdit;
+window.addNewRecord = addNewRecord;
+window.saveNewRecord = saveNewRecord;
+window.deleteRecord = deleteRecord;
+window.deleteSelectedRecords = deleteSelectedRecords;
+window.refreshAttributeTable = refreshAttributeTable;
+window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.startTableEditing = startTableEditing;
+window.saveTableEditing = saveTableEditing;
+window.exitTableEditing = exitTableEditing;
+window.filterPopupFields = filterPopupFields;
+window.copyToClipboard = copyToClipboard;
+window.previewPopup = previewPopup;
+window.exportCurrentFeature = exportCurrentFeature;
+window.editCurrentFeature = editCurrentFeature;
+window.handleTemplateChange = handleTemplateChange;
+window.handlePopupToggle = handlePopupToggle;
+
+// Docked table utility functions
+function toggleDockedTableSize() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
+
+    if (!dockedTable) return;
+
+    if (dockedTable.classList.contains('expanded')) {
+        dockedTable.classList.remove('expanded');
+        toggleIcon.className = 'fas fa-expand-alt';
+    } else {
+        dockedTable.classList.add('expanded');
+        toggleIcon.className = 'fas fa-compress-alt';
+    }
+
+    adjustMapForDockedTable();
+}
+
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        adjustMapForDockedTable();
+    }
+}
+
+function adjustMapForDockedTable() {
+    const mapElement = document.getElementById('map');
+    const dockedTable = document.getElementById('dockedAttributeTable');
+
+    if (!mapElement) return;
+
+    if (dockedTable) {
+        const isExpanded = dockedTable.classList.contains('expanded');
+        const tableHeight = isExpanded ? '60%' : '30%';
+        const mapHeight = isExpanded ? '40%' : '70%';
+
+        mapElement.style.height = mapHeight;
+        dockedTable.style.height = tableHeight;
+    } else {
+        mapElement.style.height = '100%';
+    }
+
+    // Invalidate map size to ensure proper rendering
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
+}
+
+// Global popup control functions
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for zooming');
+        return;
+    }
+
+    const feature = window.currentPopupFeature;
+
+    try {
+        if (feature.getBounds) {
+            // Polygon geometry
+            const bounds = feature.getBounds();
+
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature zoom');
+                return;
+            }
+
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+
+            let zoomConfig;
+            switch (zoomType) {
+                case 'close':
+                    // Maximum zoom configuration for closest view
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 10) {
+                        zoomConfig = { padding: 0.4, maxZoom: 25 };
+                    } else if (boundsSize < 50) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else if (boundsSize < 100) {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    } else {
+                        zoomConfig = { padding: 0.15, maxZoom: 22 };
+                    }
+                    break;
+                case 'medium':
+                    zoomConfig = { 
+                        padding: 0.3, 
+                        maxZoom: Math.max(18, Math.min(22, 25 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                case 'far':
+                    zoomConfig = { 
+                        padding: 0.5, 
+                        maxZoom: Math.max(15, Math.min(20, 23 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                default:
+                    // Default to close view for maximum detail
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 25) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    }
+            }
+
+            map.fitBounds(bounds.pad(zoomConfig.padding), {
+                maxZoom: zoomConfig.maxZoom,
+                animate: true,
+                duration: 0.8
+            });
+
+        } else if (feature.getLatLng) {
+            // Point geometry - use maximum zoom levels
+            const latlng = feature.getLatLng();
+
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point zoom');
+                return;
+            }
+
+            let targetZoom;
+            switch (zoomType) {
+                case 'close':
+                    targetZoom = 25; // Maximum possible zoom
+                    break;
+                case 'medium':
+                    targetZoom = 22;
+                    break;
+                case 'far':
+                    targetZoom = 19;
+                    break;
+                default:
+                    targetZoom = 25; // Default to maximum zoom
+            }
+
+            map.setView(latlng, targetZoom, {
+                animate: true,
+                duration: 0.8
+            });
+
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
+        }
+
+        const actualZoom = map.getZoom();
+        showSuccess(`Zoomed to feature - ${zoomType} view (zoom level: ${actualZoom})`);
+
+    } catch (error) {
+        console.error('Error in popup zoom:', error);
+        showError('Failed to zoom to feature: ' + error.message);
+    }
+};
+
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
+
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
+    }
+
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
+    }
+};
+
+// Additional zoom control functions
+window.resetMapView = function() {
+    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
+    showInfo('Map view reset to default');
+};
+
+window.zoomToAllLayers = function() {
+    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
+
+    if (visibleLayers.length === 0) {
+        showWarning('No visible layers to zoom to');
+        return;
+    }
+
+    // Collect all features from visible layers
+    const allFeatures = [];
+    visibleLayers.forEach(layer => {
+        layer.features.forEach(feature => {
+            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
+                allFeatures.push(feature);
+            }
+        });
+    });
+
+    if (allFeatures.length === 0) {
+        showWarning('No valid features found to zoom to');
+        return;
+    }
+
+    // Create feature group and fit bounds
+    const group = new L.featureGroup(allFeatures);
+    const bounds = group.getBounds();
+
+    // Calculate adaptive padding and zoom level
+    const latSpan = bounds.getNorth() - bounds.getSouth();
+    const lngSpan = bounds.getEast() - bounds.getWest();
+    const maxSpan = Math.max(latSpan, lngSpan);
+
+    let padding, maxZoom;
+    if (maxSpan < 0.001) { // Very small area
+        padding = 0.5;
+        maxZoom = 25;
+    } else if (maxSpan < 0.01) { // Small area
+        padding = 0.3;
+        maxZoom = 23;
+    } else if (maxSpan < 0.1) { // Medium area
+        padding = 0.15;
+        maxZoom = 21;
+    } else { // Large area
+        padding = 0.05;
+        maxZoom = 19;
+    }
+
+    map.fitBounds(bounds.pad(padding), { 
+        animate: true, 
+        duration: 1,
+        maxZoom: maxZoom
+    });
+
+    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features at enhanced detail level`);
+};
+
+// Event listeners for property controls
+document.addEventListener('DOMContentLoaded', function() {
+    // Opacity slider
+    const opacitySlider = document.getElementById('propFillOpacity');
+    if (opacitySlider) {
+        opacitySlider.addEventListener('input', function() {
+            const fillOpacityValue = document.getElementById('fillOpacityValue');
+            if (fillOpacityValue) {
+                fillOpacityValue.textContent = Math.round(this.value * 100) + '%';
+            }
+        });
+    }
+
+    // Border width slider
+    const borderSlider = document.getElementById('propBorderWidth');
+    if (borderSlider) {
+        borderSlider.addEventListener('input', function() {
+            const borderWidthValue = document.getElementById('borderWidthValue');
+            if (borderWidthValue) {
+                borderWidthValue.textContent = this.value + 'px';
+            }
+        });
+    }
+
+    // Labels checkbox
+    const labelsCheckbox = document.getElementById('propEnableLabels');
+    if (labelsCheckbox) {
+        labelsCheckbox.addEventListener('change', function() {
+            const propLabelControls = document.getElementById('propLabelControls');
+            if (propLabelControls) {
+                propLabelControls.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+    }
+
+    // iTool event listeners
+    const popupEnableCheckbox = document.getElementById('propEnablePopups');
+    if (popupEnableCheckbox) {
+        popupEnableCheckbox.addEventListener('change', function(e) {
+            console.log('Popup checkbox changed:', e.target.checked);
+            handlePopupToggle();
+            // Mark as having unsaved changes
+            if (window.currentPropertiesLayer) {
+                console.log('Popup toggle changed for layer:', window.currentPropertiesLayer.name);
+
+                // Immediately update the layer properties to reflect the change
+                if (!window.currentPropertiesLayer.properties) {
+                    window.currentPropertiesLayer.properties = {};
+                }
+                if (!window.currentPropertiesLayer.properties.popup) {
+                    window.currentPropertiesLayer.properties.popup = {};
+                }
+                window.currentPropertiesLayer.properties.popup.enabled = e.target.checked;
+            }
+        });
+    }
+
+    const popupTemplateSelect = document.getElementById('propPopupTemplate');
+    if (popupTemplateSelect) {
+        popupTemplateSelect.addEventListener('change', handleTemplateChange);
+    }
+
+    // Symbology type change listener
+    const symbologyTypeSelect = document.getElementById('propSymbologyType');
+    if (symbologyTypeSelect) {
+        symbologyTypeSelect.addEventListener('change', updateSymbologyType);
+    }
+
+     // Tab switching for layer source
+    const tabButtons = document.querySelectorAll('#layerSourceTabs .nav-link');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-bs-target');
+
+            // Update button visibility based on active tab
+            const addLayerBtn = document.getElementById('addLayerBtn');
+            const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+
+            if (targetTab === '#geojson-pane') {
+                if (addLayerBtn) addLayerBtn.style.display = 'none';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'inline-block';
+            } else {
+                if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
+                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
+            }
+        });
+    });
+});
+
+// Measurement tools
+let currentDistanceUnit = 'm'; // Default unit: meters
+
+function startMeasurement(type) {
+    clearMeasurements();
+
+    // Update button states
+    document.querySelectorAll('.measurement-btn').forEach(btn => btn.classList.remove('active'));
+
+    currentMeasurement = type;
+
+    if (type === 'distance') {
+        map.on('click', onDistanceMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        showDistanceUnitSelector();
+    } else if (type === 'area') {
+        map.on('click', onAreaMeasureClick);
+        map.getContainer().style.cursor = 'crosshair';
+        hideDistanceUnitSelector();
+    }
+}
+
+function showDistanceUnitSelector() {
+    // Show unit selector when distance measurement is active
+    const unitSelector = document.getElementById('distanceUnitSelector');
+    if (unitSelector) {
+        unitSelector.style.display = 'block';
+    }
+}
+
+function hideDistanceUnitSelector() {
+    // Hide unit selector when not measuring distance
+    const unitSelector = document.getElementById('distanceUnitSelector');
+    if (unitSelector) {
+        unitSelector.style.display = 'none';
+    }
+}
+
+function changeDistanceUnit(unit) {
+    currentDistanceUnit = unit;
+    // Update button states
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.unit-btn[onclick="changeDistanceUnit('${unit}')"]`).classList.add('active');
+
+    // Recalculate and update existing distance measurements
+    updateExistingDistanceMeasurements();
+}
+
+function calculateDistance(points, unit = null) {
+    if (points.length < 2) return '0 m';
+
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+        totalDistance += points[i - 1].distanceTo(points[i]);
+    }
+
+    // Use provided unit or current selected unit
+    const selectedUnit = unit || currentDistanceUnit;
+
+    return formatDistance(totalDistance, selectedUnit);
+}
+
+function formatDistance(distanceInMeters, unit) {
+    let value, unitLabel;
+
+    switch (unit) {
+        case 'km':
+            value = distanceInMeters / 1000;
+            unitLabel = 'km';
+            // Show more precision for smaller values
+            if (value < 0.01) {
+                return Math.round(distanceInMeters) + ' m';
+            } else if (value < 1) {
+                return value.toFixed(3) + ' km';
+            } else {
+                return value.toFixed(2) + ' km';
+            }
+            break;
+        case 'ft':
+            value = distanceInMeters * 3.28084;
+            unitLabel = 'ft';
+            if (value < 1000) {
+                return Math.round(value) + ' ft';
+            } else {
+                return (value / 5280).toFixed(2) + ' mi'; // Convert to miles for large distances
+            }
+            break;
+        case 'm':
+        default:
+            value = distanceInMeters;
+            unitLabel = 'm';
+            if (value < 1000) {
+                return Math.round(value) + ' m';
+            } else {
+                return (value / 1000).toFixed(2) + ' km'; // Auto-convert to km for large distances
+            }
+    }
+}
+
+function updateExistingDistanceMeasurements() {
+    // Update all existing distance labels with new unit
+    measurementGroup.eachLayer(layer => {
+        if (layer.options && layer.options.isDistanceLabel && layer.measurementPoints) {
+            const newDistance = calculateDistance(layer.measurementPoints);
+            layer.setIcon(L.divIcon({
+                className: 'distance-label',
+                html: `<div class="measurement-label distance-label-content">${newDistance}</div>`,
+                iconSize: [80, 25],
+                iconAnchor: [40, 12]
+            }));
+        }
+    });
+}
+
+function onDistanceMeasureClick(e) {
+    measurementPoints.push(e.latlng);
+
+    // Add point marker with enhanced styling
+    const pointMarker = L.circleMarker(e.latlng, {
+        radius: 5,
+        fillColor: '#e74c3c',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    // Add point number label
+    const pointNumber = L.marker(e.latlng, {
+        icon: L.divIcon({
+            className: 'point-label',
+            html: `<div class="point-number">${measurementPoints.length}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 25]
+        }),
+        interactive: false
+    }).addTo(measurementGroup);
+
+    if (measurementPoints.length > 1) {
+        // Draw line segment
+        const lineSegment = L.polyline([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ], {
+            color: '#e74c3c',
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 5'
+        }).addTo(measurementGroup);
+
+        // Calculate segment distance
+        const segmentDistance = calculateDistance([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ]);
+
+        // Add distance label at midpoint
+        const midpoint = L.latLng(
+            (measurementPoints[measurementPoints.length - 2].lat + e.latlng.lat) / 2,
+            (measurementPoints[measurementPoints.length - 2].lng + e.latlng.lng) / 2
+        );
+
+        const distanceLabel = L.marker(midpoint, {
+            icon: L.divIcon({
+                className: 'distance-label',
+                html: `<div class="measurement-label distance-label-content">${segmentDistance}</div>`,
+                iconSize: [80, 25],
+                iconAnchor: [40, 12]
+            }),
+            interactive: false,
+            isDistanceLabel: true,
+            measurementPoints: [
+                measurementPoints[measurementPoints.length - 2],
+                measurementPoints[measurementPoints.length - 1]
+            ]
+        }).addTo(measurementGroup);
+
+        // Store reference for unit updates
+        distanceLabel.options.isDistanceLabel = true;
+        distanceLabel.measurementPoints = [
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ];
+
+        // Calculate and show total distance
+        const totalDistance = calculateDistance(measurementPoints);
+        updateMeasurementDisplay('distance', totalDistance);
+
+        // Show instruction for continuing or finishing measurement
+        showMeasurementInfo(`Total distance: ${totalDistance}. Click to continue, or double-click to finish.`);
+    } else {
+        showMeasurementInfo('Click on the map to set the next point.');
+    }
+}
+
+function onAreaMeasureClick(e) {
+    measurementPoints.push(e.latlng);
+
+    // Add point marker with enhanced styling
+    const pointMarker = L.circleMarker(e.latlng, {
+        radius: 5,
+        fillColor: '#27ae60',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1
+    }).addTo(measurementGroup);
+
+    // Add point number label
+    const pointNumber = L.marker(e.latlng, {
+        icon: L.divIcon({
+            className: 'point-label',
+            html: `<div class="point-number" style="background: #27ae60;">${measurementPoints.length}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 25]
+        }),
+        interactive: false
+    }).addTo(measurementGroup);
+
+    // Draw lines connecting points
+    if (measurementPoints.length > 1) {
+        const line = L.polyline([
+            measurementPoints[measurementPoints.length - 2],
+            measurementPoints[measurementPoints.length - 1]
+        ], {
+            color: '#27ae60',
+            weight: 2,
+            opacity: 0.8,
+            dashArray: '3, 3'
+        }).addTo(measurementGroup);
+    }
+
+    // Draw polygon if we have at least 3 points
+    if (measurementPoints.length >= 3) {
+        // Remove previous polygon
+        measurementGroup.eachLayer(layer => {
+            if (layer instanceof L.Polygon && layer.options.isAreaPolygon) {
+                measurementGroup.removeLayer(layer);
+            }
+        });
+
+        // Add new polygon
+        const polygon = L.polygon(measurementPoints, {
+            color: '#27ae60',
+            weight: 3,
+            fillColor: '#27ae60',
+            fillOpacity: 0.2,
+            isAreaPolygon: true
+        }).addTo(measurementGroup);
+
+        // Calculate and show area
+        const area = calculateArea(measurementPoints);
+        updateMeasurementDisplay('area', area);
+
+        // Remove previous area label
+        measurementGroup.eachLayer(layer => {
+            if (layer.options && layer.options.isAreaLabel) {
+                measurementGroup.removeLayer(layer);
+            }
+        });
+
+        // Add area label at centroid
+        const centroid = polygon.getBounds().getCenter();
+        const areaLabel = L.marker(centroid, {
+            icon: L.divIcon({
+                className: 'area-label',
+                html: `<div class="measurement-label" style="background: linear-gradient(135deg, #27ae60, #1e8449); color: white; border: 2px solid #fff;">${area}</div>`,
+                iconSize: [100, 30],
+                iconAnchor: [50, 15]
+            }),
+            interactive: false,
+            isAreaLabel: true
+        }).addTo(measurementGroup);
+
+        // Show instruction
+        showMeasurementInfo(`Area: ${area}. Click to add more points, or double-click to finish.`);
+
+        // Enable double-click to finish
+        map.on('dblclick', finishAreaMeasurement);
+    } else {
+        showMeasurementInfo(`Point ${measurementPoints.length} added. Add ${3 - measurementPoints.length} more point(s) to start measuring area.`);
+    }
+}
+
+function calculateArea(points) {
+    if (points.length < 3) return '0 m²';
+
+    // Calculate area using shoelace formula with proper Earth geometry
+    let area = 0;
+    const R = 6371000; // Earth's radius in meters
+
+    // Convert to radians and calculate using spherical excess
+    const coords = points.map(point => ({
+        lat: point.lat * Math.PI / 180,
+        lng: point.lng * Math.PI / 180
+    }));
+
+    // Shoelace formula adapted for spherical coordinates
+    for (let i = 0; i < coords.length; i++) {
+        const j = (i + 1) % coords.length;
+        area += coords[i].lng * Math.sin(coords[j].lat);
+        area -= coords[j].lng * Math.sin(coords[i].lat);
+    }
+
+    area = Math.abs(area) * R * R / 2;
+
+    return formatArea(area);
+}
+
+function formatArea(areaInSquareMeters) {
+    if (areaInSquareMeters < 1) {
+        return '< 1 m²';
+    } else if (areaInSquareMeters < 10000) {
+        return Math.round(areaInSquareMeters) + ' m²';
+    } else if (areaInSquareMeters < 1000000) {
+        return (areaInSquareMeters / 10000).toFixed(2) + ' ha';
+    } else {
+        return (areaInSquareMeters / 1000000).toFixed(2) + ' km²';
+    }
+}
+
+function clearMeasurements() {
+    measurementGroup.clearLayers();
+    measurementPoints = [];
+    currentMeasurement = null;
+
+    // Reset button states
+    document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+
+    // Hide unit selector
+    hideDistanceUnitSelector();
+
+    // Reset cursor
+    map.getContainer().style.cursor = '';
+
+    // Remove event listeners
+    map.off('click', onDistanceMeasureClick);
+    map.off('click', onAreaMeasureClick);
+    map.off('dblclick', finishAreaMeasurement);
+
+    // Clear measurement display
+    updateMeasurementDisplay('', '');
+    hideMeasurementInfo();
+}
+
+function updateMeasurementDisplay(type, value) {
+    // Update measurement display if it exists
+    const display = document.getElementById('measurementDisplay');
+    if (display) {
+        if (type && value) {
+            display.innerHTML = `<strong>${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${value}`;
+            display.style.display = 'block';
+        } else {
+            display.style.display = 'none';
+        }
+    }
+}
+
+function showMeasurementInfo(message) {
+    // Remove existing info if any
+    hideMeasurementInfo();
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'measurement-info';
+    infoDiv.id = 'measurementInfo';
+    infoDiv.innerHTML = `<i class="fas fa-info-circle me-2"></i>${message}`;
+
+    document.body.appendChild(infoDiv);
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        hideMeasurementInfo();
+    }, 5000);
+}
+
+function hideMeasurementInfo() {
+    const existingInfo = document.getElementById('measurementInfo');
+    if (existingInfo) {
+        existingInfo.remove();
+    }
+}
+
+function updateUnitDescription(unit) {
+    const descriptions = {
+        'm': 'Meters - Standard metric unit',
+        'km': 'Kilometers - For longer distances',
+        'ft': 'Feet - Imperial unit system'
+    };
+
+    const descElement = document.getElementById('unitDescription');
+    if (descElement) {
+        descElement.textContent = descriptions[unit] || 'Distance measurement unit';
+    }
+}
+
+// Enhanced changeDistanceUnit function
+function changeDistanceUnit(unit) {
+    currentDistanceUnit = unit;
+
+    // Update button states
+    document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.unit-btn[onclick="changeDistanceUnit('${unit}')"]`).classList.add('active');
+
+    // Update description
+    updateUnitDescription(unit);
+
+    // Recalculate and update existing distance measurements
+    updateExistingDistanceMeasurements();
+
+    // Show unit change feedback
+    const unitNames = { 'm': 'Meters', 'km': 'Kilometers', 'ft': 'Feet' };
+    showSuccess(`Distance unit changed to ${unitNames[unit]}`);
+}
+
+// Load filter fields based on selected layer
+function loadFilterFields() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldSelect = document.getElementById('filterField');
+
+    if (fieldSelect) {
+        fieldSelect.innerHTML = '<option value="">Select field...</option>';
+
+        if (!layerId) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records || layer.records.length === 0) return;
+
+        // Get all fields except geometry field
+        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
+        console.log(`Loading filter fields for layer "${layer.name}" - all fields:`, allFields);
+
+        // Filter out hidden fields based on permissions
+        const permittedFields = filterFieldsByPermissions(allFields, layer);
+        console.log(`Permitted fields for filtering:`, permittedFields);
+
+        permittedFields.forEach(field => {
+            const permission = getFieldPermission(field, layer);
+            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
+            const option = document.createElement('option');
+            option.value = field;
+            option.textContent = `${permissionIcon} ${field}`;
+            fieldSelect.appendChild(option);
+        });
+
+        if (permittedFields.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No accessible fields for filtering";
+            option.disabled = true;
+            fieldSelect.appendChild(option);
+        }
+
+        console.log(`Filter field selector populated with ${permittedFields.length} permitted fields`);
+    }
+}
+
+// Load filter values based on selected field
+function loadFilterValues() {
+    const layerId = document.getElementById('filterLayer').value;
+    const fieldName = document.getElementById('filterField').value;
+    const valueSelect = document.getElementById('filterValue');
+
+    if (valueSelect) {
+        valueSelect.innerHTML = '<option value="">Select value...</option>';
+
+        if (!layerId || !fieldName) return;
+
+        const layer = mapLayers.find(l => l.id === layerId);
+        if (!layer || !layer.records) return;
+
+        // Check if user has permission to access this field
+        const permission = getFieldPermission(fieldName, layer);
+        if (permission === 'hidden') {
+            console.log(`Field "${fieldName}" is hidden - not loading values`);
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "Field not accessible";
+            option.disabled = true;
+            valueSelect.appendChild(option);
+            return;
+        }
+
+        // Get unique values for the field
+        const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
+        uniqueValues.forEach(value => {
+            if (value !== null && value !== undefined) {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                valueSelect.appendChild(option);
+            }
+        });
+
+        console.log(`Loaded ${uniqueValues.length} unique values for permitted field "${fieldName}"`);
+    }
+}
+
+// Add a new filter rule
+function addFilterRule() {
+    const layerId = document.getElementById('filterLayer').value;
+    const field = document.getElementById('filterField').value;
+    const operator = document.getElementById('filterOperator').value;
+    const value = document.getElementById('filterValue').value;
+
+    if (!layerId || !field || !operator || !value) {
+        showWarning('Please fill in all filter fields');
+        return;
+    }
+
+    // Validate field permissions before adding filter
+    const layer = mapLayers.find(l => l.id === layerId);
+    if (layer) {
+        const permission = getFieldPermission(field, layer);
+        if (permission === 'hidden') {
+            showError(`Cannot filter on field "${field}" - field is not accessible due to permissions`);
+            return;
+        }
+    }
+
+    const filter = {
+        id: Date.now().toString(),
+        layerId: layerId,
+        field: field,
+        operator: operator,
+        value: value
+    };
+
+    currentFilters.push(filter);
+    updateFilterRulesDisplay();
+
+    // Clear form
+    const filterLayer = document.getElementById('filterLayer');
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+
+    if (filterLayer) filterLayer.value = '';
+    if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
+    if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
+
+    console.log(`Added filter rule for permitted field "${field}" with ${operator} "${value}"`);
+}
+
+// Update the display of applied filter rules
+function updateFilterRulesDisplay() {
+    const container = document.getElementById('filterRules');
+
+    if (!container) return;
+
+    if (currentFilters.length === 0) {
+        container.innerHTML = '<p class="text-muted">No filters applied</p>';
+        return;
+    }
+
+    let html = '';
+    currentFilters.forEach(filter => {
+        const layer = mapLayers.find(l => l.id === filter.layerId);
+        const layerName = layer ? layer.name : 'Unknown Layer';
+
+        html += `
+            <div class="filter-rule">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${layerName}</strong> → ${filter.field} ${filter.operator} "${filter.value}"
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeFilterRule('${filter.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// Remove a specific filter rule
+function removeFilterRule(filterId) {
+    const index = currentFilters.findIndex(f => f.id === filterId);
+    if (index !== -1) {
+        currentFilters.splice(index, 1);
+        updateFilterRulesDisplay();
+        applyFilters(); // Re-apply remaining filters
+    }
+}
+
+// Apply all active filters
+function applyFilters() {
+    if (currentFilters.length === 0) {
+        // Show all features
+        mapLayers.forEach(layer => {
+            if (layer.visible && layer.leafletLayer) {
+                layer.features.forEach(feature => {
+                    if (!layer.leafletLayer.hasLayer(feature)) {
+                        layer.leafletLayer.addLayer(feature);
+                    }
+                });
+            }
+        });
+        showSuccess('All filters cleared - showing all features');
+        return;
+    }
+
+    let filteredCount = 0;
+    let totalCount = 0;
+    let skippedFilters = 0;
+
+    mapLayers.forEach(layer => {
+        if (!layer.visible) return;
+
+        const layerFilters = currentFilters.filter(f => f.layerId === layer.id);
+
+        layer.features.forEach(feature => {
+            totalCount++;
+            let showFeature = true;
+
+            // Apply all filters for this layer
+            layerFilters.forEach(filter => {
+                // Check if user still has permission to access this field
+                const permission = getFieldPermission(filter.field, layer);
+                if (permission === 'hidden') {
+                    console.warn(`Skipping filter on hidden field "${filter.field}"`);
+                    skippedFilters++;
+                    return; // Skip this filter - don't apply it
+                }
+
+                const fieldValue = feature.recordData[filter.field];
+
+                switch (filter.operator) {
+                    case 'equals':
+                        if (String(fieldValue) !== String(filter.value)) showFeature = false;
+                        break;
+                    case 'contains':
+                        if (!String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'starts_with':
+                        if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
+                        break;
+                    case 'greater_than':
+                        if (!(parseFloat(fieldValue) > parseFloat(filter.value))) showFeature = false;
+                        break;
+                    case 'less_than':
+                        if (!(parseFloat(fieldValue) < parseFloat(filter.value))) showFeature = false;
+                        break;
+                }
+            });
+
+            // Show/hide feature based on filter result
+            if (showFeature) {
+                if (!layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.addLayer(feature);
+                }
+                filteredCount++;
+            } else {
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+            }
+        });
+    });
+
+    let message = `Filters applied: showing ${filteredCount} of ${totalCount} features`;
+    if (skippedFilters > 0) {
+        message += ` (${skippedFilters} filter(s) skipped due to field permissions)`;
+    }
+    showSuccess(message);
+}
+
+// Clear all active filters
+function clearAllFilters() {
+    currentFilters = [];
+    updateFilterRulesDisplay();
+    applyFilters(); // This will show all features
+}
+
+// Populate layer selector in filters
+function updateLayerSelectors() {
+    const filterLayerSelect = document.getElementById('filterLayer');
+
+    if (filterLayerSelect) {
+        filterLayerSelect.innerHTML = '<option value="">Select layer...</option>';
+        mapLayers.forEach(layer => {
+            const option = document.createElement('option');
+            option.value = layer.id;
+            option.textContent = layer.name;
+            filterLayerSelect.appendChild(option);
+        });
+    }
+}
+
+// Update map statistics displayed in the sidebar
+function updateMapStatistics() {
+    const totalLayers = mapLayers.length;
+    const visibleLayers = mapLayers.filter(l => l.visible).length;
+    const totalFeatures = mapLayers.reduce((sum, layer) => sum + layer.featureCount, 0);
+    const visibleFeatures = mapLayers.filter(l => l.visible).reduce((sum, layer) => {
+        if (layer.leafletLayer) {
+            return sum + layer.leafletLayer.getLayers().length;
+        }
+        return sum;
+    }, 0);
+
+    const totalLayersElement = document.getElementById('totalLayers');
+    const totalFeaturesElement = document.getElementById('totalFeatures');
+    const visibleFeaturesElement = document.getElementById('visibleFeatures');
+    const filteredFeaturesElement = document.getElementById('filteredFeatures');
+
+    if (totalLayersElement) totalLayersElement.textContent = totalLayers;
+    if (totalFeaturesElement) totalFeaturesElement.textContent = totalFeatures;
+    if (visibleFeaturesElement) visibleFeaturesElement.textContent = visibleFeatures;
+    if (filteredFeaturesElement) filteredFeaturesElement.textContent = totalFeatures - visibleFeatures;
+
+    // Update layer selectors
+    updateLayerSelectors();
+}
+
+// Export functionality
+function exportMap() {
+    showInfo('Map export functionality would be implemented here');
+}
+
+// Fullscreen map functionality
+function fullscreenMap() {
+    const mapContainer = document.getElementById('map');
+
+    if (!mapContainer) {
+        showError('Map container not found');
+        return;
+    }
+
+    try {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (mapContainer.requestFullscreen) {
+                mapContainer.requestFullscreen();
+            } else if (mapContainer.webkitRequestFullscreen) {
+                mapContainer.webkitRequestFullscreen();
+            } else if (mapContainer.msRequestFullscreen) {
+                mapContainer.msRequestFullscreen();
+            } else if (mapContainer.mozRequestFullScreen) {
+                mapContainer.mozRequestFullScreen();
+            } else {
+                showError('Fullscreen not supported by this browser');
+                return;
+            }
+
+            // Add fullscreen class for styling
+            mapContainer.classList.add('fullscreen-map');
+
+            // Show success message
+            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
+
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+
+        // Listen for fullscreen changes to update map size and remove class
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+
+    } catch (error) {
+        console.error('Fullscreen error:', error);
+        showError('Failed to toggle fullscreen: ' + error.message);
+    }
+}
+
+function handleFullscreenChange() {
+    const mapContainer = document.getElementById('map');
+
+    if (!document.fullscreenElement && 
+        !document.webkitFullscreenElement && 
+        !document.msFullscreenElement && 
+        !document.mozFullScreenElement) {
+
+        // Exited fullscreen
+        if (mapContainer) {
+            mapContainer.classList.remove('fullscreen-map');
+        }
+
+        showInfo('Exited fullscreen mode');
+    }
+
+    // Invalidate map size to ensure proper rendering
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
+}
+
+// Detect media type specifically from URL
+function detectURLMediaType(url, layerName = null, fieldName = null) {
+    if (!url || typeof url !== 'string') return null;
+
+    const urlLower = url.toLowerCase();
+    const nameCheck = layerName ? layerName.toLowerCase() : '';
+
+    // 360° detection (highest priority) - check both URL and layer name
+    if (nameCheck.includes('360') || nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
+        console.log(`URL detected as 360° content: ${url}`);
+        return '360';
+    }
+
+    // Video detection
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || 
+        urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.avi') ||
+        urlLower.includes('vimeo.com') || urlLower.includes('video')) {
+        return 'video';
+    }
+
+    // Audio detection
+    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') ||
+        urlLower.includes('soundcloud.com') || urlLower.includes('audio')) {
+        return 'audio';
+    }
+
+    // PDF detection
+    if (urlLower.includes('.pdf') || urlLower.includes('document')) {
+        return 'pdf';
+    }
+
+    // Image detection - but not if layer is named "360" or contains "360"
+    if (!nameCheck.includes('360') && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
+        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
+        return 'image';
+    }
+
+    return null;
+}
+
+// Get media type information for display
+function getMediaTypeInfo(mediaType) {
+    const mediaTypes = {
+        'video': {
+            icon: '🎥',
+            title: 'Video',
+            buttonText: 'View Video'
+        },
+        'audio': {
+            icon: '🎵',
+            title: 'Audio',
+            buttonText: 'Play Audio'
+        },
+        'image': {
+            icon: '📷',
+            title: 'Image',
+            buttonText: 'View Image'
+        },
+        'pdf': {
+            icon: '📄',
+            title: 'PDF',
+            buttonText: 'View PDF'
+        },
+        '360': {
+            icon: '🌐',
+            title: '360° View',
+            buttonText: 'View 360°'
+        }
+    };
+
+    return mediaTypes[mediaType] || {
+        icon: '🔗',
+        title: 'Link',
+        buttonText: 'Open Link'
+    };
+}
+
+// Open media from URL with appropriate modal
+window.openMediaFromURL = function(url, mediaType, title = 'Media') {
+    try {
+        switch (mediaType) {
+            case 'video':
+                openVideoModal(url, title);
+                break;
+            case 'audio':
+                openAudioModal(url, title);
+                break;
+            case 'image':
+                openImageModal(url, title);
+                break;
+            case 'pdf':
+                openPdfModal(url, title);
+                break;
+            case '360':
+                open360Modal(url, title);
+                break;
+            default:
+                // Fallback to opening in new tab
+                window.open(url, '_blank');
+        }
+
+        console.log(`Opened ${mediaType} modal for URL: ${url}`);
+    } catch (error) {
+        console.error('Error opening media:', error);
+        showError('Failed to open media: ' + error.message);
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+    }
+};
+
+// Enhanced media layer detection function
+function detectMediaLayerType(layerName, records) {
+    const name = layerName.toLowerCase();
+
+    // Check layer name first - prioritize 360 detection
+    if (name.includes('360') || name === '360' || name.includes('panorama') || name.includes('streetview')) {
+        console.log(`Layer "${layerName}" detected as 360° layer based on name`);
+        return '360';
+    }
+    if (name.includes('video')) return 'video';
+    if (name.includes('audio')) return 'audio';
+    if (name.includes('pdf') || name.includes('document')) return 'pdf';
+
+    // If name doesn't match, analyze URL patterns from data
+    if (records && records.length > 0) {
+        for (const record of records.slice(0, 5)) { // Check first 5 records
+            const fields = record.fields || {};
+
+            for (const fieldName of Object.keys(fields)) {
+                const fieldValue = fields[fieldName];
+
+                if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
+                    const url = fieldValue.toLowerCase();
+
+                    // 360 detection (check first for priority)
+                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
+                        console.log(`URL contains 360° indicators: ${url}`);
+                        return '360';
+                    }
+
+                    // Video detection
+                    if (url.includes('youtube.com') || url.includes('youtu.be') || 
+                        url.includes('.mp4') || url.includes('.webm') || url.includes('.avi') ||
+                        url.includes('vimeo.com') || url.includes('video')) {
+                        return 'video';
+                    }
+
+                    // Audio detection
+                    if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg') ||
+                        url.includes('soundcloud.com') || url.includes('audio')) {
+                        return 'audio';
+                    }
+
+                    // PDF detection
+                    if (url.includes('.pdf') || url.includes('document')) {
+                        return 'pdf';
+                    }
+
+                    // Image detection - but only if layer name doesn't contain "360"
+                    if (!name.includes('360') && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
+                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
+                        return 'image';
+                    }
+                }
+            }
+        }
+
+        // Special case: If layer name contains "360", always treat as 360 layer
+        if (name.includes('360') || name === '360') {
+            console.log(`Layer containing "360" will use Pannellum viewer regardless of URL content`);
+            return '360';
+        }
+    }
+
+    return null; // Standard layer
+}
+
+// Video player modal
+function openVideoModal(url, title = 'Video Player') {
+    const modal = document.getElementById('videoModal');
+    const videoElement = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    const videoInfo = document.getElementById('videoInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-play-circle me-2"></i>${title}`;
+    }
+
+    if (videoSource && videoElement) {
+        // Handle different video URL types
+        let finalUrl = url;
+
+        // Convert YouTube URLs to embed format
+        if (url.includes('youtube.com/watch?v=')) {
+            const videoId = url.split('v=')[1].split('&')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            // For YouTube, we'll use an iframe instead
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else if (url.includes('youtu.be/')) {
+            const videoId = url.split('youtu.be/')[1].split('?')[0];
+            finalUrl = `https://www.youtube.com/embed/${videoId}`;
+
+            videoElement.style.display = 'none';
+            const container = videoElement.parentElement;
+            container.innerHTML = `
+                <iframe src="${finalUrl}" 
+                    style="width: 100%; height: 100%; border: none;" 
+                    allow="autoplay; encrypted-media" allowfullscreen>
+                </iframe>
+            `;
+        } else {
+            // Regular video file
+            videoSource.src = finalUrl;
+            videoElement.load();
+            videoElement.style.display = 'block';
+        }
+
+        if (videoInfo) {
+            videoInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+        }
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened video modal for: ${title}`);
+}
+
+// Audio player modal
+function openAudioModal(url, title = 'Audio Player') {
+    const modal = document.getElementById('audioModal');
+    const audioElements = modal.querySelectorAll('audio source');
+    const audioInfo = document.getElementById('audioInfo');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-music me-2"></i>${title}`;
+    }
+
+    // Update all audio source elements
+    audioElements.forEach(source => {
+        source.src = url;
+    });
+
+    // Load the audio
+    const audioElement = modal.querySelector('audio');
+    if (audioElement) {
+        audioElement.load();
+    }
+
+    if (audioInfo) {
+        audioInfo.innerHTML = `<strong>Source:</strong> ${url}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened audio modal for: ${title}`);
+}
+
+// Image viewer modal
+function openImageModal(url, title = 'Image Viewer') {
+    const modal = document.getElementById('imageModal');
+    const imageElement = modal.querySelector('img');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-image me-2"></i>${title}`;
+    }
+
+    if (imageElement) {
+        imageElement.src = url;
+        imageElement.alt = title;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened image modal for: ${title}`);
+}
+
+// PDF viewer modal
+function openPdfModal(url, title = 'PDF Viewer') {
+    const modal = document.getElementById('pdfModal');
+    const iframeElement = modal.querySelector('iframe');
+    const modalTitle = modal.querySelector('.modal-title');
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${title}`;
+    }
+
+    if (iframeElement) {
+        iframeElement.src = url;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    console.log(`Opened PDF modal for: ${title}`);
+}
+
+// 360° viewer modal (using Pannellum)
+function open360Modal(url, title = '360° Viewer') {
+    const modal = document.getElementById('image360Modal');
+    const pannellumContainer = document.getElementById('panorama360');
+    const modalTitle = modal ? modal.querySelector('.modal-title') : null;
+
+    if (!modal) {
+        console.error('360° modal not found with ID "image360Modal"');
+        // Fallback to opening in new tab
+        window.open(url, '_blank');
+        return;
+    }
+
+    if (modalTitle) {
+        modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
+    }
+
+    const bootstrapModal = new bootstrap.Modal(modal);
+    let viewer = null;
+    let autoRotateInterval = null;
+
+    // Initialize 360 viewer when modal is shown
+    modal.addEventListener('shown.bs.modal', function() {
+        if (typeof pannellum !== 'undefined' && pannellumContainer) {
+            try {
+                viewer = pannellum.viewer('panorama360', {
+                    type: 'equirectangular',
+                    panorama: url,
+                    autoLoad: true,
+                    showControls: true,
+                    showZoomCtrl: true,
+                    showFullscreenCtrl: true,
+                    mouseZoom: true,
+                    compass: true,
+                    northOffset: 0,
+                    pitch: 0,
+                    yaw: 0,
+                    hfov: 100,
+                    minHfov: 50,
+                    maxHfov: 120,
+                    autoRotate: 0, // Start with auto-rotation off
+                    keyboardZoom: true,
+                    mouseZoom: true,
+                    draggable: true
+                });
+
+                // Add custom navigation and control buttons
+                addPannellumControls(viewer);
+
+                console.log('Pannellum 360 viewer initialized with enhanced controls');
+            } catch (error) {
+                console.error('Error initializing Pannellum:', error);
+                pannellumContainer.innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        360° viewer could not be initialized.
+                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt me-1"></i>View image directly
+                        </a>
+                    </div>
+                `;
+            }
+        } else {
+            // Fallback to regular image display
+            if (pannellumContainer) {
+                pannellumContainer.innerHTML = `
+                    <div class="text-center">
+                        <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            360° viewer library not loaded. Displaying as regular image.
+                            <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>View original
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    });
+
+    // Clean up when modal is hidden
+    modal.addEventListener('hidden.bs.modal', function() {
+        if (autoRotateInterval) {
+            clearInterval(autoRotateInterval);
+            autoRotateInterval = null;
+        }
+        if (viewer) {
+            viewer.destroy();
+            viewer = null;
+        }
+        // Remove custom controls
+        const customControls = document.querySelector('.pannellum-custom-controls');
+        if (customControls) {
+            customControls.remove();
+        }
+    });
+
+    bootstrapModal.show();
+    console.log(`Opened 360° modal for: ${title}`);
+}
+
+// Add custom navigation and control buttons to Pannellum viewer
+function addPannellumControls(viewer) {
+    // Wait for viewer to be ready
+    setTimeout(() => {
+        const pannellumContainer = document.getElementById('panorama360');
+        if (!pannellumContainer) return;
+
+        // Create custom controls container
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'pannellum-custom-controls';
+        controlsContainer.style.cssText = `
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+        `;
+
+        // Navigation controls
+        const navigationSection = document.createElement('div');
+        navigationSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-arrows-alt me-1"></i>Navigation
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px; justify-content: center;">
+                <div></div>
+                <button id="pan-up" class="pan-btn" title="Look Up">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <div></div>
+                <button id="pan-left" class="pan-btn" title="Look Left">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button id="pan-center" class="pan-btn" title="Reset View">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+                <button id="pan-right" class="pan-btn" title="Look Right">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div></div>
+                <button id="pan-down" class="pan-btn" title="Look Down">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div></div>
+            </div>
+        `;
+
+        // Auto-rotation controls
+        const autoRotateSection = document.createElement('div');
+        autoRotateSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-sync-alt me-1"></i>Auto Rotation
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation" style="position: relative;">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation" style="position: relative;">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction" style="position: relative;">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; text-align: center;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span>Speed:</span>
+                    <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
+                           style="width: 80px; height: 15px; cursor: pointer;">
+                    <span id="speed-value">2x</span>
+                </label>
+            </div>
+            <div id="rotation-status" style="margin-top: 5px; font-size: 10px; text-align: center; color: rgba(255,255,255,0.8);">
+                Status: Stopped
+            </div>
+        `;
+
+        // Zoom controls
+        const zoomSection = document.createElement('div');
+        zoomSection.innerHTML = `
+            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
+                <i class="fas fa-search me-1"></i>Zoom
+            </div>
+            <div style="display: flex; gap: 5px; justify-content: center;">
+                <button id="zoom-in" class="control-btn" title="Zoom In">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button id="zoom-out" class="control-btn" title="Zoom Out">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="zoom-reset" class="control-btn" title="Reset Zoom">
+                    <i class="fas fa-home"></i>
+                </button>
+            </div>
+        `;
+
+        controlsContainer.appendChild(navigationSection);
+        controlsContainer.appendChild(autoRotateSection);
+        controlsContainer.appendChild(zoomSection);
+
+        // Add styles for buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            .pan-btn, .control-btn {
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                width: 40px;
+                height: 35px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                transition: all 0.2s;
+            }
+            .pan-btn:hover, .control-btn:hover {
+                background: rgba(255, 255, 255, 0.4);
+                border-color: rgba(255, 255, 255, 0.6);
+                transform: scale(1.05);
+            }
+            .pan-btn:active, .control-btn:active {
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0.95);
+            }
+            #rotation-speed {
+                background: rgba(255, 255, 255, 0.3);
+                border: none;
+                border-radius: 10px;
+            }
+            #rotation-speed::-webkit-slider-thumb {
+                background: white;
+                border-radius: 50%;
+                width: 12px;
+                height: 12px;
+                cursor: pointer;
+            }
+        `;
+        document.head.appendChild(style);
+
+        pannellumContainer.appendChild(controlsContainer);
+
+        // Add event listeners
+        let isAutoRotating = false;
+        let rotationDirection = 1; // 1 for right, -1 for left
+
+        // Navigation controls
+        document.getElementById('pan-up').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.min(currentPitch + 10, 90));
+        });
+
+        document.getElementById('pan-down').addEventListener('click', () => {
+            const currentPitch = viewer.getPitch();
+            viewer.setPitch(Math.max(currentPitch - 10, -90));
+        });
+
+        document.getElementById('pan-left').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw - 15);
+        });
+
+        document.getElementById('pan-right').addEventListener('click', () => {
+            const currentYaw = viewer.getYaw();
+            viewer.setYaw(currentYaw + 15);
+        });
+
+        document.getElementById('pan-center').addEventListener('click', () => {
+            viewer.setPitch(0);
+            viewer.setYaw(0);
+            viewer.setHfov(100);
+        });
+
+        // Auto-rotation controls
+        document.getElementById('auto-rotate-start').addEventListener('click', () => {
+            const speed = parseFloat(document.getElementById('rotation-speed').value);
+            const rotationSpeed = speed * rotationDirection;
+            viewer.setAutoRotate(rotationSpeed);
+            isAutoRotating = true;
+            console.log(`Started auto-rotation at ${speed}x speed (direction: ${rotationDirection > 0 ? 'right' : 'left'})`);
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(0, 255, 0, 0.4)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 255, 255, 0.2)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = `Status: Rotating ${rotationDirection > 0 ? 'Right' : 'Left'} at ${speed}x`;
+                statusEl.style.color = 'rgba(0, 255, 0, 0.9)';
+            }
+        });
+
+        document.getElementById('auto-rotate-stop').addEventListener('click', () => {
+            viewer.setAutoRotate(0);
+            isAutoRotating = false;
+            console.log('Stopped auto-rotation');
+
+            // Update button states
+            document.getElementById('auto-rotate-start').style.background = 'rgba(255, 255, 255, 0.2)';
+            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 0, 0, 0.4)';
+
+            // Update status
+            const statusEl = document.getElementById('rotation-status');
+            if (statusEl) {
+                statusEl.textContent = 'Status: Stopped';
+                statusEl.style.color = 'rgba(255, 255, 255, 0.8)';
+            }
+        });
+
+        document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
+            rotationDirection *= -1;
+            if (isAutoRotating) {
+                const speed = parseFloat(document.getElementById('rotation-speed').value);
+                viewer.setAutoRotate(speed * rotationDirection);
+            }
+            console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);
+
+            // Visual feedback for direction change
+            const reverseBtn = document.getElementById('auto-rotate-reverse');
+            const originalBg = reverseBtn.style.background;
+            reverseBtn.style.background = 'rgba(255, 255, 0, 0.6)';
+            setTimeout(() => {
+                reverseBtn.style.background = originalBg;
+            }, 300);
+        });
+
+        // Speed control
+        document.getElementById('rotation-speed').addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = speed + 'x';
+            if (isAutoRotating) {
+                viewer.setAutoRotate(speed * rotationDirection);
+                console.log(`Updated rotation speed to ${speed}x`);
+            }
+        });
+
+        // Zoom controls
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.max(currentHfov - 10, 50));
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            const currentHfov = viewer.getHfov();
+            viewer.setHfov(Math.min(currentHfov + 10, 120));
+        });
+
+        document.getElementById('zoom-reset').addEventListener('click', () => {
+            viewer.setHfov(100);
+        });
+
+        console.log('Pannellum custom controls added successfully');
+
+    }, 500); // Wait for Pannellum to fully initialize
+}
+
+// Media modal utility functions
+window.downloadCurrentMedia = function() {
+    // Get the currently active modal
+    const activeModal = document.querySelector('.modal.show');
+    if (!activeModal) {
+        showError('No active media to download');
+        return;
+    }
+
+    let mediaUrl = null;
+
+    // Extract media URL based on modal type
+    if (activeModal.id === 'videoModal') {
+        const videoElement = activeModal.querySelector('#videoPlayer source');
+        mediaUrl = videoElement ? videoElement.src : null;
+    } else if (activeModal.id === 'audioModal') {
+        const audioElement = activeModal.querySelector('audio source');
+        mediaUrl = audioElement ? audioElement.src : null;
+    } else if (activeModal.id === 'imageModal') {
+        const imageElement = activeModal.querySelector('img');
+        mediaUrl = imageElement ? imageElement.src : null;
+    } else if (activeModal.id === 'pdfModal') {
+        const iframeElement = activeModal.querySelector('iframe');
+        mediaUrl = iframeElement ? iframeElement.src : null;
+    }
+
+    if (mediaUrl) {
+        const link = document.createElement('a');
+        link.href = mediaUrl;
+        link.download = '';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showSuccess('Download started');
+    } else {
+        showError('Could not find media URL for download');
+    }
+};
+
+window.fullscreenVideo = function() {
+    const videoElement = document.getElementById('videoPlayer');
+    if (videoElement) {
+        if (videoElement.requestFullscreen) {
+            videoElement.requestFullscreen();
+        } else if (videoElement.webkitRequestFullscreen) {
+            videoElement.webkitRequestFullscreen();
+        } else if (videoElement.msRequestFullscreen) {
+            videoElement.msRequestFullscreen();
+        } else if (videoElement.mozRequestFullScreen) {
+            videoElement.mozRequestFullScreen();
+        }
+        showSuccess('Video entered fullscreen mode');
+    }
+};
+
+window.fullscreenImage = function() {
+    const activeModal = document.querySelector('.modal.show');
+    const imageElement = activeModal ? activeModal.querySelector('img') : null;
+
+    if (imageElement) {
+        if (imageElement.requestFullscreen) {
+            imageElement.requestFullscreen();
+        } else if (imageElement.webkitRequestFullscreen) {
+            imageElement.webkitRequestFullscreen();
+        } else if (imageElement.msRequestFullscreen) {
+            imageElement.msRequestFullscreen();
+        } else if (imageElement.mozRequestFullScreen) {
+            imageElement.mozRequestFullScreen();
+        }
+        showSuccess('Image entered fullscreen mode');
+    }
+};
+
+window.adjustPlaybackRate = function(adjustment) {
+    const audioElement = document.querySelector('#audioModal audio');
+    if (audioElement) {
+        if (adjustment === 0) {
+            audioElement.playbackRate = 1.0;
+        } else {
+            audioElement.playbackRate = Math.max(0.25, Math.min(2.0, audioElement.playbackRate + adjustment));
+        }
+        showSuccess(`Playback rate: ${audioElement.playbackRate}x`);
+    }
+};
+
+// Image zoom functions
+let imageScale = 1;
+let imageTranslateX = 0;
+let imageTranslateY = 0;
+
+function zoomImage(factor) {
+    const imageViewer = document.getElementById('imageViewer');
+    if (imageViewer) {
+        imageScale *= factor;
+        imageScale = Math.max(0.1, Math.min(5, imageScale));
+        updateImageTransform();
+    }
+}
+
+function resetImageZoom() {
+    imageScale = 1;
+    imageTranslateX = 0;
+    imageTranslateY = 0;
+    updateImageTransform();
+}
+
+function updateImageTransform() {
+    const imageViewer = document.getElementById('imageViewer');
+    if (imageViewer) {
+        imageViewer.style.transform = `
+            scale(${imageScale}) 
+            translate(${imageTranslateX}px, ${imageTranslateY}px)
+        `;
+    }
+}
+
+function toggleImageZoom(event) {
+    if (imageScale === 1) {
+        zoomImage(2);
+    } else {
+        resetImageZoom();
+    }
+}
+
+// Utility functions
+function showSuccess(message) {
+    showAlert('success', message);
+}
+
+function showError(message) {
+    showAlert('danger', message);
+}
+
+function showWarning(message) {
+    showAlert('warning', message);
+}
+
+function showInfo(message) {
+    showAlert('info', message);
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Properties modal functions
+function switchPropertiesTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.properties-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+
+    // Update tab content
+    document.querySelectorAll('.tab-pane').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById(tabName + '-tab').style.display = 'block';
+}
+
+function updateSymbologyType() {
+    const symbologyTypeSelect = document.getElementById('propSymbologyType');
+    if (!symbologyTypeSelect) {
+        console.error('Symbology type selector not found');
+        return;
+    }
+
+    const symbologyType = symbologyTypeSelect.value;
+    console.log('Updating symbology type to:', symbologyType);
+
+    // Get all symbology control sections
+    const singleControls = document.getElementById('propSingleSymbol');
+    const graduatedControls = document.getElementById('propGraduated');
+    const categorizedControls = document.getElementById('propCategorized');
+
+    // Debug: Check if elements exist
+    console.log('Control elements found:', {
+        single: !!singleControls,
+        graduated: !!graduatedControls,
+        categorized: !!categorizedControls
+    });
+
+    // Hide all controls first
+    if (singleControls) {
+        singleControls.style.display = 'none';
+        console.log('Hidden single controls');
+    }
+    if (graduatedControls) {
+        graduatedControls.style.display = 'none';
+        console.log('Hidden graduated controls');
+    }
+    if (categorizedControls) {
+        categorizedControls.style.display = 'none';
+        console.log('Hidden categorized controls');
+    }
+
+    // Show relevant controls based on selection
+    switch (symbologyType) {
+        case 'single':
+            if (singleControls) {
+                singleControls.style.display = 'block';
+                console.log('✅ Showing single symbology controls');
+
+                // Ensure the single symbol styling is properly initialized
+                if (window.currentPropertiesLayer) {
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+
+                    // Set default single symbol properties if not already set
+                    if (layer.properties.symbology.type !== 'single') {
+                        layer.properties.symbology.type = 'single';
+                        layer.properties.symbology.fillColor = layer.properties.symbology.fillColor || '#3498db';
+                        layer.properties.symbology.borderColor = layer.properties.symbology.borderColor || '#2c3e50';
+                        layer.properties.symbology.borderWidth = layer.properties.symbology.borderWidth || 2;
+                        layer.properties.symbology.fillOpacity = layer.properties.symbology.fillOpacity || 0.7;
+
+                        console.log('Initialized single symbol properties for layer:', layer.name);
+                    }
+                }
+            } else {
+                console.error('❌ Single symbol controls not found - element with ID "propSingleSymbol" missing');
+            }
+            break;
+
+        case 'graduated':
+            if (graduatedControls) {
+                graduatedControls.style.display = 'block';
+                console.log('✅ Showing graduated symbology controls');
+
+                // Populate field selectors when switching to graduated
+                if (window.currentPropertiesLayer) {
+                    populateFieldSelectors(window.currentPropertiesLayer);
+
+                    // Initialize graduated properties
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+                    layer.properties.symbology.type = 'graduated';
+                }
+            } else {
+                console.error('❌ Graduated controls not found');
+            }
+            break;
+
+        case 'categorized':
+            if (categorizedControls) {
+                categorizedControls.style.display = 'block';
+                console.log('✅ Showing categorized symbology controls');
+
+                // Populate field selectors when switching to categorized
+                if (window.currentPropertiesLayer) {
+                    populateFieldSelectors(window.currentPropertiesLayer);
+
+                    // Initialize categorized properties
+                    const layer = window.currentPropertiesLayer;
+                    if (!layer.properties) layer.properties = {};
+                    if (!layer.properties.symbology) layer.properties.symbology = {};
+                    layer.properties.symbology.type = 'categorized';
+                }
+            } else {
+                console.error('❌ Categorized controls not found');
+            }
+            break;
+
+        default:
+            // Default to single symbol if no valid type selected or empty
+            if (singleControls) {
+                singleControls.style.display = 'block';
+                console.log('⚠️ Defaulting to single symbology controls for type:', symbologyType);
+
+                // Set default to single if undefined
+                const symbologySelect = document.getElementById('propSymbologyType');
+                if (symbologySelect && (!symbologyType || symbologyType === '')) {
+                    symbologySelect.value = 'single';
+                }
+            }
+            console.warn('Unknown or empty symbology type:', symbologyType, '- defaulting to single');
+    }
+
+    // Force a UI update to ensure visibility changes take effect
+    setTimeout(() => {
+        console.log('Final visibility states:', {
+            single: singleControls ? singleControls.style.display : 'not found',
+            graduated: graduatedControls ? graduatedControls.style.display : 'not found',
+            categorized: categorizedControls ? categorizedControls.style.display : 'not found'
+        });
+    }, 100);
+}
+
+function updatePopupFieldSelection(fieldName, isSelected) {
+    if (!window.currentPropertiesLayer) return;
+
+    const layer = window.currentPropertiesLayer;
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.popup) layer.properties.popup = {};
+    if (!layer.properties.popup.fields) layer.properties.popup.fields = [];
+
+    if (isSelected && !layer.properties.popup.fields.includes(fieldName)) {
+        layer.properties.popup.fields.push(fieldName);
+    } else if (!isSelected) {
+        layer.properties.popup.fields = layer.properties.popup.fields.filter(f => f !== fieldName);
+    }
+
+    // Mark as configured when any field selection is made
+    layer.properties.popup.configured = true;
+
+    // Update the actual layer reference in mapLayers array immediately
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        // Deep copy to ensure changes are reflected
+        if (!mapLayers[layerIndex].properties) mapLayers[layerIndex].properties = {};
+        if (!mapLayers[layerIndex].properties.popup) mapLayers[layerIndex].properties.popup = {};
+        mapLayers[layerIndex].properties.popup.fields = [...layer.properties.popup.fields];
+        mapLayers[layerIndex].properties.popup.configured = true;
+
+        console.log(`Updated popup fields for layer "${layer.name}": ${layer.properties.popup.fields.join(', ')}`);
+        console.log('Fields will be applied when "Apply" button is clicked.');
+    }
+}
+
+function selectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, true);
+    });
+}
+
+function deselectAllPopupFields() {
+    const checkboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        updatePopupFieldSelection(fieldName, false);
+    });
+}
+
+function generateGraduatedSymbology() {
+    const field = document.getElementById('propGraduatedField').value;
+    const classesInput = document.getElementById('propGraduatedClasses');
+    const colorRampSelect = document.getElementById('propColorRamp');
+
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for graduated symbology');
+        return;
+    }
+
+    if (!classesInput || !colorRampSelect) {
+        showError('Graduated symbology controls not found');
+        return;
+    }
+
+    const classes = parseInt(classesInput.value) || 5;
+    const colorRamp = colorRampSelect.value || 'blues';
+
+    const layer = window.currentPropertiesLayer;
+
+    // Extract numeric values from the selected field
+    const values = [];
+    layer.records.forEach(record => {
+        const value = record.fields[field];
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && isFinite(numValue)) {
+            values.push(numValue);
+        }
+    });
+
+    if (values.length === 0) {
+        showError('No numeric values found in the selected field');
+        return;
+    }
+
+    // Calculate class breaks using equal intervals
+    values.sort((a, b) => a - b);
+    const min = values[0];
+    const max = values[values.length - 1];
+
+    if (min === max) {
+        showError('All values are the same, cannot create graduated symbology');
+        return;
+    }
+
+    const interval = (max - min) / classes;
+    const breaks = [];
+    const colors = generateColorRamp(colorRamp, classes);
+
+    // Create legend with proper styling
+    let legendHTML = '<div class="graduated-legend mt-3">';
+    legendHTML += '<h6>Legend Preview</h6>';
+
+    for (let i = 0; i < classes; i++) {
+        const minVal = min + (i * interval);
+        const maxVal = min + ((i + 1) * interval);
+        breaks.push(maxVal);
+
+        legendHTML += `
+            <div class="legend-item d-flex align-items-center mb-2">
+                <div class="legend-color me-2" style="
+                    background-color: ${colors[i]}; 
+                    width: 20px; 
+                    height: 20px; 
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                "></div>
+                <span class="small">${minVal.toFixed(2)} - ${maxVal.toFixed(2)}</span>
+            </div>
+        `;
+    }
+    legendHTML += '</div>';
+
+    const legendContainer = document.getElementById('propGraduatedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+
+    layer.properties.symbology = {
+        type: 'graduated',
+        field: field,
+        classes: classes,
+        colorRamp: colorRamp,
+        breaks: breaks,
+        colors: colors,
+        min: min,
+        max: max,
+        interval: interval
+    };
+
+    showSuccess(`Graduated symbology generated with ${classes} classes for field "${field}"`);
+    console.log('Generated graduated symbology:', layer.properties.symbology);
+}
+
+function generateCategorizedSymbology() {
+    const field = document.getElementById('propCategorizedField').value;
+
+    if (!field || !window.currentPropertiesLayer) {
+        showError('Please select a field for categorized symbology');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+
+    // Extract unique values with counts
+    const valueCount = new Map();
+    layer.records.forEach(record => {
+        const value = record.fields[field];
+        if (value !== null && value !== undefined && value !== '') {
+            const stringValue = String(value);
+            valueCount.set(stringValue, (valueCount.get(stringValue) || 0) + 1);
+        }
+    });
+
+    const uniqueValues = Array.from(valueCount.keys());
+
+    if (uniqueValues.length === 0) {
+        showError('No values found in the selected field');
+        return;
+    }
+
+    if (uniqueValues.length > 20) {
+        showWarning(`Field has ${uniqueValues.length} unique values. Consider using a field with fewer categories for better visualization.`);
+    }
+
+    // Generate colors using a better color palette
+    const colors = generateColorPalette(uniqueValues.length);
+
+    // Create legend with counts and better styling
+    let legendHTML = '<div class="categorized-legend mt-3">';
+    legendHTML += '<h6>Legend Preview</h6>';
+
+    uniqueValues.forEach((value, index) => {
+        const count = valueCount.get(value);
+        legendHTML += `
+            <div class="legend-item d-flex align-items-center mb-2">
+                <div class="legend-color me-2" style="
+                    background-color: ${colors[index]}; 
+                    width: 20px; 
+                    height: 20px; 
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                "></div>
+                <span class="small flex-grow-1">${value}</span>
+                <span class="badge bg-secondary ms-2">${count}</span>
+            </div>
+        `;
+    });
+    legendHTML += '</div>';
+
+    const legendContainer = document.getElementById('propCategorizedLegend');
+    if (legendContainer) {
+        legendContainer.innerHTML = legendHTML;
+    }
+
+    // Update layer properties
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+
+    layer.properties.symbology = {
+        type: 'categorized',
+        field: field,
+        categories: uniqueValues.map((value, index) => ({
+            value: value,
+            color: colors[index],
+            label: String(value),
+            count: valueCount.get(value)
+        }))
+    };
+
+    showSuccess(`Categorized symbology generated with ${uniqueValues.length} categories for field "${field}"`);
+    console.log('Generated categorized symbology:', layer.properties.symbology);
+}
+
+function generateColorRamp(rampName, count) {
+    const ramps = {
+        blues: ['#08519c', '#3182bd', '#6baed6', '#9ecae1', '#c6dbef'],
+        greens: ['#006d2c', '#31a354', '#74c476', '#a1d99b', '#c7e9c0'],
+        reds: ['#a50f15', '#de2d26', '#fb6a4a', '#fc9272', '#fcbba1'],
+        oranges: ['#b30000', '#e34a33', '#fc8d59', '#fdbb84', '#fdd49e'],
+        purples: ['#54278f', '#756bb1', '#9e9ac8', '#bcbddc', '#dadaeb']
+    };
+
+    const baseColors = ramps[rampName] || ramps.blues;
+
+    if (count <= baseColors.length) {
+        return baseColors.slice(0, count);
+    }
+
+    // Interpolate colors if we need more than available
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        const ratio = i / (count - 1);
+        const index = ratio * (baseColors.length - 1);
+        const lower = Math.floor(index);
+        const upper = Math.ceil(index);
+
+        if (lower === upper) {
+            colors.push(baseColors[lower]);
+        } else {
+            // Simple interpolation
+            colors.push(baseColors[lower]); // For simplicity, just use the lower color
+        }
+    }
+
+    return colors;
+}
+
+function generateColorPalette(count) {
+    const colors = [];
+    const hueStep = 360 / count;
+
+    for (let i = 0; i < count; i++) {
+        const hue = (i * hueStep) % 360;
+        const saturation = 70 + (i % 3) * 10;
+        const lightness = 50 + (i % 2) * 10;
+
+        colors.push(hslToHex(hue, saturation, lightness));
+    }
+
+    return colors;
+}
+
+function hslToHex(h, s, l) {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function applyProperties() {
+    if (!window.currentPropertiesLayer) {
+        showError('No layer selected for properties update');
+        return;
+    }
+
+    const layer = window.currentPropertiesLayer;
+
+    // Update layer name
+    layer.name = document.getElementById('propLayerName').value;
+
+    // Update symbology properties
+    if (!layer.properties) layer.properties = {};
+    if (!layer.properties.symbology) layer.properties.symbology = {};
+
+    // Get current symbology type
+    const symbologyType = document.getElementById('propSymbologyType').value || 'single';
+    layer.properties.symbology.type = symbologyType;
+
+    // Update common properties
+    const fillColor = document.getElementById('propFillColor').value;
+    const borderColor = document.getElementById('propBorderColor').value;
+    const borderWidth = parseInt(document.getElementById('propBorderWidth').value);
+    const fillOpacity = parseFloat(document.getElementById('propFillOpacity').value);
+
+    if (fillColor) layer.properties.symbology.fillColor = fillColor;
+    if (borderColor) layer.properties.symbology.borderColor = borderColor;
+    if (!isNaN(borderWidth)) layer.properties.symbology.borderWidth = borderWidth;
+    if (!isNaN(fillOpacity)) layer.properties.symbology.fillOpacity = fillOpacity;
+
+    console.log('Updated symbology properties:', {
+        type: symbologyType,
+        fillColor: fillColor,
+        borderColor: borderColor,
+        borderWidth: borderWidth,
+        fillOpacity: fillOpacity
+    });
+
+    // Update labels properties
+    if (!layer.properties.labels) layer.properties.labels = {};
+    layer.properties.labels.enabled = document.getElementById('propEnableLabels').checked;
+    layer.properties.labels.field = document.getElementById('propLabelField').value;
+    layer.properties.labels.fontSize = parseInt(document.getElementById('propLabelSize').value);
+    layer.properties.labels.color = document.getElementById('propLabelColor').value;
+    layer.properties.labels.background = document.getElementById('propLabelBackground').checked;
+
+    // Update popup properties with all iTool settings
+    if (!layer.properties.popup) layer.properties.popup = {};
+
+    // Get popup enabled state FIRST before applying other settings
+    const popupEnabledCheckbox = document.getElementById('propEnablePopups');
+    const popupEnabled = popupEnabledCheckbox ? popupEnabledCheckbox.checked : true;
+    layer.properties.popup.enabled = popupEnabled;
+
+    console.log(`Applying popup enabled state: ${popupEnabled} for layer "${layer.name}"`);
+
+    // Apply all popup settings
+    updateLayerPopupSettings(layer);
+
+    // Collect selected popup fields from checkboxes
+    const selectedPopupFields = [];
+    const popupCheckboxes = document.querySelectorAll('#propPopupFields input[type="checkbox"]:checked');
+    popupCheckboxes.forEach(checkbox => {
+        const fieldName = checkbox.id.replace('popup_field_', '');
+        selectedPopupFields.push(fieldName);
+    });
+
+    // Update popup fields in layer properties and mark as configured
+    layer.properties.popup.fields = selectedPopupFields;
+    layer.properties.popup.configured = true;
+
+    console.log(`Applying popup configuration for layer "${layer.name}"`);
+    console.log(`Selected popup fields: ${selectedPopupFields.join(', ')}`);
+    console.log(`Total selected fields: ${selectedPopupFields.length}`);
+
+    // Update the actual layer reference in mapLayers array
+    const layerIndex = mapLayers.findIndex(l => l.id === layer.id);
+    if (layerIndex !== -1) {
+        // Deep copy the updated properties to ensure changes persist
+        mapLayers[layerIndex].properties = JSON.parse(JSON.stringify(layer.properties));
+        mapLayers[layerIndex].name = layer.name;
+
+        // Force update all existing feature popups with new field configuration
+        if (mapLayers[layerIndex].features && mapLayers[layerIndex].records) {
+            console.log(`Updating popups for ${mapLayers[layerIndex].features.length} features`);
+
+            mapLayers[layerIndex].features.forEach((feature, index) => {
+                // Get the record data for this feature
+                const recordData = mapLayers[layerIndex].records[index]?.fields;
+
+                if (recordData) {
+                    // Update the cached record data on the feature
+                    feature.recordData = recordData;
+                    feature.layerId = mapLayers[layerIndex].id;
+                    feature.featureIndex = index;
+
+                    // Create new popup content with updated field configuration
+                    const newPopupContent = createFeaturePopup(recordData, mapLayers[layerIndex]);
+
+                    // Remove existing popup if it exists
+                    if (feature.getPopup()) {
+                        feature.unbindPopup();
+                    }
+
+                    // Bind new popup with updated content
+                    feature.bindPopup(newPopupContent);
+
+                    // Update click handler to use new configuration
+                    feature.off('click');
+                    feature.on('click', function(e) {
+                        window.currentPopupFeature = this;
+                        handleFeatureClick(this, index, mapLayers[layerIndex]);
+                    });
+                }
+            });
+
+            console.log(`Successfully updated popups for all features in layer "${layer.name}"`);
+        }
+    }
+
+    // Apply visual styling changes to map features
+    applyLayerStyling(layer);
+
+    // Apply labels if enabled
+    if (layer.properties.labels && layer.properties.labels.enabled) {
+        applyLabelsToLayer(layer);
+    } else {
+        // Remove labels if disabled
+        if (layer.labelGroup) {
+            map.removeLayer(layer.labelGroup);
+            layer.labelGroup = null;
+        }
+    }
+
+    // Update layers list to reflect changes
+    updateLayersList();
+
+    const fieldCount = selectedPopupFields.length;
+    const message = fieldCount === 0 ? 
+        'Layer properties applied! Popup will show no fields.' : 
+        `Layer properties applied! Popup will show ${fieldCount} selected field(s): ${selectedPopupFields.join(', ')}.`;
+
     showSuccess(message);
 }
 
@@ -4911,7 +9784,7 @@ function applyAndCloseProperties() {
     if (modal) {
         modal.hide();
     }
-    
+
     // Ensure add layer functionality is restored after closing properties modal
     setTimeout(() => {
         resetAddLayerModalState();
@@ -4920,13 +9793,36 @@ function applyAndCloseProperties() {
 }
 
 function resetAddLayerModalState() {
-    // Clear any references that might interfere
-    window.currentPropertiesLayer = null;
-    
-    // Reset any form states
-    const addLayerModal = document.getElementById('addLayerModal');
-    if (addLayerModal && !addLayerModal.classList.contains('show')) {
-        resetAddLayerModal();
+    // Clear any references that might interfere with add layer
+    if (window.currentPropertiesLayer) {
+        // Clear the reference to avoid conflicts
+        const tempLayer = window.currentPropertiesLayer;
+        window.currentPropertiesLayer = null;
+
+        // Restore it after a short delay to allow add layer to work properly
+        setTimeout(() => {
+            if (!document.getElementById('addLayerModal').classList.contains('show')) {
+                window.currentPropertiesLayer = tempLayer;
+            }
+        }, 100);
+    }
+
+    // Ensure the add layer modal event listeners are still active
+    const addLayerBtn = document.querySelector('[onclick*="showAddLayerModal"]');
+    if (addLayerBtn && !addLayerBtn.onclick) {
+        addLayerBtn.onclick = showAddLayerModal;
+    }
+
+    // Re-enable table loading functionality
+    const tableSelector = document.getElementById('newLayerTable');
+    if (tableSelector) {
+        // Remove any disabled state that might have been applied
+        tableSelector.disabled = false;
+
+        // Ensure change event listener is active
+        if (!tableSelector.onchange) {
+            tableSelector.onchange = loadTableFields;
+        }
     }
 }
 
@@ -4937,7 +9833,7 @@ function ensureModalEventListeners() {
         // Remove existing listeners to avoid duplicates
         addLayerModal.removeEventListener('shown.bs.modal', handleAddLayerModalShown);
         addLayerModal.removeEventListener('hidden.bs.modal', handleAddLayerModalHidden);
-        
+
         // Add fresh listeners
         addLayerModal.addEventListener('shown.bs.modal', handleAddLayerModalShown);
         addLayerModal.addEventListener('hidden.bs.modal', handleAddLayerModalHidden);
@@ -5132,7 +10028,7 @@ function applyLayerStyling(layer) {
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
     }
-    
+
     // Ensure add layer functionality remains intact after styling
     ensureAddLayerFunctionality();
 }
@@ -5143,7 +10039,7 @@ function ensureAddLayerFunctionality() {
         // Clear the reference to avoid conflicts
         const tempLayer = window.currentPropertiesLayer;
         window.currentPropertiesLayer = null;
-        
+
         // Restore it after a short delay to allow add layer to work properly
         setTimeout(() => {
             if (!document.getElementById('addLayerModal').classList.contains('show')) {
@@ -5151,19 +10047,19 @@ function ensureAddLayerFunctionality() {
             }
         }, 100);
     }
-    
+
     // Ensure the add layer modal event listeners are still active
     const addLayerBtn = document.querySelector('[onclick*="showAddLayerModal"]');
     if (addLayerBtn && !addLayerBtn.onclick) {
         addLayerBtn.onclick = showAddLayerModal;
     }
-    
+
     // Re-enable table loading functionality
     const tableSelector = document.getElementById('newLayerTable');
     if (tableSelector) {
         // Remove any disabled state that might have been applied
         tableSelector.disabled = false;
-        
+
         // Ensure change event listener is active
         if (!tableSelector.onchange) {
             tableSelector.onchange = loadTableFields;
@@ -5197,7 +10093,7 @@ function applyLabelsToLayer(layer) {
             // Calculate the visual center of the polygon for better label placement
             const bounds = feature.getBounds();
             const center = bounds.getCenter();
-            
+
             // Create a transparent marker at the center for label positioning
             const labelMarker = L.marker(center, {
                 icon: L.divIcon({
@@ -5240,7 +10136,7 @@ function applyLabelsToLayer(layer) {
         } else if (feature.getLatLng) {
             // For point features, use the existing approach but improved
             const labelPosition = feature.getLatLng();
-            
+
             const labelMarker = L.marker(labelPosition, {
                 icon: L.divIcon({
                     className: 'point-label-marker',
@@ -5293,19 +10189,19 @@ function calculateLabelOffset(position, index, totalLabels) {
     // Calculate smart positioning to reduce overlap
     const baseOffset = 15;
     const spacing = 25;
-    
+
     // For small numbers of features, use center positioning
     if (totalLabels < 10) {
         return { x: 0, y: 0 };
     }
-    
+
     // For larger numbers, create a slight offset pattern
     const angle = (index * 45) % 360; // Rotate through different angles
     const radius = baseOffset + (index % 3) * 5; // Vary the distance
-    
+
     const x = Math.cos(angle * Math.PI / 180) * radius;
     const y = Math.sin(angle * Math.PI / 180) * radius;
-    
+
     return { x: Math.round(x), y: Math.round(y) };
 }
 
@@ -5346,21 +10242,21 @@ function previewPopup() {
         showError('No layer selected or no data available for preview');
         return;
     }
-    
+
     const layer = window.currentPropertiesLayer;
     const sampleRecord = layer.records[0];
-    
+
     if (!sampleRecord || !sampleRecord.fields) {
         showError('No sample data available for preview');
         return;
     }
-    
+
     // Apply current settings to layer temporarily for preview
     updateLayerPopupSettings(layer);
-    
+
     // Generate preview content
     const previewContent = createFeaturePopup(sampleRecord.fields, layer);
-    
+
     // Display in preview area
     document.getElementById('popupPreview').innerHTML = previewContent;
 }
@@ -5368,12 +10264,12 @@ function previewPopup() {
 function updateLayerPopupSettings(layer) {
     if (!layer.properties) layer.properties = {};
     if (!layer.properties.popup) layer.properties.popup = {};
-    
+
     // Get popup enabled state - this should already be set but ensure consistency
     const enablePopupsCheckbox = document.getElementById('propEnablePopups');
     const popupEnabled = enablePopupsCheckbox ? enablePopupsCheckbox.checked : true;
     layer.properties.popup.enabled = popupEnabled;
-    
+
     // Only update other popup settings if popups are enabled
     if (!popupEnabled) {
         console.log(`Popups disabled for layer "${layer.name}" - skipping detailed popup configuration`);
@@ -5391,7 +10287,7 @@ function updateLayerPopupSettings(layer) {
     layer.properties.popup.showCopyButtons = document.getElementById('propShowCopyButtons')?.checked || false;
     layer.properties.popup.enableFieldSorting = document.getElementById('propEnableFieldSorting')?.checked || false;
     layer.properties.popup.customTemplate = document.getElementById('propCustomTemplate')?.value || '';
-    
+
     // Controls
     if (!layer.properties.popup.controls) layer.properties.popup.controls = {};
     layer.properties.popup.controls.showZoomControls = document.getElementById('propShowZoomControls')?.checked !== false;
@@ -5405,10 +10301,10 @@ function exportCurrentFeature() {
         showError('No feature data available for export');
         return;
     }
-    
+
     const data = window.currentPopupFeature.recordData;
     const csvContent = Object.keys(data).map(key => `${key},"${data[key]}"`).join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -5416,7 +10312,7 @@ function exportCurrentFeature() {
     link.download = 'feature_data.csv';
     link.click();
     URL.revokeObjectURL(url);
-    
+
     showSuccess('Feature data exported successfully!');
 }
 
@@ -5428,7 +10324,7 @@ function editCurrentFeature() {
 function handleTemplateChange() {
     const template = document.getElementById('propPopupTemplate')?.value;
     const customSection = document.getElementById('customTemplateSection');
-    
+
     if (template === 'custom' && customSection) {
         customSection.style.display = 'block';
     } else if (customSection) {
@@ -5444,1696 +10340,126 @@ function handleFeatureClick(feature, index, layerConfig) {
 }
 
 // Global popup control functions
-window.zoomToCurrentPopupFeature = function(zoomLevel = 'close') {
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
     if (!window.currentPopupFeature) {
         showError('No feature selected for zooming');
         return;
     }
-    
+
     const feature = window.currentPopupFeature;
-    const layerId = feature.layerId;
-    const featureIndex = feature.featureIndex;
-    
-    if (layerId !== undefined && featureIndex !== undefined) {
-        const zoomOptions = {
-            'close': { padding: 0.05, maxZoom: 25 },
-            'medium': { padding: 0.1, maxZoom: 20 },
-            'far': { padding: 0.3, maxZoom: 15 }
-        };
-        
-        zoomToFeature(layerId, featureIndex, zoomOptions[zoomLevel]);
+
+    try {
+        if (feature.getBounds) {
+            // Polygon geometry
+            const bounds = feature.getBounds();
+
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature zoom');
+                return;
+            }
+
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+
+            let zoomConfig;
+            switch (zoomType) {
+                case 'close':
+                    // Maximum zoom configuration for closest view
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 10) {
+                        zoomConfig = { padding: 0.4, maxZoom: 25 };
+                    } else if (boundsSize < 50) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else if (boundsSize < 100) {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    } else {
+                        zoomConfig = { padding: 0.15, maxZoom: 22 };
+                    }
+                    break;
+                case 'medium':
+                    zoomConfig = { 
+                        padding: 0.3, 
+                        maxZoom: Math.max(18, Math.min(22, 25 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                case 'far':
+                    zoomConfig = { 
+                        padding: 0.5, 
+                        maxZoom: Math.max(15, Math.min(20, 23 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                default:
+                    // Default to close view for maximum detail
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 25) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    }
+            }
+
+            map.fitBounds(bounds.pad(zoomConfig.padding), {
+                maxZoom: zoomConfig.maxZoom,
+                animate: true,
+                duration: 0.8
+            });
+
+        } else if (feature.getLatLng) {
+            // Point geometry - use maximum zoom levels
+            const latlng = feature.getLatLng();
+
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point zoom');
+                return;
+            }
+
+            let targetZoom;
+            switch (zoomType) {
+                case 'close':
+                    targetZoom = 25; // Maximum possible zoom
+                    break;
+                case 'medium':
+                    targetZoom = 22;
+                    break;
+                case 'far':
+                    targetZoom = 19;
+                    break;
+                default:
+                    targetZoom = 25; // Default to maximum zoom
+            }
+
+            map.setView(latlng, targetZoom, {
+                animate: true,
+                duration: 0.8
+            });
+
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
+        }
+
+        const actualZoom = map.getZoom();
+        showSuccess(`Zoomed to feature - ${zoomType} view (zoom level: ${actualZoom})`);
+
+    } catch (error) {
+        console.error('Error in popup zoom:', error);
+        showError('Failed to zoom to feature: ' + error.message);
     }
 };
 
 window.centerCurrentPopupFeature = function() {
-    if (!window.currentPopupFeature) {
-        showError('No feature selected for centering');
-        return;
-    }
-    
-    const feature = window.currentPopupFeature;
-    
-    try {
-        if (feature.getBounds) {
-            const center = feature.getBounds().getCenter();
-            map.setView(center, map.getZoom());
-        } else if (feature.getLatLng) {
-            const latlng = feature.getLatLng();
-            map.setView(latlng, map.getZoom());
-        }
-        showSuccess('Map centered on feature');
-    } catch (error) {
-        showError('Failed to center on feature');
-    }
-};
+    if (!window.currentPopupFeature) return;
 
-// Popup enable/disable handler
-function handlePopupToggle() {
-    const enabledCheckbox = document.getElementById('propEnablePopups');
-    if (!enabledCheckbox) {
-        console.error('Enable popups checkbox not found');
-        return;
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
     }
-    
-    const enabled = enabledCheckbox.checked;
-    console.log('Popup toggle changed to:', enabled);
-    
-    // Find all popup configuration sections that should be toggled
-    const configSections = [
-        'popupConfigSection',
-        'popupTemplateSection', 
-        'popupFieldsSection',
-        'popupAdvancedSection',
-        'popupControlsSection'
-    ];
-    
-    configSections.forEach(sectionId => {
-        const section = document.getElementById(sectionId);
-        if (section) {
-            section.style.display = enabled ? 'block' : 'none';
-            console.log(`Section ${sectionId} ${enabled ? 'shown' : 'hidden'}`);
-        }
-    });
-    
-    // Also toggle individual popup configuration controls
-    const popupControls = document.querySelectorAll('.popup-config-control');
-    popupControls.forEach(control => {
-        control.style.display = enabled ? 'block' : 'none';
-    });
-    
-    // Toggle the main popup configuration container
-    const mainPopupConfig = document.querySelector('.popup-configuration');
-    if (mainPopupConfig) {
-        mainPopupConfig.style.display = enabled ? 'block' : 'none';
-    }
-    
-    // Update the layer's popup enabled state immediately
-    if (window.currentPropertiesLayer) {
-        if (!window.currentPropertiesLayer.properties) {
-            window.currentPropertiesLayer.properties = {};
-        }
-        if (!window.currentPropertiesLayer.properties.popup) {
-            window.currentPropertiesLayer.properties.popup = {};
-        }
-        window.currentPropertiesLayer.properties.popup.enabled = enabled;
-        
-        console.log(`✅ Popup ${enabled ? 'enabled' : 'disabled'} for layer: ${window.currentPropertiesLayer.name}`);
-        
-        // If disabling popups, also update all existing feature popups
-        if (!enabled && window.currentPropertiesLayer.features) {
-            window.currentPropertiesLayer.features.forEach(feature => {
-                if (feature.getPopup && feature.getPopup()) {
-                    feature.unbindPopup();
-                }
-            });
-            console.log('Removed existing popups from all features');
-        }
-        
-        // If enabling popups, rebind popups to all features
-        if (enabled && window.currentPropertiesLayer.features && window.currentPropertiesLayer.records) {
-            window.currentPropertiesLayer.features.forEach((feature, index) => {
-                const recordData = window.currentPropertiesLayer.records[index]?.fields;
-                if (recordData) {
-                    const popupContent = createFeaturePopup(recordData, window.currentPropertiesLayer);
-                    feature.bindPopup(popupContent);
-                }
-            });
-            console.log('Rebound popups to all features');
-        }
-    }
-    
-    // Show user feedback
-    if (enabled) {
-        showSuccess('Popups enabled for this layer');
-    } else {
-        showInfo('Popups disabled for this layer');
-    }
-}
 
-// Inline editing functionality
-function setupInlineEditing(layer) {
-    // Add CSS for inline editing if not already added
-    if (!document.getElementById('inlineEditingStyles')) {
-        const styles = document.createElement('style');
-        styles.id = 'inlineEditingStyles';
-        styles.textContent = `
-            .editable-cell {
-                cursor: pointer;
-                transition: background-color 0.2s;
-                border-left: 3px solid transparent;
-            }
-            .editable-cell:hover {
-                background-color: #f8f9fa;
-            }
-            .readonly-cell {
-                border-left: 3px solid transparent;
-            }
-            .border-success {
-                border-left-color: #28a745 !important;
-            }
-            .border-info {
-                border-left-color: #17a2b8 !important;
-            }
-            .border-danger {
-                border-left-color: #dc3545 !important;
-            }
-            .edit-icon, .view-icon {
-                opacity: 0.6;
-                font-size: 0.75em;
-            }
-            .editable-cell:hover .edit-icon {
-                opacity: 1;
-            }
-            .inline-editor {
-                width: 100%;
-                border: 2px solid #007bff;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 0.875rem;
-                background: #fff;
-            }
-            .inline-editor:focus {
-                outline: none;
-                border-color: #0056b3;
-                box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-            }
-            .save-cancel-buttons {
-                margin-top: 4px;
-            }
-            .permission-indicator .badge {
-                font-size: 0.7em;
-            }
-        `;
-        document.head.appendChild(styles);
-    }
-}
-
-function startInlineEdit(cell) {
-    // Only allow editing in editing mode
-    if (!isTableEditingMode) {
-        showWarning('Please click "Start Editing" button first to enable editing mode.');
-        return;
-    }
-    
-    if (cell.querySelector('.inline-editor')) {
-        return; // Already editing
-    }
-    
-    const fieldName = cell.getAttribute('data-field');
-    const recordId = cell.getAttribute('data-record-id');
-    const originalValue = cell.getAttribute('data-original-value') || '';
-    
-    // Get table ID and layer for field type detection
-    const row = cell.closest('tr');
-    const tableId = row.getAttribute('data-table-id');
-    const layer = mapLayers.find(l => l.tableId === tableId);
-    
-    // Detect field type
-    const fieldType = layer ? detectFieldType(layer, fieldName, originalValue) : 'text';
-    
-    // Create input element with appropriate type and validation
-    const input = document.createElement('input');
-    input.className = 'inline-editor';
-    input.value = originalValue;
-    
-    // Set input type and attributes based on field type
-    switch (fieldType) {
-        case 'number':
-            input.type = 'number';
-            input.step = 'any';
-            input.placeholder = 'Enter number';
-            break;
-        case 'boolean':
-            input.type = 'text';
-            input.placeholder = 'true or false';
-            input.setAttribute('list', 'booleanOptions');
-            // Create datalist for boolean options
-            if (!document.getElementById('booleanOptions')) {
-                const datalist = document.createElement('datalist');
-                datalist.id = 'booleanOptions';
-                datalist.innerHTML = '<option value="true"><option value="false">';
-                document.body.appendChild(datalist);
-            }
-            break;
-        case 'date':
-            input.type = 'date';
-            input.placeholder = 'YYYY-MM-DD';
-            break;
-        default:
-            input.type = 'text';
-            input.placeholder = 'Enter text';
-    }
-    
-    // Create save/cancel buttons with field type indicator
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.className = 'save-cancel-buttons';
-    buttonsDiv.innerHTML = `
-        <small class="text-muted me-2">${fieldType}</small>
-        <button class="btn btn-xs btn-success me-1" onclick="saveInlineEdit(this, '${recordId}', '${fieldName}')">
-            <i class="fas fa-check"></i>
-        </button>
-        <button class="btn btn-xs btn-secondary" onclick="cancelInlineEdit(this, '${escapeHtml(originalValue)}')">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    // Replace cell content
-    cell.innerHTML = '';
-    cell.appendChild(input);
-    cell.appendChild(buttonsDiv);
-    
-    // Focus and select input
-    input.focus();
-    input.select();
-    
-    // Handle Enter and Escape keys
-    input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            saveInlineEdit(buttonsDiv.querySelector('.btn-success'), recordId, fieldName);
-        } else if (e.key === 'Escape') {
-            cancelInlineEdit(buttonsDiv.querySelector('.btn-secondary'), originalValue);
-        }
-    });
-    
-    // Add real-time validation feedback
-    input.addEventListener('input', function() {
-        const value = this.value;
-        let isValid = true;
-        let errorMessage = '';
-        
-        if (value !== '' && value !== null && value !== undefined) {
-            try {
-                convertValueByType(value, fieldType);
-            } catch (error) {
-                isValid = false;
-                errorMessage = error.message;
-            }
-        }
-        
-        // Update input styling based on validation
-        if (isValid) {
-            this.style.borderColor = '#28a745';
-            this.style.backgroundColor = '#f8fff9';
-            this.title = '';
-        } else {
-            this.style.borderColor = '#dc3545';
-            this.style.backgroundColor = '#fff5f5';
-            this.title = errorMessage;
-        }
-        
-        // Enable/disable save button
-        const saveButton = buttonsDiv.querySelector('.btn-success');
-        if (saveButton) {
-            saveButton.disabled = !isValid;
-        }
-    });
-}
-
-async function saveInlineEdit(button, recordId, fieldName) {
-    const cell = button.closest('td');
-    const input = cell.querySelector('.inline-editor');
-    const rawValue = input.value;
-    const originalValue = cell.getAttribute('data-original-value') || '';
-    
-    if (rawValue === originalValue) {
-        cancelInlineEdit(button, originalValue);
-        return;
-    }
-    
-    try {
-        // Get table ID from row
-        const row = cell.closest('tr');
-        const tableId = row.getAttribute('data-table-id');
-        
-        if (!tableId) {
-            throw new Error('Table ID not found');
-        }
-        
-        // Get layer and field information for type validation
-        const layer = mapLayers.find(l => l.tableId === tableId);
-        if (!layer) {
-            throw new Error('Layer not found');
-        }
-        
-        // Detect field type and convert value accordingly
-        let convertedValue = rawValue;
-        const fieldType = detectFieldType(layer, fieldName, rawValue);
-        
-        try {
-            convertedValue = convertValueByType(rawValue, fieldType);
-        } catch (conversionError) {
-            throw new Error(`Invalid ${fieldType} value: ${rawValue}`);
-        }
-        
-        // Store the change for batch saving
-        const changeKey = `${recordId}_${fieldName}`;
-        editingChanges.set(changeKey, {
-            recordId: recordId,
-            fieldName: fieldName,
-            newValue: convertedValue,
-            originalValue: originalValue,
-            fieldType: fieldType
-        });
-        
-        // Update cell display with new value
-        const displayValue = String(convertedValue).length > 50 ? 
-            String(convertedValue).substring(0, 50) + '...' : String(convertedValue);
-        cell.setAttribute('data-original-value', convertedValue);
-        cell.title = `Modified: ${convertedValue} (will be saved when you click Save Editing)`;
-        cell.innerHTML = `
-            <div class="editable-content modified">
-                ${escapeHtml(displayValue)}
-                <i class="fas fa-edit edit-icon ms-1" style="color: #ffc107;"></i>
-                <i class="fas fa-clock ms-1 text-warning" title="Pending save"></i>
-            </div>
-        `;
-        
-        // Re-add click handler for further editing
-        cell.onclick = function() { startInlineEdit(this); };
-        
-        // Update save button to show pending changes count
-        const saveBtn = document.getElementById('saveEditingBtn');
-        if (saveBtn) {
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
-            saveBtn.classList.add('btn-warning');
-            saveBtn.classList.remove('btn-success');
-        }
-        
-        showInfo(`Field "${fieldName}" marked for saving. Click "Save Editing" to commit all changes.`);
-        
-    } catch (error) {
-        console.error('Error processing field change:', error);
-        showError(`Invalid value: ${error.message}`);
-        
-        // Restore original content
-        cancelInlineEdit(button, originalValue);
-    }
-}
-
-function detectFieldType(layer, fieldName, value) {
-    // First check existing data to determine field type
-    if (layer.records && layer.records.length > 0) {
-        for (const record of layer.records) {
-            const existingValue = record.fields[fieldName];
-            if (existingValue !== null && existingValue !== undefined && existingValue !== '') {
-                if (typeof existingValue === 'number') {
-                    return 'number';
-                } else if (typeof existingValue === 'boolean') {
-                    return 'boolean';
-                } else if (typeof existingValue === 'string') {
-                    // Check if it's a date string
-                    if (existingValue.match(/^\d{4}-\d{2}-\d{2}/)) {
-                        return 'date';
-                    }
-                    return 'text';
-                }
-            }
-        }
-    }
-    
-    // If no existing data, try to infer from the input value
-    if (value === '' || value === null || value === undefined) {
-        return 'text';
-    }
-    
-    // Check if it's a number
-    if (!isNaN(parseFloat(value)) && isFinite(value)) {
-        return 'number';
-    }
-    
-    // Check if it's a boolean
-    if (value.toLowerCase() === 'true' || value.toLowerCase() === 'false') {
-        return 'boolean';
-    }
-    
-    // Check if it's a date
-    if (value.match(/^\d{4}-\d{2}-\d{2}/)) {
-        return 'date';
-    }
-    
-    return 'text';
-}
-
-function convertValueByType(value, fieldType) {
-    if (value === '' || value === null || value === undefined) {
-        return null;
-    }
-    
-    switch (fieldType) {
-        case 'number':
-            const numValue = parseFloat(value);
-            if (isNaN(numValue) || !isFinite(numValue)) {
-                throw new Error(`"${value}" is not a valid number`);
-            }
-            return numValue;
-            
-        case 'boolean':
-            if (typeof value === 'boolean') {
-                return value;
-            }
-            const strValue = String(value).toLowerCase();
-            if (strValue === 'true' || strValue === '1' || strValue === 'yes') {
-                return true;
-            } else if (strValue === 'false' || strValue === '0' || strValue === 'no') {
-                return false;
-            } else {
-                throw new Error(`"${value}" is not a valid boolean value`);
-            }
-            
-        case 'date':
-            // Basic date validation
-            if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                const date = new Date(value);
-                if (isNaN(date.getTime())) {
-                    throw new Error(`"${value}" is not a valid date`);
-                }
-                return value;
-            } else {
-                throw new Error(`"${value}" is not a valid date format (YYYY-MM-DD)`);
-            }
-            
-        case 'text':
-        default:
-            return String(value);
-    }
-}
-
-function cancelInlineEdit(button, originalValue) {
-    const cell = button.closest('td');
-    const displayValue = originalValue.length > 50 ? originalValue.substring(0, 50) + '...' : originalValue;
-    
-    // Check if this field had pending changes and remove them
-    const recordId = cell.getAttribute('data-record-id');
-    const fieldName = cell.getAttribute('data-field');
-    const changeKey = `${recordId}_${fieldName}`;
-    
-    if (editingChanges.has(changeKey)) {
-        editingChanges.delete(changeKey);
-        
-        // Update save button
-        const saveBtn = document.getElementById('saveEditingBtn');
-        if (saveBtn) {
-            if (editingChanges.size === 0) {
-                saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
-                saveBtn.classList.remove('btn-warning');
-                saveBtn.classList.add('btn-success');
-            } else {
-                saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
-            }
-        }
-    }
-    
-    cell.innerHTML = `
-        <div class="editable-content">
-            ${escapeHtml(displayValue)}
-            <i class="fas fa-edit edit-icon ms-1 text-success"></i>
-        </div>
-    `;
-    
-    // Re-add click handler if in editing mode
-    if (isTableEditingMode) {
-        cell.onclick = function() { startInlineEdit(this); };
-    }
-}
-
-async function addNewRecord(layerId) {
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) {
-        showError('Layer not found');
-        return;
-    }
-    
-    if (!canEditRecords()) {
-        showError('You do not have permission to add records');
-        return;
-    }
-    
-    try {
-        // Get all fields from layer (not just first record)
-        let allFields = [];
-        if (layer.records && layer.records.length > 0) {
-            // Get all unique field names from all records
-            const fieldSet = new Set();
-            layer.records.forEach(record => {
-                if (record.fields) {
-                    Object.keys(record.fields).forEach(field => {
-                        if (field !== layer.geometryField) {
-                            fieldSet.add(field);
-                        }
-                    });
-                }
-            });
-            allFields = Array.from(fieldSet);
-        } else {
-            // If no records exist, get fields from table schema
-            try {
-                const tableFields = await window.teableAPI.getTableFields(layer.tableId);
-                allFields = tableFields.map(field => field.name).filter(name => name !== layer.geometryField);
-            } catch (error) {
-                console.warn('Could not get table fields:', error);
-                allFields = [];
-            }
-        }
-        
-        // Filter to only editable fields
-        const editableFields = allFields.filter(field => 
-            getFieldPermission(field, layer) === 'edit'
-        );
-        
-        if (editableFields.length === 0) {
-            showWarning('No editable fields available. You can still create a record, but it will only contain default values.');
-            // Still allow creation with empty record
-        }
-        
-        // Show modal for new record
-        showNewRecordModal(layer, editableFields);
-        
-    } catch (error) {
-        console.error('Error preparing new record:', error);
-        showError('Failed to prepare new record: ' + error.message);
-    }
-}
-
-function showNewRecordModal(layer, editableFields) {
-    // Get field types for better input controls
-    const getInputType = (fieldName) => {
-        if (layer.records && layer.records.length > 0) {
-            // Analyze existing data to determine field type
-            for (const record of layer.records) {
-                const value = record.fields[fieldName];
-                if (value !== null && value !== undefined && value !== '') {
-                    if (typeof value === 'number') {
-                        return 'number';
-                    } else if (typeof value === 'boolean') {
-                        return 'checkbox';
-                    } else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
-                        return 'date';
-                    }
-                }
-            }
-        }
-        return 'text';
-    };
-
-    const createFieldInput = (field) => {
-        const inputType = getInputType(field);
-        let inputHTML = '';
-        
-        switch (inputType) {
-            case 'number':
-                inputHTML = `<input type="number" step="any" class="form-control" name="${field}" placeholder="Enter ${field}">`;
-                break;
-            case 'checkbox':
-                inputHTML = `
-                    <select class="form-control" name="${field}">
-                        <option value="">Select...</option>
-                        <option value="true">True</option>
-                        <option value="false">False</option>
-                    </select>
-                `;
-                break;
-            case 'date':
-                inputHTML = `<input type="date" class="form-control" name="${field}" placeholder="Enter ${field}">`;
-                break;
-            default:
-                inputHTML = `<input type="text" class="form-control" name="${field}" placeholder="Enter ${field}">`;
-        }
-        
-        return `
-            <div class="col-md-6 mb-3">
-                <label class="form-label">
-                    ${field}
-                    <span class="badge bg-success ms-1">Editable</span>
-                    <small class="text-muted">(${inputType})</small>
-                </label>
-                ${inputHTML}
-                <div class="invalid-feedback"></div>
-            </div>
-        `;
-    };
-
-    const modalHTML = `
-        <div class="modal fade" id="newRecordModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            <i class="fas fa-plus me-2"></i>Add New Record - ${layer.name}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            This will create a new record in the Teable.io table "${layer.name}". 
-                            ${editableFields.length > 0 ? `${editableFields.length} editable fields available.` : 'No specific fields configured - record will be created with default values.'}
-                        </div>
-                        <form id="newRecordForm" novalidate>
-                            ${editableFields.length > 0 ? `
-                                <div class="row">
-                                    ${editableFields.map(field => createFieldInput(field)).join('')}
-                                </div>
-                            ` : `
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    No editable fields configured. A basic record will be created.
-                                </div>
-                            `}
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-success" onclick="saveNewRecord('${layer.id}')" id="saveNewRecordBtn">
-                            <i class="fas fa-save me-1"></i>Save Record
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Remove existing modal
-    const existingModal = document.getElementById('newRecordModal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-    
-    // Add modal to page
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('newRecordModal'));
-    modal.show();
-    
-    // Add form validation
-    const form = document.getElementById('newRecordForm');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            saveNewRecord(layer.id);
-        });
-        
-        // Add real-time validation
-        const inputs = form.querySelectorAll('input, select');
-        inputs.forEach(input => {
-            input.addEventListener('blur', function() {
-                validateField(this);
-            });
-        });
-    }
-}
-
-async function saveNewRecord(layerId) {
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) {
-        showError('Layer not found');
-        return;
-    }
-    
-    const saveBtn = document.getElementById('saveNewRecordBtn');
-    const originalText = saveBtn ? saveBtn.innerHTML : '';
-    
-    try {
-        // Show saving state
-        if (saveBtn) {
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-            saveBtn.disabled = true;
-        }
-        
-        // Get and validate form data
-        const form = document.getElementById('newRecordForm');
-        if (!form) {
-            throw new Error('Form not found');
-        }
-        
-        // Validate form first
-        if (!validateNewRecordForm(form)) {
-            throw new Error('Please fix the validation errors before saving');
-        }
-        
-        const formData = new FormData(form);
-        const recordData = {};
-        
-        // Process form data with proper type conversion
-        for (const [key, value] of formData.entries()) {
-            if (value !== '' && value !== null && value !== undefined) {
-                // Convert value based on field type
-                const fieldType = detectFieldType(layer, key, value);
-                try {
-                    recordData[key] = convertValueByType(value, fieldType);
-                } catch (conversionError) {
-                    throw new Error(`Invalid ${fieldType} value for field "${key}": ${value}`);
-                }
-            } else {
-                // Leave empty fields as null
-                recordData[key] = null;
-            }
-        }
-        
-        // Add geometry field as empty if it exists
-        if (layer.geometryField && !recordData.hasOwnProperty(layer.geometryField)) {
-            recordData[layer.geometryField] = '';
-        }
-        
-        console.log('Creating new record with data:', recordData);
-        
-        // Create record in Teable.io
-        const newRecord = await window.teableAPI.createRecord(layer.tableId, recordData);
-        
-        console.log('Successfully created record:', newRecord);
-        
-        // Add to local layer data
-        if (newRecord) {
-            layer.records.push(newRecord);
-            layer.featureCount = layer.records.length;
-            
-            // Update layer bounds if needed
-            updateLayerBounds(layer);
-            
-            // Refresh the attribute table to show the new record
-            await refreshAttributeTable(layerId);
-            
-            // Update layer statistics
-            updateLayersList();
-            updateMapStatistics();
-            
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('newRecordModal'));
-            if (modal) {
-                modal.hide();
-            }
-            
-            showSuccess(`✅ New record added successfully to "${layer.name}"!
-            
-📊 Record created in Teable.io table
-📋 Attribute table updated
-📈 Layer statistics refreshed`);
-            
-            // Log the activity
-            try {
-                const currentUser = window.teableAuth?.getCurrentSession();
-                if (currentUser && window.teableAPI?.logActivity) {
-                    await window.teableAPI.logActivity(
-                        currentUser.email,
-                        'record_created',
-                        `Created new record in layer "${layer.name}"`
-                    );
-                }
-            } catch (logError) {
-                console.log('Failed to log activity:', logError.message);
-            }
-        } else {
-            throw new Error('Record creation returned empty result');
-        }
-        
-    } catch (error) {
-        console.error('Error saving new record:', error);
-        
-        // Show detailed error message
-        let errorMessage = 'Failed to save new record: ' + error.message;
-        
-        if (error.message.includes('400')) {
-            errorMessage += '\n\nThis usually means there\'s a validation error. Please check:';
-            errorMessage += '\n• All required fields are filled';
-            errorMessage += '\n• Data types match field requirements';
-            errorMessage += '\n• Field values are within acceptable ranges';
-        }
-        
-        showError(errorMessage);
-        
-        // Restore button state
-        if (saveBtn) {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
-    }
-}
-
-// Helper function to validate the new record form
-function validateNewRecordForm(form) {
-    let isValid = true;
-    const inputs = form.querySelectorAll('input, select');
-    
-    inputs.forEach(input => {
-        if (!validateField(input)) {
-            isValid = false;
-        }
-    });
-    
-    return isValid;
-}
-
-// Helper function to validate individual fields
-function validateField(input) {
-    const value = input.value;
-    const fieldName = input.name;
-    const type = input.type;
-    let isValid = true;
-    let errorMessage = '';
-    
-    // Skip validation for empty optional fields
-    if (value === '' || value === null || value === undefined) {
-        input.classList.remove('is-invalid');
-        return true;
-    }
-    
-    // Type-specific validation
-    switch (type) {
-        case 'number':
-            if (isNaN(parseFloat(value)) || !isFinite(value)) {
-                isValid = false;
-                errorMessage = 'Must be a valid number';
-            }
-            break;
-        case 'date':
-            if (!value.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                isValid = false;
-                errorMessage = 'Must be a valid date (YYYY-MM-DD)';
-            }
-            break;
-        case 'email':
-            if (!value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-                isValid = false;
-                errorMessage = 'Must be a valid email address';
-            }
-            break;
-    }
-    
-    // Update field styling and error message
-    if (isValid) {
-        input.classList.remove('is-invalid');
-        input.classList.add('is-valid');
-    } else {
-        input.classList.remove('is-valid');
-        input.classList.add('is-invalid');
-        const feedback = input.parentNode.querySelector('.invalid-feedback');
-        if (feedback) {
-            feedback.textContent = errorMessage;
-        }
-    }
-    
-    return isValid;
-}
-
-// Helper function to update layer bounds after adding records
-function updateLayerBounds(layer) {
-    if (!layer.features || layer.features.length === 0) return;
-    
-    try {
-        const validFeatures = layer.features.filter(feature => 
-            (feature.getLatLng && feature.getLatLng()) || 
-            (feature.getBounds && feature.getBounds().isValid())
-        );
-        
-        if (validFeatures.length > 0) {
-            const group = new L.featureGroup(validFeatures);
-            layer.bounds = group.getBounds();
-        }
-    } catch (error) {
-        console.warn('Could not update layer bounds:', error);
-    }
-}
-
-async function deleteRecord(layerId, recordId, featureIndex) {
-    if (!canEditRecords()) {
-        showError('You do not have permission to delete records');
-        return;
-    }
-    
-    if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
-        return;
-    }
-    
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) {
-        showError('Layer not found');
-        return;
-    }
-    
-    try {
-        // Delete from Teable.io
-        await window.teableAPI.deleteRecord(layer.tableId, recordId);
-        
-        // Remove from local data
-        layer.records = layer.records.filter(r => r.id !== recordId);
-        layer.featureCount--;
-        
-        // Remove feature from map if it exists
-        if (layer.features[featureIndex]) {
-            if (layer.leafletLayer.hasLayer(layer.features[featureIndex])) {
-                layer.leafletLayer.removeLayer(layer.features[featureIndex]);
-            }
-            layer.features.splice(featureIndex, 1);
-        }
-        
-        // Refresh the attribute table
-        await refreshAttributeTable(layerId);
-        
-        // Update layer list and statistics
-        updateLayersList();
-        updateMapStatistics();
-        
-        showSuccess('Record deleted successfully!');
-        
-    } catch (error) {
-        console.error('Error deleting record:', error);
-        showError('Failed to delete record: ' + error.message);
-    }
-}
-
-async function deleteSelectedRecords(layerId) {
-    if (!canEditRecords()) {
-        showError('You do not have permission to delete records');
-        return;
-    }
-    
-    const selectedCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector:checked');
-    if (selectedCheckboxes.length === 0) {
-        showWarning('No records selected for deletion');
-        return;
-    }
-    
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) {
-        showError('Layer not found');
-        return;
-    }
-    
-    const recordsToDelete = [];
-    const featuresToDelete = [];
-    
-    // Collect records and their corresponding features
-    selectedCheckboxes.forEach(checkbox => {
-        const row = checkbox.closest('tr');
-        const recordId = row.getAttribute('data-record-id');
-        const featureIndex = parseInt(row.getAttribute('data-feature-index'));
-        
-        if (recordId) {
-            recordsToDelete.push(recordId);
-            
-            // Find corresponding feature
-            const feature = layer.features.find(f => f.recordId === recordId);
-            if (feature) {
-                featuresToDelete.push(feature);
-            }
-        }
-    });
-    
-    // Enhanced confirmation dialog with detailed information
-    const confirmationMessage = `🗑️ DELETE CONFIRMATION
-    
-You are about to permanently delete:
-• ${recordsToDelete.length} record(s) from the attribute table
-• ${featuresToDelete.length} geometry feature(s) from the map
-• All associated data from Teable.io table "${layer.name}"
-
-⚠️ THIS ACTION CANNOT BE UNDONE ⚠️
-
-Are you sure you want to proceed with the deletion?`;
-    
-    // Show enhanced confirmation dialog
-    const confirmed = confirm(confirmationMessage);
-    if (!confirmed) {
-        showInfo('Deletion cancelled by user');
-        return;
-    }
-    
-    try {
-        // Show progress indicator
-        showInfo(`🔄 Deleting ${recordsToDelete.length} selected record(s)...`);
-        
-        let successCount = 0;
-        let errorCount = 0;
-        const failedRecords = [];
-        
-        // Delete records from Teable.io one by one with progress tracking
-        for (let i = 0; i < recordsToDelete.length; i++) {
-            const recordId = recordsToDelete[i];
-            
-            try {
-                console.log(`🗑️ Deleting record ${i + 1}/${recordsToDelete.length}: ${recordId}`);
-                await window.teableAPI.deleteRecord(layer.tableId, recordId);
-                successCount++;
-                
-                // Update progress
-                if (recordsToDelete.length > 5) {
-                    showInfo(`⏳ Deleting... ${successCount}/${recordsToDelete.length} completed`);
-                }
-                
-            } catch (deleteError) {
-                console.error(`❌ Failed to delete record ${recordId}:`, deleteError);
-                errorCount++;
-                failedRecords.push(recordId);
-            }
-        }
-        
-        // Remove successfully deleted records from local data
-        const successfullyDeleted = recordsToDelete.filter(id => !failedRecords.includes(id));
-        
-        if (successfullyDeleted.length > 0) {
-            // Update layer records
-            layer.records = layer.records.filter(r => !successfullyDeleted.includes(r.id));
-            layer.featureCount = Math.max(0, layer.featureCount - successfullyDeleted.length);
-            
-            // Remove features from map and clear from selectedFeatures
-            layer.features = layer.features.filter((feature, index) => {
-                if (successfullyDeleted.includes(feature.recordId)) {
-                    // Remove from map display
-                    if (layer.leafletLayer && layer.leafletLayer.hasLayer(feature)) {
-                        layer.leafletLayer.removeLayer(feature);
-                    }
-                    
-                    // Remove from global selectedFeatures array
-                    const selectedIndex = selectedFeatures.indexOf(feature);
-                    if (selectedIndex !== -1) {
-                        selectedFeatures.splice(selectedIndex, 1);
-                    }
-                    
-                    // Remove feature popup if open
-                    if (feature.getPopup && feature.getPopup() && map.hasLayer(feature.getPopup())) {
-                        map.closePopup(feature.getPopup());
-                    }
-                    
-                    console.log(`✅ Removed feature from map for record: ${feature.recordId}`);
-                    return false; // Remove from features array
-                }
-                return true; // Keep in features array
-            });
-            
-            // Update feature indices for remaining features
-            layer.features.forEach((feature, newIndex) => {
-                feature.featureIndex = newIndex;
-            });
-        }
-        
-        // Clear all row selections in the attribute table
-        const allCheckboxes = document.querySelectorAll('#dockedAttributeTable .row-selector');
-        allCheckboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        
-        // Clear master checkbox
-        const masterCheckbox = document.querySelector('#dockedAttributeTable thead .row-selector input[type="checkbox"]');
-        if (masterCheckbox) {
-            masterCheckbox.checked = false;
-        }
-        
-        // Refresh the attribute table to reflect changes
-        await refreshAttributeTable(layerId);
-        
-        // Update UI components
-        updateLayersList();
-        updateMapStatistics();
-        updateSelectionCount();
-        
-        // Enable/disable buttons based on new selection state
-        const deleteBtn = document.getElementById('deleteSelectedBtn');
-        if (deleteBtn) {
-            deleteBtn.disabled = true;
-        }
-        
-        const zoomToSelectionBtn = document.getElementById('zoomToSelectionBtn');
-        if (zoomToSelectionBtn) {
-            zoomToSelectionBtn.disabled = true;
-        }
-        
-        // Show final result message
-        if (errorCount === 0) {
-            showSuccess(`✅ Successfully deleted ${successCount} record(s) and their geometry features!
-            
-🗺️ Map updated: ${successCount} feature(s) removed
-📊 Teable.io updated: All records permanently deleted
-📈 Layer statistics refreshed`);
-        } else if (successCount > 0) {
-            showWarning(`⚠️ Deletion completed with some issues:
-            
-✅ Successfully deleted: ${successCount} record(s)
-❌ Failed to delete: ${errorCount} record(s)
-            
-The successfully deleted features have been removed from both the map and Teable.io.
-Failed deletions: ${failedRecords.join(', ')}`);
-        } else {
-            showError(`❌ Failed to delete any of the selected ${recordsToDelete.length} record(s).
-            
-Please check your connection and permissions, then try again.`);
-        }
-        
-        // Log the deletion activity
-        try {
-            const currentUser = window.teableAuth?.getCurrentSession();
-            if (currentUser && window.teableAPI?.logActivity) {
-                await window.teableAPI.logActivity(
-                    currentUser.email,
-                    'records_deleted',
-                    `Bulk deleted ${successCount} records from layer "${layer.name}"`
-                );
-            }
-        } catch (logError) {
-            console.log('Failed to log deletion activity:', logError.message);
-        }
-        
-    } catch (error) {
-        console.error('Error in bulk delete operation:', error);
-        showError(`Failed to delete selected records: ${error.message}
-        
-Please try the following:
-1. Check your internet connection
-2. Verify you have delete permissions
-3. Try deleting fewer records at once
-4. Contact your administrator if the problem persists`);
-    }
-}
-
-async function refreshAttributeTable(layerId) {
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) return;
-    
-    try {
-        console.log(`Refreshing attribute table for layer: ${layer.name}`);
-        
-        // Reload fresh data from Teable.io
-        const recordsData = await window.teableAPI.getRecords(layer.tableId, { limit: 1000 });
-        const records = recordsData.records || [];
-        
-        console.log(`Loaded ${records.length} records from Teable.io`);
-        
-        // Update layer data
-        const oldRecordCount = layer.records.length;
-        layer.records = records;
-        layer.featureCount = records.length;
-        
-        // Update the attribute table if it's currently visible
-        const tableContainer = document.getElementById('attributeTableContainer');
-        if (tableContainer) {
-            // Show loading indicator
-            tableContainer.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Refreshing...</div>';
-            
-            // Recreate the attribute table with fresh data
-            setTimeout(async () => {
-                try {
-                    tableContainer.innerHTML = `
-                        <table class="table table-sm table-striped mb-0" id="attributeTable">
-                            <thead class="table-dark sticky-top">
-                                ${await createEnhancedTableHeader(layer)}
-                            </thead>
-                            <tbody>
-                                ${await createEnhancedTableBody(layer)}
-                            </tbody>
-                        </table>
-                    `;
-                    
-                    // Reapply inline editing functionality
-                    setupInlineEditing(layer);
-                    
-                    // Update table header with new count
-                    const headerElement = document.querySelector('.docked-table-header h6');
-                    if (headerElement) {
-                        headerElement.innerHTML = `
-                            <i class="fas fa-table me-2"></i>Attribute Table - ${layer.name}
-                            <span class="badge bg-info ms-2">${getUserRoleBadge()}</span>
-                        `;
-                    }
-                    
-                    // Update record count in toolbar
-                    const recordCountElements = document.querySelectorAll('.docked-table-toolbar .text-muted');
-                    recordCountElements.forEach(element => {
-                        if (element.textContent.includes('features selected')) {
-                            element.innerHTML = `<span id="selectedCount">0</span> of ${records.length} features selected`;
-                        }
-                    });
-                    
-                    console.log(`Attribute table refreshed: ${oldRecordCount} → ${records.length} records`);
-                    
-                } catch (tableError) {
-                    console.error('Error recreating table:', tableError);
-                    tableContainer.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Error loading table data: ${tableError.message}
-                        </div>
-                    `;
-                }
-            }, 100);
-        }
-        
-        // Clear any selections since data has changed
-        selectedFeatures.length = 0;
-        updateSelectionCount();
-        
-        // Update layer statistics
-        updateLayersList();
-        updateMapStatistics();
-        
-        // Show success message if record count changed
-        if (oldRecordCount !== records.length) {
-            const changeText = records.length > oldRecordCount ? 
-                `Added ${records.length - oldRecordCount} record(s)` : 
-                `Removed ${oldRecordCount - records.length} record(s)`;
-            showInfo(`Attribute table refreshed - ${changeText}. Total: ${records.length} records`);
-        }
-        
-    } catch (error) {
-        console.error('Error refreshing attribute table:', error);
-        showError('Failed to refresh attribute table: ' + error.message);
-        
-        // Show error in table if it exists
-        const tableContainer = document.getElementById('attributeTableContainer');
-        if (tableContainer) {
-            tableContainer.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Failed to load fresh data: ${error.message}
-                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="refreshAttributeTable('${layerId}')">
-                        <i class="fas fa-retry me-1"></i>Retry
-                    </button>
-                </div>
-            `;
-        }
-    }
-}
-
-// Table editing mode management
-let isTableEditingMode = false;
-let editingChanges = new Map(); // Store pending changes
-
-// Initialize editing changes map
-if (typeof editingChanges === 'undefined') {
-    editingChanges = new Map();
-}
-
-function startTableEditing(layerId) {
-    isTableEditingMode = true;
-    editingChanges.clear();
-    
-    // Toggle button visibility
-    document.getElementById('startEditingBtn').style.display = 'none';
-    document.getElementById('saveEditingBtn').style.display = 'inline-block';
-    
-    // Enable inline editing for all editable cells
-    const editableCells = document.querySelectorAll('.editable-cell');
-    editableCells.forEach(cell => {
-        cell.style.cursor = 'pointer';
-        cell.style.backgroundColor = '#f8f9fa';
-        cell.onclick = function() { startInlineEdit(this); };
-        
-        // Add visual indicator for editing mode
-        cell.style.borderLeft = '3px solid #007bff';
-        cell.title = 'Click to edit this field';
-    });
-    
-    // Show editing mode indicator
-    showSuccess('Editing mode enabled. Click on blue-bordered cells to modify values.');
-    
-    // Add editing mode visual indicators
-    const toolbar = document.querySelector('.docked-table-toolbar');
-    if (toolbar) {
-        toolbar.classList.add('editing-mode');
-    }
-}
-
-async function saveTableEditing(layerId) {
-    if (editingChanges.size === 0) {
-        // No changes to save, just exit editing mode
-        exitTableEditing();
-        showInfo('No changes to save. Editing mode disabled.');
-        return;
-    }
-    
-    try {
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer) {
-            throw new Error('Layer not found');
-        }
-        
-        // Check if API is available
-        if (!window.teableAPI) {
-            throw new Error('Teable API not available. Please check your configuration.');
-        }
-        
-        // Show saving indicator
-        const saveBtn = document.getElementById('saveEditingBtn');
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-        saveBtn.disabled = true;
-        
-        // Group changes by record ID for batch processing
-        const recordChanges = new Map();
-        
-        for (const [key, change] of editingChanges) {
-            if (!recordChanges.has(change.recordId)) {
-                recordChanges.set(change.recordId, {});
-            }
-            recordChanges.get(change.recordId)[change.fieldName] = change.newValue;
-        }
-        
-        console.log(`Saving ${editingChanges.size} changes across ${recordChanges.size} records...`);
-        
-        // Save all pending changes
-        let successCount = 0;
-        let errorCount = 0;
-        const failedChanges = [];
-        
-        for (const [recordId, fieldsToUpdate] of recordChanges) {
-            try {
-                console.log(`Updating record ${recordId} with fields:`, fieldsToUpdate);
-                
-                // Check if updateRecord method exists
-                if (typeof window.teableAPI.updateRecord !== 'function') {
-                    // Fallback: try to use other available methods
-                    if (typeof window.teableAPI.modifyRecord === 'function') {
-                        await window.teableAPI.modifyRecord(layer.tableId, recordId, fieldsToUpdate);
-                    } else if (typeof window.teableAPI.patchRecord === 'function') {
-                        await window.teableAPI.patchRecord(layer.tableId, recordId, fieldsToUpdate);
-                    } else {
-                        throw new Error('No suitable update method found in teableAPI');
-                    }
-                } else {
-                    // Use the standard updateRecord method
-                    await window.teableAPI.updateRecord(layer.tableId, recordId, fieldsToUpdate);
-                }
-                
-                // Update local data
-                const record = layer.records.find(r => r.id === recordId);
-                if (record) {
-                    // Update all changed fields in the record
-                    Object.keys(fieldsToUpdate).forEach(fieldName => {
-                        record.fields[fieldName] = fieldsToUpdate[fieldName];
-                    });
-                    
-                    // Update corresponding map feature
-                    const featureIndex = layer.features.findIndex(f => f.recordId === recordId);
-                    if (featureIndex !== -1 && layer.features[featureIndex]) {
-                        layer.features[featureIndex].recordData = record.fields;
-                        
-                        // Update popup if it exists
-                        if (layer.features[featureIndex].getPopup()) {
-                            const newPopupContent = createFeaturePopup(record.fields, layer);
-                            layer.features[featureIndex].getPopup().setContent(newPopupContent);
-                        }
-                    }
-                }
-                
-                // Mark cells as successfully saved
-                Object.keys(fieldsToUpdate).forEach(fieldName => {
-                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
-                    if (cell) {
-                        cell.style.backgroundColor = '#d4edda';
-                        cell.style.borderColor = '#28a745';
-                        cell.title = 'Successfully saved to Teable.io';
-                        
-                        // Update the original value to the new value
-                        cell.setAttribute('data-original-value', fieldsToUpdate[fieldName]);
-                    }
-                });
-                
-                successCount += Object.keys(fieldsToUpdate).length;
-                console.log(`✅ Successfully updated record ${recordId}`);
-                
-            } catch (error) {
-                console.error(`❌ Error saving changes for record ${recordId}:`, error);
-                errorCount += Object.keys(fieldsToUpdate).length;
-                
-                // Store failed changes
-                Object.keys(fieldsToUpdate).forEach(fieldName => {
-                    failedChanges.push(`${recordId}_${fieldName}`);
-                });
-                
-                // Mark failed cells visually
-                Object.keys(fieldsToUpdate).forEach(fieldName => {
-                    const cell = document.querySelector(`td[data-record-id="${recordId}"][data-field="${fieldName}"]`);
-                    if (cell) {
-                        cell.style.backgroundColor = '#f8d7da';
-                        cell.style.borderColor = '#dc3545';
-                        cell.title = `Failed to save: ${error.message}`;
-                    }
-                });
-            }
-        }
-        
-        // Clear only successful changes from the pending changes map
-        const changesToRemove = [];
-        for (const [key, change] of editingChanges) {
-            if (!failedChanges.includes(key)) {
-                changesToRemove.push(key);
-            }
-        }
-        
-        changesToRemove.forEach(key => {
-            editingChanges.delete(key);
-        });
-        
-        // Show results and update UI
-        if (errorCount === 0) {
-            showSuccess(`All ${successCount} field changes saved successfully to Teable.io!`);
-            
-            // Reset save button and exit editing mode
-            saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
-            saveBtn.disabled = false;
-            
-            // Auto-exit editing mode after successful save
-            setTimeout(() => {
-                exitTableEditing();
-            }, 1500);
-            
-        } else if (successCount > 0) {
-            showWarning(`${successCount} changes saved successfully, ${errorCount} failed. Failed changes remain for retry.`);
-            
-            // Update save button to show remaining changes
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Retry Save (${editingChanges.size})`;
-            saveBtn.disabled = false;
-            saveBtn.classList.add('btn-warning');
-            saveBtn.classList.remove('btn-success');
-            
-        } else {
-            showError(`All ${errorCount} changes failed to save. Check your connection and permissions.`);
-            
-            // Restore save button
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
-            saveBtn.disabled = false;
-            saveBtn.classList.add('btn-danger');
-            saveBtn.classList.remove('btn-success');
-        }
-        
-        // Show detailed error information if available
-        if (errorCount > 0) {
-            console.log('Failed to save the following changes:', failedChanges);
-            showError(`Save failed for ${errorCount} field(s). Check console for details.`);
-        }
-        
-    } catch (error) {
-        console.error('Error in saveTableEditing:', error);
-        showError('Failed to save changes: ' + error.message);
-        
-        // Restore button state
-        const saveBtn = document.getElementById('saveEditingBtn');
-        if (saveBtn) {
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i>Save Editing (${editingChanges.size})`;
-            saveBtn.disabled = false;
-            saveBtn.classList.add('btn-danger');
-            saveBtn.classList.remove('btn-success');
-        }
-    }
-}
-
-function exitTableEditing() {
-    isTableEditingMode = false;
-    editingChanges.clear();
-    
-    // Toggle button visibility
-    const startBtn = document.getElementById('startEditingBtn');
-    const saveBtn = document.getElementById('saveEditingBtn');
-    
-    if (startBtn) {
-        startBtn.style.display = 'inline-block';
-    }
-    
-    if (saveBtn) {
-        saveBtn.style.display = 'none';
-        // Reset save button classes and text
-        saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Editing';
-        saveBtn.classList.remove('btn-warning', 'btn-danger');
-        saveBtn.classList.add('btn-success');
-        saveBtn.disabled = false;
-    }
-    
-    // Disable inline editing and reset cell styles
-    const editableCells = document.querySelectorAll('.editable-cell');
-    editableCells.forEach(cell => {
-        cell.style.cursor = 'default';
-        cell.style.backgroundColor = '';
-        cell.onclick = null;
-        
-        // Reset visual indicators
-        cell.style.borderLeft = '3px solid #28a745';
-        cell.title = 'Editable field (click Start Editing to modify)';
-        
-        // Remove any success/error styling
-        if (cell.style.backgroundColor === 'rgb(212, 237, 218)' || 
-            cell.style.backgroundColor === 'rgb(248, 215, 218)') {
-            cell.style.backgroundColor = '';
-            cell.style.borderColor = '';
-        }
-    });
-    
-    // Remove editing mode visual indicators
-    const toolbar = document.querySelector('.docked-table-toolbar');
-    if (toolbar) {
-        toolbar.classList.remove('editing-mode');
-    }
-    
-    // Remove any modified content indicators
-    const modifiedElements = document.querySelectorAll('.editable-content.modified');
-    modifiedElements.forEach(element => {
-        element.classList.remove('modified');
-        element.style.backgroundColor = '';
-        element.style.borderLeft = '';
-        
-        // Remove pending save indicators
-        const pendingIcons = element.querySelectorAll('.fa-clock');
-        pendingIcons.forEach(icon => icon.remove());
-    });
-    
-    showInfo('Editing mode disabled. All changes have been processed.');
-}
-
-// Drone imagery utility functions
-window.zoomToDroneImageryLevel = function() {
-    const currentBasemap = document.getElementById('basemapSelector').value;
-    const droneOption = document.querySelector('option[value="drone_imagery"]');
-    
-    if (!droneOption) {
-        showWarning('Drone imagery is not available for this customer context.');
-        return;
-    }
-    
-    // Switch to drone imagery if not already selected
-    if (currentBasemap !== 'drone_imagery') {
-        document.getElementById('basemapSelector').value = 'drone_imagery';
-        changeBasemap();
-    }
-    
-    // Zoom to minimum drone imagery level
-    const currentZoom = map.getZoom();
-    const minDroneZoom = baseMaps.drone_imagery.minZoom;
-    
-    if (currentZoom < minDroneZoom) {
-        map.setZoom(minDroneZoom);
-        showSuccess(`Zoomed to drone imagery level (${minDroneZoom}). Use +/- to explore higher detail levels up to ${baseMaps.drone_imagery.maxZoom}.`);
-    } else {
-        showInfo(`Already at drone imagery zoom level ${currentZoom}. Maximum detail available at level ${baseMaps.drone_imagery.maxZoom}.`);
-    }
-};
-
-// Customer context management
-window.getCustomerInfo = function() {
-    const customerId = getCustomerContext();
-    const hasCustomTiles = document.querySelector('option[value="drone_imagery"]') !== null;
-    
-    console.log('Customer Context Information:');
-    console.log('Customer ID:', customerId);
-    console.log('Has Custom Drone Tiles:', hasCustomTiles);
-    console.log('Tile URL Pattern:', hasCustomTiles ? baseMaps.drone_imagery.url : 'Not available');
-    
-    if (hasCustomTiles) {
-        showInfo(`Customer ${customerId} context active with drone imagery support (zoom levels ${baseMaps.drone_imagery.minZoom}-${baseMaps.drone_imagery.maxZoom})`);
-    } else {
-        showInfo(`Customer ${customerId} context active (no custom drone imagery available)`);
-    }
-};
-
-// Debug function to test tile availability
-window.testCustomTiles = async function() {
-    const customerId = getCustomerContext();
-    const available = await checkCustomTilesAvailability(customerId);
-    
-    console.log('Tile availability test for customer', customerId, ':', available);
-    
-    if (available) {
-        showSuccess('Custom drone imagery tiles are accessible for this customer.');
-    } else {
-        showWarning('Custom drone imagery tiles are not available or accessible for this customer.');
-    }
-};
-
-// Media modal utility functions
-window.downloadCurrentMedia = function() {
-    // Get the currently active modal
-    const activeModal = document.querySelector('.modal.show');
-    if (!activeModal) {
-        showError('No active media to download');
-        return;
-    }
-    
-    let mediaUrl = null;
-    
-    // Extract media URL based on modal type
-    if (activeModal.id === 'videoModal') {
-        const videoElement = activeModal.querySelector('#videoPlayer source');
-        mediaUrl = videoElement ? videoElement.src : null;
-    } else if (activeModal.id === 'audioModal') {
-        const audioElement = activeModal.querySelector('audio source');
-        mediaUrl = audioElement ? audioElement.src : null;
-    } else if (activeModal.id === 'imageModal') {
-        const imageElement = activeModal.querySelector('img');
-        mediaUrl = imageElement ? imageElement.src : null;
-    } else if (activeModal.id === 'pdfModal') {
-        const iframeElement = activeModal.querySelector('iframe');
-        mediaUrl = iframeElement ? iframeElement.src : null;
-    }
-    
-    if (mediaUrl) {
-        const link = document.createElement('a');
-        link.href = mediaUrl;
-        link.download = '';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showSuccess('Download started');
-    } else {
-        showError('Could not find media URL for download');
-    }
-};
-
-window.fullscreenVideo = function() {
-    const videoElement = document.getElementById('videoPlayer');
-    if (videoElement) {
-        if (videoElement.requestFullscreen) {
-            videoElement.requestFullscreen();
-        } else if (videoElement.webkitRequestFullscreen) {
-            videoElement.webkitRequestFullscreen();
-        } else if (videoElement.msRequestFullscreen) {
-            videoElement.msRequestFullscreen();
-        }
-        showSuccess('Video entered fullscreen mode');
-    }
-};
-
-window.fullscreenImage = function() {
-    const activeModal = document.querySelector('.modal.show');
-    const imageElement = activeModal ? activeModal.querySelector('img') : null;
-    
-    if (imageElement) {
-        if (imageElement.requestFullscreen) {
-            imageElement.requestFullscreen();
-        } else if (imageElement.webkitRequestFullscreen) {
-            imageElement.webkitRequestFullscreen();
-        } else if (imageElement.msRequestFullscreen) {
-            imageElement.msRequestFullscreen();
-        }
-        showSuccess('Image entered fullscreen mode');
-    }
-};
-
-window.adjustPlaybackRate = function(adjustment) {
-    const audioElement = document.querySelector('#audioModal audio');
-    if (audioElement) {
-        if (adjustment === 0) {
-            audioElement.playbackRate = 1.0;
-        } else {
-            audioElement.playbackRate = Math.max(0.25, Math.min(2.0, audioElement.playbackRate + adjustment));
-        }
-        showSuccess(`Playback rate: ${audioElement.playbackRate}x`);
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
     }
 };
 
@@ -7248,7 +10574,7 @@ function adjustMapForDockedTable() {
     }, 100);
 }
 
-// Global functions for popup zoom controls
+// Global popup control functions
 window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
     if (!window.currentPopupFeature) {
         showError('No feature selected for zooming');
@@ -7261,14 +10587,14 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
         if (feature.getBounds) {
             // Polygon geometry
             const bounds = feature.getBounds();
-            
+
             if (!bounds.isValid()) {
                 showError('Invalid bounds for feature zoom');
                 return;
             }
-            
+
             const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
-            
+
             let zoomConfig;
             switch (zoomType) {
                 case 'close':
@@ -7307,22 +10633,22 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
                         zoomConfig = { padding: 0.2, maxZoom: 23 };
                     }
             }
-            
+
             map.fitBounds(bounds.pad(zoomConfig.padding), {
                 maxZoom: zoomConfig.maxZoom,
                 animate: true,
                 duration: 0.8
             });
-            
+
         } else if (feature.getLatLng) {
             // Point geometry - use maximum zoom levels
             const latlng = feature.getLatLng();
-            
+
             if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
                 showError('Invalid coordinates for point zoom');
                 return;
             }
-            
+
             let targetZoom;
             switch (zoomType) {
                 case 'close':
@@ -7337,20 +10663,20 @@ window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
                 default:
                     targetZoom = 25; // Default to maximum zoom
             }
-            
+
             map.setView(latlng, targetZoom, {
                 animate: true,
                 duration: 0.8
             });
-            
+
         } else {
             showError('Feature does not have valid geometry for zooming');
             return;
         }
-        
+
         const actualZoom = map.getZoom();
         showSuccess(`Zoomed to feature - ${zoomType} view (zoom level: ${actualZoom})`);
-        
+
     } catch (error) {
         console.error('Error in popup zoom:', error);
         showError('Failed to zoom to feature: ' + error.message);
@@ -7372,667 +10698,109 @@ window.centerCurrentPopupFeature = function() {
     }
 };
 
-// Additional zoom control functions
-window.resetMapView = function() {
-    map.setView([20.5937, 78.9629], 5, { animate: true, duration: 1 });
-    showInfo('Map view reset to default');
-};
+// Make functions globally available
+window.toggleSection = toggleSection;
+window.showAddLayerModal = showAddLayerModal;
+window.addNewLayer = addNewLayer;
+window.loadTableFields = loadTableFields;
+window.toggleLayerVisibility = toggleLayerVisibility;
+window.zoomToLayer = zoomToLayer;
+window.showAttributeTable = showAttributeTable;
+window.showLayerProperties = showLayerProperties;
+window.removeLayer = removeLayer;
+window.changeBasemap = changeBasemap;
+window.toggleDockedTableSize = toggleDockedTableSize;
+window.closeDockedTable = closeDockedTable;
+window.startMeasurement = startMeasurement;
+window.clearMeasurements = clearMeasurements;
+window.loadFilterFields = loadFilterFields;
+window.loadFilterValues = loadFilterValues;
+window.addFilterRule = addFilterRule;
+window.removeFilterRule = removeFilterRule;
+window.applyFilters = applyFilters;
+window.clearAllFilters = clearAllFilters;
+window.exportMap = exportMap;
+window.fullscreenMap = fullscreenMap;
+window.switchPropertiesTab = switchPropertiesTab;
+window.updateSymbologyType = updateSymbologyType;
+window.applyProperties = applyProperties;
+window.applyAndCloseProperties = applyAndCloseProperties;
+window.cancelProperties = cancelProperties;
+window.selectAllRows = selectAllRows;
+window.toggleRowSelection = toggleRowSelection;
+window.zoomToSelection = zoomToSelection;
+window.generateGraduatedSymbology = generateGraduatedSymbology;
+window.generateCategorizedSymbology = generateCategorizedSymbology;
+window.selectAllPopupFields = selectAllPopupFields;
+window.deselectAllPopupFields = deselectAllPopupFields;
+window.zoomToFeature = zoomToFeature;
+window.showFeatureInfo = showFeatureInfo;
+window.exportTableData = exportTableData;
+window.clearSelection = clearSelection;
+window.toggleAllRows = toggleAllRows;
+window.startInlineEdit = startInlineEdit;
+window.saveInlineEdit = saveInlineEdit;
+window.cancelInlineEdit = cancelInlineEdit;
+window.addNewRecord = addNewRecord;
+window.saveNewRecord = saveNewRecord;
+window.deleteRecord = deleteRecord;
+window.deleteSelectedRecords = deleteSelectedRecords;
+window.refreshAttributeTable = refreshAttributeTable;
+window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.startTableEditing = startTableEditing;
+window.saveTableEditing = saveTableEditing;
+window.exitTableEditing = exitTableEditing;
+window.filterPopupFields = filterPopupFields;
+window.copyToClipboard = copyToClipboard;
+window.previewPopup = previewPopup;
+window.exportCurrentFeature = exportCurrentFeature;
+window.editCurrentFeature = editCurrentFeature;
+window.handleTemplateChange = handleTemplateChange;
+window.handlePopupToggle = handlePopupToggle;
 
-window.zoomToAllLayers = function() {
-    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.features && layer.features.length > 0);
+// Docked table utility functions
+function toggleDockedTableSize() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
 
-    if (visibleLayers.length === 0) {
-        showWarning('No visible layers to zoom to');
-        return;
-    }
+    if (!dockedTable) return;
 
-    // Collect all features from visible layers
-    const allFeatures = [];
-    visibleLayers.forEach(layer => {
-        layer.features.forEach(feature => {
-            if ((feature.getLatLng && feature.getLatLng()) || (feature.getLatLngs && feature.getLatLngs().length > 0)) {
-                allFeatures.push(feature);
-            }
-        });
-    });
-
-    if (allFeatures.length === 0) {
-        showWarning('No valid features found to zoom to');
-        return;
-    }
-
-    // Create feature group and fit bounds
-    const group = new L.featureGroup(allFeatures);
-    const bounds = group.getBounds();
-
-    // Calculate adaptive padding and zoom level
-    const latSpan = bounds.getNorth() - bounds.getSouth();
-    const lngSpan = bounds.getEast() - bounds.getWest();
-    const maxSpan = Math.max(latSpan, lngSpan);
-
-    let padding, maxZoom;
-    if (maxSpan < 0.001) { // Very small area
-        padding = 0.5;
-        maxZoom = 25;
-    } else if (maxSpan < 0.01) { // Small area
-        padding = 0.3;
-        maxZoom = 23;
-    } else if (maxSpan < 0.1) { // Medium area
-        padding = 0.15;
-        maxZoom = 21;
-    } else { // Large area
-        padding = 0.05;
-        maxZoom = 19;
-    }
-
-    map.fitBounds(bounds.pad(padding), { 
-        animate: true, 
-        duration: 1,
-        maxZoom: maxZoom
-    });
-
-    showSuccess(`Zoomed to ${visibleLayers.length} visible layer(s) with ${allFeatures.length} features at enhanced detail level`);
-};
-
-// Event listeners for property controls
-document.addEventListener('DOMContentLoaded', function() {
-    // Opacity slider
-    const opacitySlider = document.getElementById('propFillOpacity');
-    if (opacitySlider) {
-        opacitySlider.addEventListener('input', function() {
-            const fillOpacityValue = document.getElementById('fillOpacityValue');
-            if (fillOpacityValue) {
-                fillOpacityValue.textContent = Math.round(this.value * 100) + '%';
-            }
-        });
-    }
-
-    // Border width slider
-    const borderSlider = document.getElementById('propBorderWidth');
-    if (borderSlider) {
-        borderSlider.addEventListener('input', function() {
-            const borderWidthValue = document.getElementById('borderWidthValue');
-            if (borderWidthValue) {
-                borderWidthValue.textContent = this.value + 'px';
-            }
-        });
-    }
-
-    // Labels checkbox
-    const labelsCheckbox = document.getElementById('propEnableLabels');
-    if (labelsCheckbox) {
-        labelsCheckbox.addEventListener('change', function() {
-            const propLabelControls = document.getElementById('propLabelControls');
-            if (propLabelControls) {
-                propLabelControls.style.display = this.checked ? 'block' : 'none';
-            }
-        });
-    }
-
-    // iTool event listeners
-    const popupEnableCheckbox = document.getElementById('propEnablePopups');
-    if (popupEnableCheckbox) {
-        popupEnableCheckbox.addEventListener('change', function(e) {
-            console.log('Popup checkbox changed:', e.target.checked);
-            handlePopupToggle();
-            // Mark as having unsaved changes
-            if (window.currentPropertiesLayer) {
-                console.log('Popup toggle changed for layer:', window.currentPropertiesLayer.name);
-                
-                // Immediately update the layer properties to reflect the change
-                if (!window.currentPropertiesLayer.properties) {
-                    window.currentPropertiesLayer.properties = {};
-                }
-                if (!window.currentPropertiesLayer.properties.popup) {
-                    window.currentPropertiesLayer.properties.popup = {};
-                }
-                window.currentPropertiesLayer.properties.popup.enabled = e.target.checked;
-            }
-        });
-    }
-
-    const popupTemplateSelect = document.getElementById('propPopupTemplate');
-    if (popupTemplateSelect) {
-        popupTemplateSelect.addEventListener('change', handleTemplateChange);
-    }
-
-    // Symbology type change listener
-    const symbologyTypeSelect = document.getElementById('propSymbologyType');
-    if (symbologyTypeSelect) {
-        symbologyTypeSelect.addEventListener('change', updateSymbologyType);
-    }
-
-     // Tab switching for layer source
-    const tabButtons = document.querySelectorAll('#layerSourceTabs .nav-link');
-    tabButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const targetTab = this.getAttribute('data-bs-target');
-
-            // Update button visibility based on active tab
-            const addLayerBtn = document.getElementById('addLayerBtn');
-            const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-
-            if (targetTab === '#geojson-pane') {
-                if (addLayerBtn) addLayerBtn.style.display = 'none';
-                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'inline-block';
-            } else {
-                if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
-                if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
-            }
-        });
-    });
-});
-
-// Measurement tools
-function startMeasurement(type) {
-    clearMeasurements();
-    currentMeasurement = type;
-    measurementPoints = [];
-
-    if (type === 'distance') {
-        map.on('click', onDistanceMeasureClick);
-        map.getContainer().style.cursor = 'crosshair';
-        showInfo('Click on the map to start measuring distance');
-    } else if (type === 'area') {
-        map.on('click', onAreaMeasureClick);
-        map.getContainer().style.cursor = 'crosshair';
-        showInfo('Click on the map to start measuring area');
-    }
-}
-
-function onDistanceMeasureClick(e) {
-    measurementPoints.push(e.latlng);
-
-    // Add marker
-    const marker = L.circleMarker(e.latlng, {
-        radius: 4,
-        fillColor: '#e74c3c',
-        color: '#c0392b',
-        weight: 2,
-        fillOpacity: 1
-    }).addTo(measurementGroup);
-
-    if (measurementPoints.length > 1) {
-        // Draw line
-        const line = L.polyline(measurementPoints, {
-            color: '#e74c3c',
-            weight: 3
-        }).addTo(measurementGroup);
-
-        // Calculate distance
-        const distance = calculateDistance(measurementPoints);
-
-        // Add distance label
-        const midpoint = L.latLng(
-            (measurementPoints[measurementPoints.length - 2].lat + e.latlng.lat) / 2,
-            (measurementPoints[measurementPoints.length - 2].lng + e.latlng.lng) / 2
-        );
-
-        L.marker(midpoint, {
-            icon: L.divIcon({
-                className: 'distance-label',
-                html: `<div class="measurement-result">${distance}</div>`,
-                iconSize: [60, 20],
-                iconAnchor: [30, 10]
-            })
-        }).addTo(measurementGroup);
-    }
-}
-
-function onAreaMeasureClick(e) {
-    measurementPoints.push(e.latlng);
-
-    // Add marker
-    L.circleMarker(e.latlng, {
-        radius: 4,
-        fillColor: '#27ae60',
-        color: '#229954',
-        weight: 2,
-        fillOpacity: 1
-    }).addTo(measurementGroup);
-
-    if (measurementPoints.length > 2) {
-        // Draw polygon
-        const polygon = L.polygon(measurementPoints, {
-            color: '#27ae60',
-            weight: 3,
-            fillOpacity: 0.2
-        }).addTo(measurementGroup);
-
-        // Calculate area
-        const area = calculateArea(measurementPoints);
-
-        // Add area label at centroid
-        const centroid = polygon.getBounds().getCenter();
-        L.marker(centroid, {
-            icon: L.divIcon({
-                className: 'area-label',
-                html: `<div class="measurement-result">${area}</div>`,
-                iconSize: [80, 20],
-                iconAnchor: [40, 10]
-            })
-        }).addTo(measurementGroup);
-    }
-}
-
-function calculateDistance(points) {
-    let totalDistance = 0;
-    for (let i = 1; i < points.length; i++) {
-        totalDistance += points[i - 1].distanceTo(points[i]);
-    }
-
-    if (totalDistance < 1000) {
-        return Math.round(totalDistance) + ' m';
+    if (dockedTable.classList.contains('expanded')) {
+        dockedTable.classList.remove('expanded');
+        toggleIcon.className = 'fas fa-expand-alt';
     } else {
-        return (totalDistance / 1000).toFixed(2) + ' km';
+        dockedTable.classList.add('expanded');
+        toggleIcon.className = 'fas fa-compress-alt';
+    }
+
+    adjustMapForDockedTable();
+}
+
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        adjustMapForDockedTable();
     }
 }
 
-function calculateArea(points) {
-    if (points.length < 3) return '0 m²';
+function adjustMapForDockedTable() {
+    const mapElement = document.getElementById('map');
+    const dockedTable = document.getElementById('dockedAttributeTable');
 
-    // Simple area calculation using shoelace formula
-    let area = 0;
-    for (let i = 0; i < points.length; i++) {
-        const j = (i + 1) % points.length;
-        area += points[i].lat * points[j].lng;
-        area -= points[j].lat * points[i].lng;
-    }
-    area = Math.abs(area) / 2;
+    if (!mapElement) return;
 
-    // Convert to approximate square meters (rough calculation)
-    area = area * 111320 * 111320 * Math.cos(points[0].lat * Math.PI / 180);
+    if (dockedTable) {
+        const isExpanded = dockedTable.classList.contains('expanded');
+        const tableHeight = isExpanded ? '60%' : '30%';
+        const mapHeight = isExpanded ? '40%' : '70%';
 
-    if (area < 10000) {
-        return Math.round(area) + ' m²';
+        mapElement.style.height = mapHeight;
+        dockedTable.style.height = tableHeight;
     } else {
-        return (area / 10000).toFixed(2) + ' ha';
-    }
-}
-
-function clearMeasurements() {
-    measurementGroup.clearLayers();
-    measurementPoints = [];
-    currentMeasurement = null;
-
-    // Reset cursor
-    map.getContainer().style.cursor = '';
-
-    // Remove event listeners
-    map.off('click', onDistanceMeasureClick);
-    map.off('click', onAreaMeasureClick);
-}
-
-// Filter functionality
-function loadFilterFields() {
-    const layerId = document.getElementById('filterLayer').value;
-    const fieldSelect = document.getElementById('filterField');
-
-    if (fieldSelect) {
-        fieldSelect.innerHTML = '<option value="">Select field...</option>';
-
-        if (!layerId) return;
-
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer || !layer.records || layer.records.length === 0) return;
-
-        // Get all fields except geometry field
-        const allFields = Object.keys(layer.records[0].fields || {}).filter(field => field !== layer.geometryField);
-        console.log(`Loading filter fields for layer "${layer.name}" - all fields:`, allFields);
-        
-        // Filter out hidden fields based on permissions
-        const permittedFields = filterFieldsByPermissions(allFields, layer);
-        console.log(`Permitted fields for filtering:`, permittedFields);
-        
-        permittedFields.forEach(field => {
-            const permission = getFieldPermission(field, layer);
-            const permissionIcon = permission === 'edit' ? '✏️' : '👁️';
-            const option = document.createElement('option');
-            option.value = field;
-            option.textContent = `${permissionIcon} ${field}`;
-            fieldSelect.appendChild(option);
-        });
-        
-        if (permittedFields.length === 0) {
-            const option = document.createElement('option');
-            option.value = "";
-            option.textContent = "No accessible fields for filtering";
-            option.disabled = true;
-            fieldSelect.appendChild(option);
-        }
-        
-        console.log(`Filter field selector populated with ${permittedFields.length} permitted fields`);
-    }
-}
-
-function loadFilterValues() {
-    const layerId = document.getElementById('filterLayer').value;
-    const fieldName = document.getElementById('filterField').value;
-    const valueSelect = document.getElementById('filterValue');
-
-    if (valueSelect) {
-        valueSelect.innerHTML = '<option value="">Select value...</option>';
-
-        if (!layerId || !fieldName) return;
-
-        const layer = mapLayers.find(l => l.id === layerId);
-        if (!layer || !layer.records) return;
-
-        // Check if user has permission to access this field
-        const permission = getFieldPermission(fieldName, layer);
-        if (permission === 'hidden') {
-            console.log(`Field "${fieldName}" is hidden - not loading values`);
-            const option = document.createElement('option');
-            option.value = "";
-            option.textContent = "Field not accessible";
-            option.disabled = true;
-            valueSelect.appendChild(option);
-            return;
-        }
-
-        // Get unique values for the field
-        const uniqueValues = [...new Set(layer.records.map(record => record.fields[fieldName]))];
-        uniqueValues.forEach(value => {
-            if (value !== null && value !== undefined) {
-                const option = document.createElement('option');
-                option.value = value;
-                option.textContent = value;
-                valueSelect.appendChild(option);
-            }
-        });
-        
-        console.log(`Loaded ${uniqueValues.length} unique values for permitted field "${fieldName}"`);
-    }
-}
-
-function addFilterRule() {
-    const layerId = document.getElementById('filterLayer').value;
-    const field = document.getElementById('filterField').value;
-    const operator = document.getElementById('filterOperator').value;
-    const value = document.getElementById('filterValue').value;
-
-    if (!layerId || !field || !operator || !value) {
-        showWarning('Please fill in all filter fields');
-        return;
+        mapElement.style.height = '100%';
     }
 
-    // Validate field permissions before adding filter
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (layer) {
-        const permission = getFieldPermission(field, layer);
-        if (permission === 'hidden') {
-            showError(`Cannot filter on field "${field}" - field is not accessible due to permissions`);
-            return;
-        }
-    }
-
-    const filter = {
-        id: Date.now().toString(),
-        layerId: layerId,
-        field: field,
-        operator: operator,
-        value: value
-    };
-
-    currentFilters.push(filter);
-    updateFilterRulesDisplay();
-
-    // Clear form
-    const filterLayer = document.getElementById('filterLayer');
-    const filterField = document.getElementById('filterField');
-    const filterValue = document.getElementById('filterValue');
-
-    if (filterLayer) filterLayer.value = '';
-    if (filterField) filterField.innerHTML = '<option value="">Select field...</option>';
-    if (filterValue) filterValue.innerHTML = '<option value="">Select value...</option>';
-    
-    console.log(`Added filter rule for permitted field "${field}" with ${operator} "${value}"`);
-}
-
-function updateFilterRulesDisplay() {
-    const container = document.getElementById('filterRules');
-
-    if (!container) return;
-
-    if (currentFilters.length === 0) {
-        container.innerHTML = '<p class="text-muted">No filters applied</p>';
-        return;
-    }
-
-    let html = '';
-    currentFilters.forEach(filter => {
-        const layer = mapLayers.find(l => l.id === filter.layerId);
-        const layerName = layer ? layer.name : 'Unknown Layer';
-
-        html += `
-            <div class="filter-rule">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${layerName}</strong> → ${filter.field} ${filter.operator} "${filter.value}"
-                    </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="removeFilterRule('${filter.id}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-}
-
-function removeFilterRule(filterId) {
-    const index = currentFilters.findIndex(f => f.id === filterId);
-    if (index !== -1) {
-        currentFilters.splice(index, 1);
-        updateFilterRulesDisplay();
-        applyFilters(); // Re-apply remaining filters
-    }
-}
-
-function applyFilters() {
-    if (currentFilters.length === 0) {
-        // Show all features
-        mapLayers.forEach(layer => {
-            if (layer.visible && layer.leafletLayer) {
-                layer.features.forEach(feature => {
-                    if (!layer.leafletLayer.hasLayer(feature)) {
-                        layer.leafletLayer.addLayer(feature);
-                    }
-                });
-            }
-        });
-        showSuccess('All filters cleared - showing all features');
-        return;
-    }
-
-    let filteredCount = 0;
-    let totalCount = 0;
-    let skippedFilters = 0;
-
-    mapLayers.forEach(layer => {
-        if (!layer.visible) return;
-
-        const layerFilters = currentFilters.filter(f => f.layerId === layer.id);
-
-        layer.features.forEach(feature => {
-            totalCount++;
-            let showFeature = true;
-
-            // Apply all filters for this layer
-            layerFilters.forEach(filter => {
-                // Check if user still has permission to access this field
-                const permission = getFieldPermission(filter.field, layer);
-                if (permission === 'hidden') {
-                    console.warn(`Skipping filter on hidden field "${filter.field}"`);
-                    skippedFilters++;
-                    return; // Skip this filter - don't apply it
-                }
-
-                const fieldValue = feature.recordData[filter.field];
-
-                switch (filter.operator) {
-                    case 'equals':
-                        if (String(fieldValue) !== String(filter.value)) showFeature = false;
-                        break;
-                    case 'contains':
-                        if (!String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase())) showFeature = false;
-                        break;
-                    case 'starts_with':
-                        if (!String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase())) showFeature = false;
-                        break;
-                    case 'greater_than':
-                        if (!(parseFloat(fieldValue) > parseFloat(filter.value))) showFeature = false;
-                        break;
-                    case 'less_than':
-                        if (!(parseFloat(fieldValue) < parseFloat(filter.value))) showFeature = false;
-                        break;
-                }
-            });
-
-            // Show/hide feature based on filter result
-            if (showFeature) {
-                if (!layer.leafletLayer.hasLayer(feature)) {
-                    layer.leafletLayer.addLayer(feature);
-                }
-                filteredCount++;
-            } else {
-                if (layer.leafletLayer.hasLayer(feature)) {
-                    layer.leafletLayer.removeLayer(feature);
-                }
-            }
-        });
-    });
-
-    let message = `Filters applied: showing ${filteredCount} of ${totalCount} features`;
-    if (skippedFilters > 0) {
-        message += ` (${skippedFilters} filter(s) skipped due to field permissions)`;
-    }
-    showSuccess(message);
-}
-
-function clearAllFilters() {
-    currentFilters = [];
-    updateFilterRulesDisplay();
-    applyFilters(); // This will show all features
-}
-
-// Populate layer selector in filters
-function updateLayerSelectors() {
-    const filterLayerSelect = document.getElementById('filterLayer');
-
-    if (filterLayerSelect) {
-        filterLayerSelect.innerHTML = '<option value="">Select layer...</option>';
-        mapLayers.forEach(layer => {
-            const option = document.createElement('option');
-            option.value = layer.id;
-            option.textContent = layer.name;
-            filterLayerSelect.appendChild(option);
-        });
-    }
-}
-
-function updateMapStatistics() {
-    const totalLayers = mapLayers.length;
-    const visibleLayers = mapLayers.filter(l => l.visible).length;
-    const totalFeatures = mapLayers.reduce((sum, layer) => sum + layer.featureCount, 0);
-    const visibleFeatures = mapLayers.filter(l => l.visible).reduce((sum, layer) => {
-        if (layer.leafletLayer) {
-            return sum + layer.leafletLayer.getLayers().length;
-        }
-        return sum;
-    }, 0);
-
-    const totalLayersElement = document.getElementById('totalLayers');
-    const totalFeaturesElement = document.getElementById('totalFeatures');
-    const visibleFeaturesElement = document.getElementById('visibleFeatures');
-    const filteredFeaturesElement = document.getElementById('filteredFeatures');
-
-    if (totalLayersElement) totalLayersElement.textContent = totalLayers;
-    if (totalFeaturesElement) totalFeaturesElement.textContent = totalFeatures;
-    if (visibleFeaturesElement) visibleFeaturesElement.textContent = visibleFeatures;
-    if (filteredFeaturesElement) filteredFeaturesElement.textContent = totalFeatures - visibleFeatures;
-
-    // Update layer selectors
-    updateLayerSelectors();
-}
-
-// Export functionality
-function exportMap() {
-    showInfo('Map export functionality would be implemented here');
-}
-
-function fullscreenMap() {
-    const mapContainer = document.getElementById('map');
-    
-    if (!mapContainer) {
-        showError('Map container not found');
-        return;
-    }
-
-    try {
-        if (!document.fullscreenElement) {
-            // Enter fullscreen
-            if (mapContainer.requestFullscreen) {
-                mapContainer.requestFullscreen();
-            } else if (mapContainer.webkitRequestFullscreen) {
-                mapContainer.webkitRequestFullscreen();
-            } else if (mapContainer.msRequestFullscreen) {
-                mapContainer.msRequestFullscreen();
-            } else if (mapContainer.mozRequestFullScreen) {
-                mapContainer.mozRequestFullScreen();
-            } else {
-                showError('Fullscreen not supported by this browser');
-                return;
-            }
-            
-            // Add fullscreen class for styling
-            mapContainer.classList.add('fullscreen-map');
-            
-            // Show success message
-            showSuccess('Map is now in fullscreen mode. Press ESC to exit.');
-            
-        } else {
-            // Exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            }
-        }
-        
-        // Listen for fullscreen changes to update map size and remove class
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('msfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        
-    } catch (error) {
-        console.error('Fullscreen error:', error);
-        showError('Failed to toggle fullscreen: ' + error.message);
-    }
-}
-
-function handleFullscreenChange() {
-    const mapContainer = document.getElementById('map');
-    
-    if (!document.fullscreenElement && 
-        !document.webkitFullscreenElement && 
-        !document.msFullscreenElement && 
-        !document.mozFullScreenElement) {
-        
-        // Exited fullscreen
-        if (mapContainer) {
-            mapContainer.classList.remove('fullscreen-map');
-        }
-        
-        showInfo('Exited fullscreen mode');
-    }
-    
     // Invalidate map size to ensure proper rendering
     setTimeout(() => {
         if (map) {
@@ -8041,810 +10809,237 @@ function handleFullscreenChange() {
     }, 100);
 }
 
-// Detect media type specifically from URL
-function detectURLMediaType(url, layerName = null) {
-    if (!url || typeof url !== 'string') return null;
-    
-    const urlLower = url.toLowerCase();
-    const nameCheck = layerName ? layerName.toLowerCase() : '';
-    
-    // 360° detection (highest priority) - check both URL and layer name
-    if (nameCheck.includes('360') || nameCheck === '360' || urlLower.includes('360') || urlLower.includes('panorama') || urlLower.includes('streetview')) {
-        console.log(`URL detected as 360° content: ${url}`);
-        return '360';
+// Global popup control functions
+window.zoomToCurrentPopupFeature = function(zoomType = 'close') {
+    if (!window.currentPopupFeature) {
+        showError('No feature selected for zooming');
+        return;
     }
-    
-    // Video detection
-    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || 
-        urlLower.includes('.mp4') || urlLower.includes('.webm') || urlLower.includes('.avi') ||
-        urlLower.includes('vimeo.com') || urlLower.includes('video')) {
-        return 'video';
-    }
-    
-    // Audio detection
-    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.ogg') ||
-        urlLower.includes('soundcloud.com') || urlLower.includes('audio')) {
-        return 'audio';
-    }
-    
-    // Image detection - but not if layer is named "360" or contains "360"
-    if (!nameCheck.includes('360') && (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') ||
-        urlLower.includes('.gif') || urlLower.includes('.webp') || urlLower.includes('image'))) {
-        return 'image';
-    }
-    
-    // PDF detection
-    if (urlLower.includes('.pdf') || urlLower.includes('document')) {
-        return 'pdf';
-    }
-    
-    return null;
-}
 
-// Get media type information for display
-function getMediaTypeInfo(mediaType) {
-    const mediaTypes = {
-        'video': {
-            icon: '🎥',
-            title: 'Video',
-            buttonText: 'View Video'
-        },
-        'audio': {
-            icon: '🎵',
-            title: 'Audio',
-            buttonText: 'Play Audio'
-        },
-        'image': {
-            icon: '📷',
-            title: 'Image',
-            buttonText: 'View Image'
-        },
-        'pdf': {
-            icon: '📄',
-            title: 'PDF',
-            buttonText: 'View PDF'
-        },
-        '360': {
-            icon: '🌐',
-            title: '360° View',
-            buttonText: 'View 360°'
-        }
-    };
-    
-    return mediaTypes[mediaType] || {
-        icon: '🔗',
-        title: 'Link',
-        buttonText: 'Open Link'
-    };
-}
+    const feature = window.currentPopupFeature;
 
-// Open media from URL with appropriate modal
-window.openMediaFromURL = function(url, mediaType, title = 'Media') {
     try {
-        switch (mediaType) {
-            case 'video':
-                openVideoModal(url, title);
-                break;
-            case 'audio':
-                openAudioModal(url, title);
-                break;
-            case 'image':
-                openImageModal(url, title);
-                break;
-            case 'pdf':
-                openPdfModal(url, title);
-                break;
-            case '360':
-                open360Modal(url, title);
-                break;
-            default:
-                // Fallback to opening in new tab
-                window.open(url, '_blank');
+        if (feature.getBounds) {
+            // Polygon geometry
+            const bounds = feature.getBounds();
+
+            if (!bounds.isValid()) {
+                showError('Invalid bounds for feature zoom');
+                return;
+            }
+
+            const boundsSize = bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+
+            let zoomConfig;
+            switch (zoomType) {
+                case 'close':
+                    // Maximum zoom configuration for closest view
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 10) {
+                        zoomConfig = { padding: 0.4, maxZoom: 25 };
+                    } else if (boundsSize < 50) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else if (boundsSize < 100) {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    } else {
+                        zoomConfig = { padding: 0.15, maxZoom: 22 };
+                    }
+                    break;
+                case 'medium':
+                    zoomConfig = { 
+                        padding: 0.3, 
+                        maxZoom: Math.max(18, Math.min(22, 25 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                case 'far':
+                    zoomConfig = { 
+                        padding: 0.5, 
+                        maxZoom: Math.max(15, Math.min(20, 23 - Math.floor(Math.log10(boundsSize + 1))))
+                    };
+                    break;
+                default:
+                    // Default to close view for maximum detail
+                    if (boundsSize < 1) {
+                        zoomConfig = { padding: 0.5, maxZoom: 25 };
+                    } else if (boundsSize < 25) {
+                        zoomConfig = { padding: 0.3, maxZoom: 24 };
+                    } else {
+                        zoomConfig = { padding: 0.2, maxZoom: 23 };
+                    }
+            }
+
+            map.fitBounds(bounds.pad(zoomConfig.padding), {
+                maxZoom: zoomConfig.maxZoom,
+                animate: true,
+                duration: 0.8
+            });
+
+        } else if (feature.getLatLng) {
+            // Point geometry - use maximum zoom levels
+            const latlng = feature.getLatLng();
+
+            if (!latlng || isNaN(latlng.lat) || isNaN(latlng.lng)) {
+                showError('Invalid coordinates for point zoom');
+                return;
+            }
+
+            let targetZoom;
+            switch (zoomType) {
+                case 'close':
+                    targetZoom = 25; // Maximum possible zoom
+                    break;
+                case 'medium':
+                    targetZoom = 22;
+                    break;
+                case 'far':
+                    targetZoom = 19;
+                    break;
+                default:
+                    targetZoom = 25; // Default to maximum zoom
+            }
+
+            map.setView(latlng, targetZoom, {
+                animate: true,
+                duration: 0.8
+            });
+
+        } else {
+            showError('Feature does not have valid geometry for zooming');
+            return;
         }
-        
-        console.log(`Opened ${mediaType} modal for URL: ${url}`);
+
+        const actualZoom = map.getZoom();
+        showSuccess(`Zoomed to feature - ${zoomType} view (zoom level: ${actualZoom})`);
+
     } catch (error) {
-        console.error('Error opening media:', error);
-        showError('Failed to open media: ' + error.message);
-        // Fallback to opening in new tab
-        window.open(url, '_blank');
+        console.error('Error in popup zoom:', error);
+        showError('Failed to zoom to feature: ' + error.message);
     }
 };
 
-// Enhanced media layer detection function
-function detectMediaLayerType(layerName, records) {
-    const name = layerName.toLowerCase();
-    
-    // Check layer name first - prioritize 360 detection
-    if (name.includes('360') || name === '360' || name.includes('panorama') || name.includes('streetview')) {
-        console.log(`Layer "${layerName}" detected as 360° layer based on name`);
-        return '360';
+window.centerCurrentPopupFeature = function() {
+    if (!window.currentPopupFeature) return;
+
+    let center;
+    if (window.currentPopupFeature.getLatLng) {
+        center = window.currentPopupFeature.getLatLng();
+    } else if (window.currentPopupFeature.getBounds) {
+        center = window.currentPopupFeature.getBounds().getCenter();
     }
-    if (name.includes('video')) return 'video';
-    if (name.includes('audio')) return 'audio';
-    if (name.includes('pdf') || name.includes('document')) return 'pdf';
-    
-    // If name doesn't match, analyze URL patterns from data
-    if (records && records.length > 0) {
-        for (const record of records.slice(0, 5)) { // Check first 5 records
-            const fields = record.fields || {};
-            
-            for (const fieldName of Object.keys(fields)) {
-                const fieldValue = fields[fieldName];
-                
-                if (typeof fieldValue === 'string' && fieldValue.startsWith('http')) {
-                    const url = fieldValue.toLowerCase();
-                    
-                    // 360 detection (check first for priority)
-                    if (url.includes('360') || url.includes('panorama') || url.includes('streetview')) {
-                        console.log(`URL contains 360° indicators: ${url}`);
-                        return '360';
-                    }
-                    
-                    // Video detection
-                    if (url.includes('youtube.com') || url.includes('youtu.be') || 
-                        url.includes('.mp4') || url.includes('.webm') || url.includes('.avi') ||
-                        url.includes('vimeo.com') || url.includes('video')) {
-                        return 'video';
-                    }
-                    
-                    // Audio detection
-                    if (url.includes('.mp3') || url.includes('.wav') || url.includes('.ogg') ||
-                        url.includes('soundcloud.com') || url.includes('audio')) {
-                        return 'audio';
-                    }
-                    
-                    // PDF detection
-                    if (url.includes('.pdf') || url.includes('document')) {
-                        return 'pdf';
-                    }
-                    
-                    // Image detection - but only if layer name doesn't contain "360"
-                    if (!name.includes('360') && (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') ||
-                        url.includes('.gif') || url.includes('.webp') || url.includes('image'))) {
-                        return 'image';
-                    }
-                }
-            }
-        }
-        
-        // Special case: If layer name contains "360", always treat as 360 layer
-        if (name.includes('360') || name === '360') {
-            console.log(`Layer containing "360" will use Pannellum viewer regardless of URL content`);
-            return '360';
-        }
+
+    if (center) {
+        map.panTo(center, { animate: true, duration: 0.5 });
     }
-    
-    return null; // Standard layer
+};
+
+// Make functions globally available
+window.toggleSection = toggleSection;
+window.showAddLayerModal = showAddLayerModal;
+window.addNewLayer = addNewLayer;
+window.loadTableFields = loadTableFields;
+window.toggleLayerVisibility = toggleLayerVisibility;
+window.zoomToLayer = zoomToLayer;
+window.showAttributeTable = showAttributeTable;
+window.showLayerProperties = showLayerProperties;
+window.removeLayer = removeLayer;
+window.changeBasemap = changeBasemap;
+window.toggleDockedTableSize = toggleDockedTableSize;
+window.closeDockedTable = closeDockedTable;
+window.startMeasurement = startMeasurement;
+window.clearMeasurements = clearMeasurements;
+window.loadFilterFields = loadFilterFields;
+window.loadFilterValues = loadFilterValues;
+window.addFilterRule = addFilterRule;
+window.removeFilterRule = removeFilterRule;
+window.applyFilters = applyFilters;
+window.clearAllFilters = clearAllFilters;
+window.exportMap = exportMap;
+window.fullscreenMap = fullscreenMap;
+window.switchPropertiesTab = switchPropertiesTab;
+window.updateSymbologyType = updateSymbologyType;
+window.applyProperties = applyProperties;
+window.applyAndCloseProperties = applyAndCloseProperties;
+window.cancelProperties = cancelProperties;
+window.selectAllRows = selectAllRows;
+window.toggleRowSelection = toggleRowSelection;
+window.zoomToSelection = zoomToSelection;
+window.generateGraduatedSymbology = generateGraduatedSymbology;
+window.generateCategorizedSymbology = generateCategorizedSymbology;
+window.selectAllPopupFields = selectAllPopupFields;
+window.deselectAllPopupFields = deselectAllPopupFields;
+window.zoomToFeature = zoomToFeature;
+window.showFeatureInfo = showFeatureInfo;
+window.exportTableData = exportTableData;
+window.clearSelection = clearSelection;
+window.toggleAllRows = toggleAllRows;
+window.startInlineEdit = startInlineEdit;
+window.saveInlineEdit = saveInlineEdit;
+window.cancelInlineEdit = cancelInlineEdit;
+window.addNewRecord = addNewRecord;
+window.saveNewRecord = saveNewRecord;
+window.deleteRecord = deleteRecord;
+window.deleteSelectedRecords = deleteSelectedRecords;
+window.refreshAttributeTable = refreshAttributeTable;
+window.updatePopupFieldSelection = updatePopupFieldSelection;
+window.startTableEditing = startTableEditing;
+window.saveTableEditing = saveTableEditing;
+window.exitTableEditing = exitTableEditing;
+window.filterPopupFields = filterPopupFields;
+window.copyToClipboard = copyToClipboard;
+window.previewPopup = previewPopup;
+window.exportCurrentFeature = exportCurrentFeature;
+window.editCurrentFeature = editCurrentFeature;
+window.handleTemplateChange = handleTemplateChange;
+window.handlePopupToggle = handlePopupToggle;
+
+// Docked table utility functions
+function toggleDockedTableSize() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    const toggleIcon = document.getElementById('tableToggleIcon');
+
+    if (!dockedTable) return;
+
+    if (dockedTable.classList.container('expanded')) {
+        dockedTable.classList.remove('expanded');
+        toggleIcon.className = 'fas fa-expand-alt';
+    } else {
+        dockedTable.classList.add('expanded');
+        toggleIcon.className = 'fas fa-compress-alt';
+    }
+
+    adjustMapForDockedTable();
 }
 
-// Function to find URL field in record data
-function findUrlField(recordData) {
-    const urlFieldNames = ['360_url', 'url', 'link', 'video_url', 'audio_url', 'image_url', 'pdf_url', 'file_url', 'media_url', 'src', 'source', 'panorama_url'];
-    
-    for (const fieldName of urlFieldNames) {
-        if (recordData[fieldName] && typeof recordData[fieldName] === 'string' && recordData[fieldName].startsWith('http')) {
-            return recordData[fieldName];
-        }
+function closeDockedTable() {
+    const dockedTable = document.getElementById('dockedAttributeTable');
+    if (dockedTable) {
+        dockedTable.remove();
+        adjustMapForDockedTable();
     }
-    
-    // Check all fields for URL-like values (prioritize 360-related fields)
-    for (const [fieldName, value] of Object.entries(recordData)) {
-        if (typeof value === 'string' && value.startsWith('http')) {
-            // Prioritize 360-related URLs
-            if (fieldName.toLowerCase().includes('360') || fieldName.toLowerCase().includes('panorama')) {
-                return value;
-            }
-        }
-    }
-    
-    // Fallback to any HTTP URL
-    for (const [fieldName, value] of Object.entries(recordData)) {
-        if (typeof value === 'string' && value.startsWith('http')) {
-            return value;
-        }
-    }
-    
-    return null;
 }
 
-// Video player modal
-function openVideoModal(url, title = 'Video Player') {
-    const modal = document.getElementById('videoModal');
-    const videoElement = document.getElementById('videoPlayer');
-    const videoSource = document.getElementById('videoSource');
-    const videoInfo = document.getElementById('videoInfo');
-    const modalTitle = modal.querySelector('.modal-title');
-    
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-play-circle me-2"></i>${title}`;
-    }
-    
-    if (videoSource && videoElement) {
-        // Handle different video URL types
-        let finalUrl = url;
-        
-        // Convert YouTube URLs to embed format
-        if (url.includes('youtube.com/watch?v=')) {
-            const videoId = url.split('v=')[1].split('&')[0];
-            finalUrl = `https://www.youtube.com/embed/${videoId}`;
-            
-            // For YouTube, we'll use an iframe instead
-            videoElement.style.display = 'none';
-            const container = videoElement.parentElement;
-            container.innerHTML = `
-                <iframe src="${finalUrl}" 
-                    style="width: 100%; height: 100%; border: none;" 
-                    allow="autoplay; encrypted-media" allowfullscreen>
-                </iframe>
-            `;
-        } else if (url.includes('youtu.be/')) {
-            const videoId = url.split('youtu.be/')[1].split('?')[0];
-            finalUrl = `https://www.youtube.com/embed/${videoId}`;
-            
-            videoElement.style.display = 'none';
-            const container = videoElement.parentElement;
-            container.innerHTML = `
-                <iframe src="${finalUrl}" 
-                    style="width: 100%; height: 100%; border: none;" 
-                    allow="autoplay; encrypted-media" allowfullscreen>
-                </iframe>
-            `;
-        } else {
-            // Regular video file
-            videoSource.src = finalUrl;
-            videoElement.load();
-            videoElement.style.display = 'block';
-        }
-        
-        if (videoInfo) {
-            videoInfo.innerHTML = `<strong>Source:</strong> ${url}`;
-        }
-    }
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
-    
-    console.log(`Opened video modal for: ${title}`);
-}
+function adjustMapForDockedTable() {
+    const mapElement = document.getElementById('map');
+    const dockedTable = document.getElementById('dockedAttributeTable');
 
-// Audio player modal
-function openAudioModal(url, title = 'Audio Player') {
-    const modal = document.getElementById('audioModal');
-    const audioElements = modal.querySelectorAll('audio source');
-    const audioInfo = document.getElementById('audioInfo');
-    const modalTitle = modal.querySelector('.modal-title');
-    
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-music me-2"></i>${title}`;
-    }
-    
-    // Update all audio source elements
-    audioElements.forEach(source => {
-        source.src = url;
-    });
-    
-    // Load the audio
-    const audioElement = modal.querySelector('audio');
-    if (audioElement) {
-        audioElement.load();
-    }
-    
-    if (audioInfo) {
-        audioInfo.innerHTML = `<strong>Source:</strong> ${url}`;
-    }
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
-    
-    console.log(`Opened audio modal for: ${title}`);
-}
+    if (!mapElement) return;
 
-// Image viewer modal
-function openImageModal(url, title = 'Image Viewer') {
-    const modal = document.getElementById('imageModal');
-    const imageElement = modal.querySelector('img');
-    const modalTitle = modal.querySelector('.modal-title');
-    
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-image me-2"></i>${title}`;
-    }
-    
-    if (imageElement) {
-        imageElement.src = url;
-        imageElement.alt = title;
-    }
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
-    
-    console.log(`Opened image modal for: ${title}`);
-}
+    if (dockedTable) {
+        const isExpanded = dockedTable.classList.contains('expanded');
+        const tableHeight = isExpanded ? '60%' : '30%';
+        const mapHeight = isExpanded ? '40%' : '70%';
 
-// PDF viewer modal
-function openPdfModal(url, title = 'PDF Viewer') {
-    const modal = document.getElementById('pdfModal');
-    const iframeElement = modal.querySelector('iframe');
-    const modalTitle = modal.querySelector('.modal-title');
-    
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${title}`;
+        mapElement.style.height = mapHeight;
+        dockedTable.style.height = tableHeight;
+    } else {
+        mapElement.style.height = '100%';
     }
-    
-    if (iframeElement) {
-        iframeElement.src = url;
-    }
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    bootstrapModal.show();
-    
-    console.log(`Opened PDF modal for: ${title}`);
-}
 
-// 360° viewer modal (using Pannellum)
-function open360Modal(url, title = '360° Viewer') {
-    const modal = document.getElementById('image360Modal');
-    const pannellumContainer = document.getElementById('panorama360');
-    const modalTitle = modal ? modal.querySelector('.modal-title') : null;
-    
-    if (!modal) {
-        console.error('360° modal not found with ID "image360Modal"');
-        // Fallback to opening in new tab
-        window.open(url, '_blank');
-        return;
-    }
-    
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-globe me-2"></i>${title}`;
-    }
-    
-    const bootstrapModal = new bootstrap.Modal(modal);
-    let viewer = null;
-    let autoRotateInterval = null;
-    
-    // Initialize 360 viewer when modal is shown
-    modal.addEventListener('shown.bs.modal', function() {
-        if (typeof pannellum !== 'undefined' && pannellumContainer) {
-            try {
-                viewer = pannellum.viewer('panorama360', {
-                    type: 'equirectangular',
-                    panorama: url,
-                    autoLoad: true,
-                    showControls: true,
-                    showZoomCtrl: true,
-                    showFullscreenCtrl: true,
-                    mouseZoom: true,
-                    compass: true,
-                    northOffset: 0,
-                    pitch: 0,
-                    yaw: 0,
-                    hfov: 100,
-                    minHfov: 50,
-                    maxHfov: 120,
-                    autoRotate: 0, // Start with auto-rotation off
-                    keyboardZoom: true,
-                    mouseZoom: true,
-                    draggable: true
-                });
-                
-                // Add custom navigation and control buttons
-                addPannellumControls(viewer);
-                
-                console.log('Pannellum 360 viewer initialized with enhanced controls');
-            } catch (error) {
-                console.error('Error initializing Pannellum:', error);
-                pannellumContainer.innerHTML = `
-                    <div class="alert alert-warning text-center">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        360° viewer could not be initialized.
-                        <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
-                            <i class="fas fa-external-link-alt me-1"></i>View image directly
-                        </a>
-                    </div>
-                `;
-            }
-        } else {
-            // Fallback to regular image display
-            if (pannellumContainer) {
-                pannellumContainer.innerHTML = `
-                    <div class="text-center">
-                        <img src="${url}" class="img-fluid" style="max-height: 60vh;" alt="360° Image">
-                        <div class="alert alert-info mt-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            360° viewer library not loaded. Displaying as regular image.
-                            <br><a href="${url}" target="_blank" class="btn btn-outline-primary mt-2">
-                                <i class="fas fa-external-link-alt me-1"></i>View original
-                            </a>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-    });
-    
-    // Clean up when modal is hidden
-    modal.addEventListener('hidden.bs.modal', function() {
-        if (autoRotateInterval) {
-            clearInterval(autoRotateInterval);
-            autoRotateInterval = null;
-        }
-        if (viewer) {
-            viewer.destroy();
-            viewer = null;
-        }
-        // Remove custom controls
-        const customControls = document.querySelector('.pannellum-custom-controls');
-        if (customControls) {
-            customControls.remove();
-        }
-    });
-    
-    bootstrapModal.show();
-    console.log(`Opened 360° modal for: ${title}`);
-}
-
-// Add custom navigation and control buttons to Pannellum viewer
-function addPannellumControls(viewer) {
-    // Wait for viewer to be ready
+    // Invalidate map size to ensure proper rendering
     setTimeout(() => {
-        const pannellumContainer = document.getElementById('panorama360');
-        if (!pannellumContainer) return;
-        
-        // Create custom controls container
-        const controlsContainer = document.createElement('div');
-        controlsContainer.className = 'pannellum-custom-controls';
-        controlsContainer.style.cssText = `
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 8px;
-            color: white;
-        `;
-        
-        // Arrow navigation controls
-        const navigationSection = document.createElement('div');
-        navigationSection.innerHTML = `
-            <div style="text-align: center; margin-bottom: 10px; font-size: 12px; font-weight: bold;">
-                <i class="fas fa-arrows-alt me-1"></i>Navigation
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(3, 40px); gap: 5px; justify-content: center;">
-                <div></div>
-                <button id="pan-up" class="pan-btn" title="Look Up">
-                    <i class="fas fa-chevron-up"></i>
-                </button>
-                <div></div>
-                <button id="pan-left" class="pan-btn" title="Look Left">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <button id="pan-center" class="pan-btn" title="Reset View">
-                    <i class="fas fa-crosshairs"></i>
-                </button>
-                <button id="pan-right" class="pan-btn" title="Look Right">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-                <div></div>
-                <button id="pan-down" class="pan-btn" title="Look Down">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-                <div></div>
-            </div>
-        `;
-        
-        // Auto-rotation controls
-        const autoRotateSection = document.createElement('div');
-        autoRotateSection.innerHTML = `
-            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
-                <i class="fas fa-sync-alt me-1"></i>Auto Rotation
-            </div>
-            <div style="display: flex; gap: 5px; justify-content: center;">
-                <button id="auto-rotate-start" class="control-btn" title="Start Auto Rotation" style="position: relative;">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button id="auto-rotate-stop" class="control-btn" title="Stop Auto Rotation" style="position: relative;">
-                    <i class="fas fa-pause"></i>
-                </button>
-                <button id="auto-rotate-reverse" class="control-btn" title="Reverse Direction" style="position: relative;">
-                    <i class="fas fa-undo"></i>
-                </button>
-            </div>
-            <div style="margin-top: 8px; font-size: 11px; text-align: center;">
-                <label style="display: flex; align-items: center; justify-content: center; gap: 5px;">
-                    <span>Speed:</span>
-                    <input type="range" id="rotation-speed" min="0.5" max="5" step="0.5" value="2" 
-                           style="width: 80px; height: 15px; cursor: pointer;">
-                    <span id="speed-value">2x</span>
-                </label>
-            </div>
-            <div id="rotation-status" style="margin-top: 5px; font-size: 10px; text-align: center; color: rgba(255,255,255,0.8);">
-                Status: Stopped
-            </div>
-        `;
-        
-        // Zoom controls
-        const zoomSection = document.createElement('div');
-        zoomSection.innerHTML = `
-            <div style="text-align: center; margin-bottom: 10px; margin-top: 15px; font-size: 12px; font-weight: bold;">
-                <i class="fas fa-search me-1"></i>Zoom
-            </div>
-            <div style="display: flex; gap: 5px; justify-content: center;">
-                <button id="zoom-in" class="control-btn" title="Zoom In">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <button id="zoom-out" class="control-btn" title="Zoom Out">
-                    <i class="fas fa-minus"></i>
-                </button>
-                <button id="zoom-reset" class="control-btn" title="Reset Zoom">
-                    <i class="fas fa-home"></i>
-                </button>
-            </div>
-        `;
-        
-        controlsContainer.appendChild(navigationSection);
-        controlsContainer.appendChild(autoRotateSection);
-        controlsContainer.appendChild(zoomSection);
-        
-        // Add styles for buttons
-        const style = document.createElement('style');
-        style.textContent = `
-            .pan-btn, .control-btn {
-                background: rgba(255, 255, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                color: white;
-                width: 40px;
-                height: 35px;
-                border-radius: 4px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                transition: all 0.2s;
-            }
-            .pan-btn:hover, .control-btn:hover {
-                background: rgba(255, 255, 255, 0.4);
-                border-color: rgba(255, 255, 255, 0.6);
-                transform: scale(1.05);
-            }
-            .pan-btn:active, .control-btn:active {
-                background: rgba(255, 255, 255, 0.6);
-                transform: scale(0.95);
-            }
-            #rotation-speed {
-                background: rgba(255, 255, 255, 0.3);
-                border: none;
-                border-radius: 10px;
-            }
-            #rotation-speed::-webkit-slider-thumb {
-                background: white;
-                border-radius: 50%;
-                width: 12px;
-                height: 12px;
-                cursor: pointer;
-            }
-        `;
-        document.head.appendChild(style);
-        
-        pannellumContainer.appendChild(controlsContainer);
-        
-        // Add event listeners
-        let isAutoRotating = false;
-        let rotationDirection = 1; // 1 for right, -1 for left
-        
-        // Navigation controls
-        document.getElementById('pan-up').addEventListener('click', () => {
-            const currentPitch = viewer.getPitch();
-            viewer.setPitch(Math.min(currentPitch + 10, 90));
-        });
-        
-        document.getElementById('pan-down').addEventListener('click', () => {
-            const currentPitch = viewer.getPitch();
-            viewer.setPitch(Math.max(currentPitch - 10, -90));
-        });
-        
-        document.getElementById('pan-left').addEventListener('click', () => {
-            const currentYaw = viewer.getYaw();
-            viewer.setYaw(currentYaw - 15);
-        });
-        
-        document.getElementById('pan-right').addEventListener('click', () => {
-            const currentYaw = viewer.getYaw();
-            viewer.setYaw(currentYaw + 15);
-        });
-        
-        document.getElementById('pan-center').addEventListener('click', () => {
-            viewer.setPitch(0);
-            viewer.setYaw(0);
-            viewer.setHfov(100);
-        });
-        
-        // Auto-rotation controls
-        document.getElementById('auto-rotate-start').addEventListener('click', () => {
-            const speed = parseFloat(document.getElementById('rotation-speed').value);
-            const rotationSpeed = speed * rotationDirection;
-            viewer.setAutoRotate(rotationSpeed);
-            isAutoRotating = true;
-            console.log(`Started auto-rotation at ${speed}x speed (direction: ${rotationDirection > 0 ? 'right' : 'left'})`);
-            
-            // Update button states
-            document.getElementById('auto-rotate-start').style.background = 'rgba(0, 255, 0, 0.4)';
-            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 255, 255, 0.2)';
-            
-            // Update status
-            const statusEl = document.getElementById('rotation-status');
-            if (statusEl) {
-                statusEl.textContent = `Status: Rotating ${rotationDirection > 0 ? 'Right' : 'Left'} at ${speed}x`;
-                statusEl.style.color = 'rgba(0, 255, 0, 0.9)';
-            }
-        });
-        
-        document.getElementById('auto-rotate-stop').addEventListener('click', () => {
-            viewer.setAutoRotate(0);
-            isAutoRotating = false;
-            console.log('Stopped auto-rotation');
-            
-            // Update button states
-            document.getElementById('auto-rotate-start').style.background = 'rgba(255, 255, 255, 0.2)';
-            document.getElementById('auto-rotate-stop').style.background = 'rgba(255, 0, 0, 0.4)';
-            
-            // Update status
-            const statusEl = document.getElementById('rotation-status');
-            if (statusEl) {
-                statusEl.textContent = 'Status: Stopped';
-                statusEl.style.color = 'rgba(255, 255, 255, 0.8)';
-            }
-        });
-        
-        document.getElementById('auto-rotate-reverse').addEventListener('click', () => {
-            rotationDirection *= -1;
-            if (isAutoRotating) {
-                const speed = parseFloat(document.getElementById('rotation-speed').value);
-                viewer.setAutoRotate(speed * rotationDirection);
-            }
-            console.log(`Rotation direction: ${rotationDirection > 0 ? 'right' : 'left'}`);
-            
-            // Visual feedback for direction change
-            const reverseBtn = document.getElementById('auto-rotate-reverse');
-            const originalBg = reverseBtn.style.background;
-            reverseBtn.style.background = 'rgba(255, 255, 0, 0.6)';
-            setTimeout(() => {
-                reverseBtn.style.background = originalBg;
-            }, 300);
-        });
-        
-        // Speed control
-        document.getElementById('rotation-speed').addEventListener('input', (e) => {
-            const speed = parseFloat(e.target.value);
-            document.getElementById('speed-value').textContent = speed + 'x';
-            if (isAutoRotating) {
-                viewer.setAutoRotate(speed * rotationDirection);
-                console.log(`Updated rotation speed to ${speed}x`);
-            }
-        });
-        
-        // Zoom controls
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            const currentHfov = viewer.getHfov();
-            viewer.setHfov(Math.max(currentHfov - 10, 50));
-        });
-        
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            const currentHfov = viewer.getHfov();
-            viewer.setHfov(Math.min(currentHfov + 10, 120));
-        });
-        
-        document.getElementById('zoom-reset').addEventListener('click', () => {
-            viewer.setHfov(100);
-        });
-        
-        console.log('Pannellum custom controls added successfully');
-        
-    }, 500); // Wait for Pannellum to fully initialize
-}
-
-function handleFeatureClick(feature, featureIndex, layerConfig) {
-    // Check if the feature is already selected
-    const isSelected = selectedFeatures.includes(feature);
-
-    // Toggle selection state
-    toggleRowSelection(layerConfig.id, featureIndex, !isSelected);
-
-    // Highlight if selected, reset style if deselected
-    if (!isSelected) {
-        // Highlight in yellow
-        if (feature.setStyle) {
-            feature.setStyle({
-                fillColor: '#ffff00',   // Yellow highlight color
-                color: '#000000',       // Black border
-                weight: 3,              // Thicker border
-                fillOpacity: 0.8        // More opaque when selected
-            });
+        if (map) {
+            map.invalidateSize();
         }
-        
-        // Get the latest layer configuration from mapLayers array to ensure we have current popup settings
-        const currentLayer = mapLayers.find(l => l.id === layerConfig.id) || layerConfig;
-        
-        // Ensure we have the record data for this feature
-        let recordData = feature.recordData;
-        if (!recordData && currentLayer.records && currentLayer.records[featureIndex]) {
-            recordData = currentLayer.records[featureIndex].fields;
-            feature.recordData = recordData; // Cache for future use
-        }
-        
-        if (recordData) {
-            // Detect media layer type and handle accordingly
-            const mediaType = detectMediaLayerType(currentLayer.name, currentLayer.records);
-            const mediaUrl = findUrlField(recordData);
-            
-            if (mediaType && mediaUrl) {
-                // Handle media layers with modals
-                const title = recordData.title || recordData.name || `${currentLayer.name} Media`;
-                
-                switch (mediaType) {
-                    case 'video':
-                        openVideoModal(mediaUrl, title);
-                        break;
-                    case 'audio':
-                        openAudioModal(mediaUrl, title);
-                        break;
-                    case 'image':
-                        openImageModal(mediaUrl, title);
-                        break;
-                    case 'pdf':
-                        openPdfModal(mediaUrl, title);
-                        break;
-                    case '360':
-                        open360Modal(mediaUrl, title);
-                        break;
-                    default:
-                        // Fallback to regular popup
-                        showRegularPopup(feature, recordData, currentLayer);
-                }
-                
-                console.log(`Opened ${mediaType} modal for feature ${featureIndex} in layer "${currentLayer.name}"`);
-            } else {
-                // Regular layer - show popup
-                showRegularPopup(feature, recordData, currentLayer);
-            }
-        }
-    } else {
-        // Reset to original style
-        if (feature.setStyle) {
-            const originalStyle = layerConfig.properties?.symbology || {};
-            feature.setStyle({
-                fillColor: originalStyle.fillColor || '#3498db',
-                color: originalStyle.borderColor || '#2c3e50',
-                weight: originalStyle.borderWidth || 2,
-                fillOpacity: originalStyle.fillOpacity || 0.7
-            });
-        }
-    }
-}
-
-function showRegularPopup(feature, recordData, currentLayer) {
-    // Check if popups are enabled for this layer
-    const popupEnabled = currentLayer.properties?.popup?.enabled !== false;
-    
-    if (popupEnabled) {
-        // Create popup content using the current layer configuration (which includes updated popup fields)
-        const popupContent = createFeaturePopup(recordData, currentLayer);
-        
-        // Update the popup with the new content that respects field selection
-        if (feature.getPopup()) {
-            feature.getPopup().setContent(popupContent);
-            feature.openPopup();
-        } else {
-            feature.bindPopup(popupContent).openPopup();
-        }
-        
-        console.log(`Regular popup opened for feature in layer "${currentLayer.name}" with ${currentLayer.properties?.popup?.fields?.length || 0} configured fields`);
-    } else {
-        console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
-        showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
-    }
+    }, 100);
 }
