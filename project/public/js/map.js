@@ -455,104 +455,147 @@ async function loadTableFields() {
 }
 
 function showAddLayerModal() {
-    // Reset modal content before showing
-    resetAddLayerModal();
-    
-    const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
-    
-    // Load tables before showing the modal
-    loadAvailableTables().then(() => {
-        modal.show();
+    try {
+        // Reset modal content before showing
+        resetAddLayerModal();
         
-        // Ensure the "From Table" tab is active by default
-        setTimeout(() => {
-            const tableTab = document.getElementById('table-tab');
-            const geoJsonTab = document.getElementById('geojson-tab');
-            const tablePane = document.getElementById('table-pane');
-            const geoJsonPane = document.getElementById('geojson-pane');
+        // Clear any existing errors
+        clearErrors();
+        
+        const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
+        
+        // Load tables before showing the modal
+        loadAvailableTables().then(() => {
+            modal.show();
             
-            if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
-                // Activate table tab
-                tableTab.classList.add('active');
-                geoJsonTab.classList.remove('active');
+            // Ensure the "From Table" tab is active by default
+            setTimeout(() => {
+                const tableTab = document.getElementById('table-tab');
+                const geoJsonTab = document.getElementById('geojson-tab');
+                const tablePane = document.getElementById('table-pane');
+                const geoJsonPane = document.getElementById('geojson-pane');
                 
-                // Show table pane
-                tablePane.classList.add('show', 'active');
-                geoJsonPane.classList.remove('show', 'active');
-            }
-        }, 100);
-    }).catch(error => {
-        console.error('Error loading tables before showing modal:', error);
-        // Still show modal even if table loading fails
-        modal.show();
-        showError('Failed to load available tables. Please check your connection and try again.');
-    });
+                if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+                    // Activate table tab
+                    tableTab.classList.add('active');
+                    geoJsonTab.classList.remove('active');
+                    
+                    // Show table pane
+                    tablePane.classList.add('show', 'active');
+                    geoJsonPane.classList.remove('show', 'active');
+                }
+            }, 100);
+        }).catch(error => {
+            console.error('Error loading tables before showing modal:', error);
+            // Still show modal even if table loading fails
+            modal.show();
+            showError('Failed to load available tables. Please check your connection and try again.');
+        });
+    } catch (error) {
+        console.error('Error in showAddLayerModal:', error);
+        showError('Failed to open Add Layer dialog: ' + error.message);
+    }
 }
 
 function resetAddLayerModal() {
-    // Clear all form fields
-    const fields = [
-        'newLayerTable',
-        'newLayerName', 
-        'newLayerGeometry',
-        'geoJSONTableName'
-    ];
-    
-    fields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) {
-            if (field.tagName === 'SELECT') {
-                field.selectedIndex = 0;
-            } else {
-                field.value = '';
+    try {
+        // Clear all form fields
+        const fields = [
+            'newLayerTable',
+            'newLayerName', 
+            'newLayerGeometry',
+            'geoJSONTableName'
+        ];
+        
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                try {
+                    if (field.tagName === 'SELECT') {
+                        field.selectedIndex = 0;
+                    } else {
+                        field.value = '';
+                    }
+                } catch (fieldError) {
+                    console.warn(`Error resetting field ${fieldId}:`, fieldError);
+                }
             }
+        });
+        
+        // Reset color picker
+        const colorField = document.getElementById('newLayerColor');
+        if (colorField) {
+            colorField.value = '#3498db';
+        }
+        
+        // Reset geometry selector
+        const geometrySelector = document.getElementById('newLayerGeometry');
+        if (geometrySelector) {
+            geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
+        }
+        
+        // Reset linked tables info
+        const linkedTablesInfo = document.getElementById('linkedTablesInfo');
+        if (linkedTablesInfo) {
+            linkedTablesInfo.innerHTML = 'Select a table to see linked information';
+        }
+        
+        // Hide GeoJSON preview
+        const geoJSONPreview = document.getElementById('geoJSONPreview');
+        if (geoJSONPreview) {
+            geoJSONPreview.style.display = 'none';
+        }
+        
+        // Reset upload progress
+        const uploadProgress = document.getElementById('uploadProgress');
+        if (uploadProgress) {
+            uploadProgress.style.display = 'none';
+        }
+        
+        // Reset button visibility
+        const addLayerBtn = document.getElementById('addLayerBtn');
+        const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+        
+        if (addLayerBtn) {
+            addLayerBtn.style.display = 'inline-block';
+            addLayerBtn.disabled = false;
+        }
+        if (uploadGeoJSONBtn) {
+            uploadGeoJSONBtn.style.display = 'none';
+            uploadGeoJSONBtn.disabled = true;
+        }
+        
+        // Clear any global variables
+        geoJSONData = null;
+        
+        // Clear any error states
+        clearModalErrors();
+        
+    } catch (error) {
+        console.error('Error in resetAddLayerModal:', error);
+    }
+}
+
+function clearErrors() {
+    // Clear any existing error alerts
+    const existingAlerts = document.querySelectorAll('.alert-danger');
+    existingAlerts.forEach(alert => {
+        if (alert.classList.contains('position-fixed')) {
+            alert.remove();
         }
     });
-    
-    // Reset color picker
-    const colorField = document.getElementById('newLayerColor');
-    if (colorField) {
-        colorField.value = '#3498db';
-    }
-    
-    // Reset geometry selector
-    const geometrySelector = document.getElementById('newLayerGeometry');
-    if (geometrySelector) {
-        geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
-    }
-    
-    // Reset linked tables info
-    const linkedTablesInfo = document.getElementById('linkedTablesInfo');
-    if (linkedTablesInfo) {
-        linkedTablesInfo.innerHTML = 'Select a table to see linked information';
-    }
-    
-    // Hide GeoJSON preview
-    const geoJSONPreview = document.getElementById('geoJSONPreview');
-    if (geoJSONPreview) {
-        geoJSONPreview.style.display = 'none';
-    }
-    
-    // Reset upload progress
-    const uploadProgress = document.getElementById('uploadProgress');
-    if (uploadProgress) {
-        uploadProgress.style.display = 'none';
-    }
-    
-    // Reset button visibility
-    const addLayerBtn = document.getElementById('addLayerBtn');
-    const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
-    
-    if (addLayerBtn) {
-        addLayerBtn.style.display = 'inline-block';
-    }
-    if (uploadGeoJSONBtn) {
-        uploadGeoJSONBtn.style.display = 'none';
-        uploadGeoJSONBtn.disabled = true;
-    }
-    
-    // Clear any global variables
-    geoJSONData = null;
+}
+
+function clearModalErrors() {
+    // Clear modal-specific error states
+    const modalInputs = document.querySelectorAll('#addLayerModal input, #addLayerModal select');
+    modalInputs.forEach(input => {
+        input.classList.remove('is-invalid');
+        const feedback = input.parentNode.querySelector('.invalid-feedback');
+        if (feedback) {
+            feedback.remove();
+        }
+    });
 }
 
 async function addNewLayer() {
@@ -567,6 +610,9 @@ async function addNewLayer() {
 
 async function addLayerFromTable() {
     try {
+        // Clear any previous errors
+        clearModalErrors();
+        
         const tableId = document.getElementById('newLayerTable').value;
         let layerName = document.getElementById('newLayerName').value.trim();
         const layerColor = document.getElementById('newLayerColor').value;
@@ -574,6 +620,12 @@ async function addLayerFromTable() {
 
         if (!tableId) {
             throw new Error('Please select a table');
+        }
+
+        // Validate color value
+        if (!layerColor || !layerColor.match(/^#[0-9A-Fa-f]{6}$/)) {
+            document.getElementById('newLayerColor').value = '#3498db';
+            console.warn('Invalid color value, reset to default');
         }
 
         // If layer name is empty, use table name as fallback
@@ -591,6 +643,13 @@ async function addLayerFromTable() {
             } catch (nameError) {
                 throw new Error('Please enter a layer name or ensure table information is available');
             }
+        }
+
+        // Show loading indicator
+        const addLayerBtn = document.getElementById('addLayerBtn');
+        if (addLayerBtn) {
+            addLayerBtn.disabled = true;
+            addLayerBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding Layer...';
         }
 
         // Get table data
@@ -626,45 +685,70 @@ async function addLayerFromTable() {
         // Load field permissions for this table
         const fieldPermissions = await loadFieldPermissionsForTable(tableId);
         
-        // Create layer
-        const layer = await createLayerFromData(records, {
+        // Create layer configuration with safe defaults
+        const layerConfig = {
             id: Date.now().toString(),
             name: layerName,
             tableId: tableId,
             geometryField: detectedGeometryField,
-            color: layerColor,
+            color: layerColor || '#3498db',
             visible: true,
             type: 'table',
             fieldPermissions: fieldPermissions
-        });
+        };
+        
+        // Create layer
+        const layer = await createLayerFromData(records, layerConfig);
 
         if (layer) {
+            // Restore button state
+            if (addLayerBtn) {
+                addLayerBtn.disabled = false;
+                addLayerBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add Layer';
+            }
+            
             // Close modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('addLayerModal'));
-            modal.hide();
+            if (modal) {
+                modal.hide();
+            }
 
             // Clear form
-            document.getElementById('newLayerTable').value = '';
-            document.getElementById('newLayerName').value = '';
-            document.getElementById('newLayerColor').value = '#3498db';
-            document.getElementById('newLayerGeometry').value = '';
+            setTimeout(() => {
+                resetAddLayerModal();
+            }, 100);
 
             // Auto-zoom to the new layer
             if (layer.bounds) {
                 setTimeout(() => {
-                    map.fitBounds(layer.bounds.pad(0.1));
-                    showSuccess(`Layer "${layerName}" added and zoomed to extent!`);
+                    try {
+                        map.fitBounds(layer.bounds.pad(0.1));
+                        showSuccess(`Layer "${layerName}" added and zoomed to extent!`);
+                    } catch (zoomError) {
+                        console.warn('Error auto-zooming to layer:', zoomError);
+                        showSuccess(`Layer "${layerName}" added successfully!`);
+                    }
                 }, 500);
             } else {
                 showSuccess('Layer added successfully!');
             }
 
             updateLayersList();
-	    updateMapStatistics();
+            if (typeof updateMapStatistics === 'function') {
+                updateMapStatistics();
+            }
         }
 
     } catch (error) {
         console.error('Error adding layer:', error);
+        
+        // Restore button state
+        const addLayerBtn = document.getElementById('addLayerBtn');
+        if (addLayerBtn) {
+            addLayerBtn.disabled = false;
+            addLayerBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add Layer';
+        }
+        
         showError('Failed to add layer: ' + error.message);
     }
 }
@@ -800,8 +884,8 @@ async function createLayerFromData(records, layerConfig) {
             properties: {
                 symbology: {
                     type: 'single',
-                    fillColor: layerConfig.color,
-                    borderColor: layerConfig.color,
+                    fillColor: layerConfig.color || '#3498db',
+                    borderColor: layerConfig.color || '#2c3e50',
                     fillOpacity: 0.7,
                     borderWidth: 2
                 },
