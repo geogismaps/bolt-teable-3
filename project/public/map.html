@@ -198,6 +198,22 @@
             max-height: 90vh;
         }
 
+        .properties-modal .modal-content {
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties-modal .modal-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .properties-modal .modal-footer {
+            flex-shrink: 0;
+            background: #f8f9fa;
+        }
+
         .properties-tabs {
             border-bottom: 1px solid #dee2e6;
         }
@@ -1494,7 +1510,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer d-flex justify-content-end gap-2 p-3 border-top">
                     <button type="button" class="btn btn-secondary" onclick="cancelProperties()">
                         <i class="fas fa-times me-1"></i>Cancel
                     </button>
