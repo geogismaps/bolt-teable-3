@@ -1793,6 +1793,9 @@ function showLayerProperties(layerId) {
     }
 
     try {
+        // Clear any existing state to prevent conflicts
+        clearModalState();
+        
         // Store current layer for properties modal
         window.currentPropertiesLayer = layer;
 
@@ -1802,10 +1805,42 @@ function showLayerProperties(layerId) {
         // Show the modal
         const modal = new bootstrap.Modal(document.getElementById('layerPropertiesModal'));
         modal.show();
+        
+        // Add event listener for when properties modal is hidden
+        const propertiesModal = document.getElementById('layerPropertiesModal');
+        propertiesModal.addEventListener('hidden.bs.modal', function() {
+            // Clean up state when properties modal is closed
+            setTimeout(() => {
+                resetModalStates();
+            }, 100);
+        }, { once: true });
+        
     } catch (error) {
         console.error('Error opening layer properties:', error);
         showError('Failed to open layer properties: ' + error.message);
     }
+}
+
+function clearModalState() {
+    // Clear any previous modal state
+    const addLayerModal = document.getElementById('addLayerModal');
+    if (addLayerModal && addLayerModal.classList.contains('show')) {
+        const modal = bootstrap.Modal.getInstance(addLayerModal);
+        if (modal) {
+            modal.hide();
+        }
+    }
+}
+
+function resetModalStates() {
+    // Reset global state
+    window.currentPropertiesLayer = null;
+    
+    // Ensure add layer modal is ready for next use
+    resetAddLayerModal();
+    
+    // Re-establish event listeners if needed
+    ensureModalEventListeners();
 }
 
 async function createDockedAttributeTable(layer) {
@@ -3093,15 +3128,8 @@ function setupModalEventListeners() {
             });
         }
         
-        // Handle modal shown event
-        addLayerModal.addEventListener('shown.bs.modal', function() {
-            // Ensure we're on the table tab by default
-            switchToTableTab();
-            // Reload tables when modal is shown
-            loadAvailableTables().catch(error => {
-                console.error('Failed to load tables on modal show:', error);
-            });
-        });
+        // Handle modal shown event using named function
+        addLayerModal.addEventListener('shown.bs.modal', handleAddLayerModalShown);
         
         // Add click handler to table selector for retry
         const tableSelector = document.getElementById('newLayerTable');
@@ -3116,10 +3144,8 @@ function setupModalEventListeners() {
             });
         }
         
-        // Handle modal hidden event - cleanup
-        addLayerModal.addEventListener('hidden.bs.modal', function() {
-            resetAddLayerModal();
-        });
+        // Handle modal hidden event using named function
+        addLayerModal.addEventListener('hidden.bs.modal', handleAddLayerModalHidden);
     }
 }
 
@@ -4885,6 +4911,50 @@ function applyAndCloseProperties() {
     if (modal) {
         modal.hide();
     }
+    
+    // Ensure add layer functionality is restored after closing properties modal
+    setTimeout(() => {
+        resetAddLayerModalState();
+        ensureModalEventListeners();
+    }, 200);
+}
+
+function resetAddLayerModalState() {
+    // Clear any references that might interfere
+    window.currentPropertiesLayer = null;
+    
+    // Reset any form states
+    const addLayerModal = document.getElementById('addLayerModal');
+    if (addLayerModal && !addLayerModal.classList.contains('show')) {
+        resetAddLayerModal();
+    }
+}
+
+function ensureModalEventListeners() {
+    // Re-establish add layer modal event listeners if they were removed
+    const addLayerModal = document.getElementById('addLayerModal');
+    if (addLayerModal) {
+        // Remove existing listeners to avoid duplicates
+        addLayerModal.removeEventListener('shown.bs.modal', handleAddLayerModalShown);
+        addLayerModal.removeEventListener('hidden.bs.modal', handleAddLayerModalHidden);
+        
+        // Add fresh listeners
+        addLayerModal.addEventListener('shown.bs.modal', handleAddLayerModalShown);
+        addLayerModal.addEventListener('hidden.bs.modal', handleAddLayerModalHidden);
+    }
+}
+
+function handleAddLayerModalShown() {
+    // Ensure we're on the table tab by default
+    switchToTableTab();
+    // Reload tables when modal is shown
+    loadAvailableTables().catch(error => {
+        console.error('Failed to load tables on modal show:', error);
+    });
+}
+
+function handleAddLayerModalHidden() {
+    resetAddLayerModal();
 }
 
 function cancelProperties() {
@@ -5061,6 +5131,43 @@ function applyLayerStyling(layer) {
     // Apply labels if enabled
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
+    }
+    
+    // Ensure add layer functionality remains intact after styling
+    ensureAddLayerFunctionality();
+}
+
+function ensureAddLayerFunctionality() {
+    // Reset any global variables that might interfere with add layer
+    if (window.currentPropertiesLayer) {
+        // Clear the reference to avoid conflicts
+        const tempLayer = window.currentPropertiesLayer;
+        window.currentPropertiesLayer = null;
+        
+        // Restore it after a short delay to allow add layer to work properly
+        setTimeout(() => {
+            if (!document.getElementById('addLayerModal').classList.contains('show')) {
+                window.currentPropertiesLayer = tempLayer;
+            }
+        }, 100);
+    }
+    
+    // Ensure the add layer modal event listeners are still active
+    const addLayerBtn = document.querySelector('[onclick*="showAddLayerModal"]');
+    if (addLayerBtn && !addLayerBtn.onclick) {
+        addLayerBtn.onclick = showAddLayerModal;
+    }
+    
+    // Re-enable table loading functionality
+    const tableSelector = document.getElementById('newLayerTable');
+    if (tableSelector) {
+        // Remove any disabled state that might have been applied
+        tableSelector.disabled = false;
+        
+        // Ensure change event listener is active
+        if (!tableSelector.onchange) {
+            tableSelector.onchange = loadTableFields;
+        }
     }
 }
 
