@@ -1179,22 +1179,141 @@ body {
             justify-content: center;
         }
 
-        /* Responsive adjustments for media items */
+        /* Responsive measurement tools */
         @media (max-width: 768px) {
-            .media-grid {
-                flex-direction: column;
+            .measurement-tool-group .col-6 {
+                margin-bottom: 8px;
             }
 
-            .media-item {
-                min-width: 100%;
+            .distance-segment-label,
+            .distance-total-label,
+            .area-temp-label,
+            .area-final-label {
+                font-size: 10px !important;
+            }
+        }
+
+        /* Drone imagery availability indicator */
+        .drone-available {
+            background: #28a745 !important;
+        }
+
+        .drone-unavailable {
+            background: #6c757d !important;
+        }
+
+        /* Enhanced Measurement Tools Styles */
+        .measurement-tool-group {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #445566;
+        }
+
+        .measurement-marker-label {
+            z-index: 1000 !important;
+        }
+
+        .distance-segment-label,
+        .distance-total-label,
+        .area-temp-label,
+        .area-final-label {
+            z-index: 1001 !important;
+            pointer-events: none;
+        }
+
+        .measurement-item {
+            background: rgba(255, 255, 255, 0.95);
+            transition: background-color 0.2s ease;
+        }
+
+        .measurement-item:hover {
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .measurement-results-summary {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        /* Unit selector styling */
+        .form-select-sm {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        /* Measurement button active states */
+        .btn-primary.measurement-active {
+            background: #007bff !important;
+            border-color: #007bff !important;
+            animation: pulse 2s infinite;
+        }
+
+        .btn-success.measurement-active {
+            background: #28a745 !important;
+            border-color: #28a745 !important;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+        }
+
+        /* Measurement result labels on map */
+        .leaflet-div-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        /* Improved measurement line styles */
+        .leaflet-interactive {
+            cursor: pointer;
+        }
+
+        .measurement-polyline {
+            stroke-dasharray: 5, 5;
+            animation: dash 0.5s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -10;
+            }
+        }
+
+        /* Measurement controls spacing */
+        .measurement-tool-group .row {
+            margin: 0;
+        }
+
+        .measurement-tool-group .col-6 {
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+
+        /* Results container styling */
+        #measurementResults {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            border: 1px solid #445566;
+        }
+
+        #measurementResults .bg-light {
+            background: rgba(255, 255, 255, 0.9) !important;
+        }
+
+        /* Responsive measurement tools */
+        @media (max-width: 768px) {
+            .measurement-tool-group .col-6 {
+                margin-bottom: 8px;
             }
 
-            .media-field-container .d-flex {
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .media-view-btn {
-                width: 100%;
+            .distance-segment-label,
+            .distance-total-label,
+            .area-temp-label,
+            .area-final-label {
+                font-size: 10px !important;
             }
         }
