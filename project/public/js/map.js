@@ -219,6 +219,9 @@ async function initializeMap() {
 
         // Setup drag and drop for GeoJSON
         setupGeoJSONDragDrop();
+        
+        // Setup modal event listeners
+        setupModalEventListeners();
 
         console.log('Map initialized successfully with customer context');
 
@@ -282,6 +285,11 @@ async function loadAvailableTables() {
         // Ensure user is authenticated and API is ready
         if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
             console.log('Authentication or API not ready, skipping table loading');
+            // Still populate with empty option for better UX
+            const tableSelector = document.getElementById('newLayerTable');
+            if (tableSelector) {
+                tableSelector.innerHTML = '<option value="">Select table...</option>';
+            }
             return;
         }
 
@@ -296,23 +304,40 @@ async function loadAvailableTables() {
             t.name !== 'data_change_logs'
         );
 
-        // Populate table selector
+        // Populate table selector - always reset completely
         const tableSelector = document.getElementById('newLayerTable');
         if (tableSelector) {
-            tableSelector.innerHTML = '<option value="">Select table...</option>';
+            // Clear existing options first
+            tableSelector.innerHTML = '';
+            
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select table...';
+            tableSelector.appendChild(defaultOption);
 
+            // Add table options
             userTables.forEach(table => {
                 const option = document.createElement('option');
                 option.value = table.id;
                 option.textContent = table.name;
                 tableSelector.appendChild(option);
             });
+            
+            console.log(`Populated table selector with ${userTables.length} tables`);
         }
 
         console.log(`Loaded ${userTables.length} available tables`);
 
     } catch (error) {
         console.error('Error loading tables:', error);
+        
+        // Show error in selector if API fails
+        const tableSelector = document.getElementById('newLayerTable');
+        if (tableSelector) {
+            tableSelector.innerHTML = '<option value="">Error loading tables - please refresh</option>';
+        }
+        
         showError('Failed to load tables: ' + error.message);
     }
 }
@@ -415,8 +440,98 @@ async function loadTableFields() {
 }
 
 function showAddLayerModal() {
+    // Reset modal content before showing
+    resetAddLayerModal();
+    
     const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
     modal.show();
+    
+    // Ensure the "From Table" tab is active by default
+    setTimeout(() => {
+        const tableTab = document.getElementById('table-tab');
+        const geoJsonTab = document.getElementById('geojson-tab');
+        const tablePane = document.getElementById('table-pane');
+        const geoJsonPane = document.getElementById('geojson-pane');
+        
+        if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+            // Activate table tab
+            tableTab.classList.add('active');
+            geoJsonTab.classList.remove('active');
+            
+            // Show table pane
+            tablePane.classList.add('show', 'active');
+            geoJsonPane.classList.remove('show', 'active');
+        }
+        
+        // Reload available tables
+        loadAvailableTables();
+    }, 100);
+}
+
+function resetAddLayerModal() {
+    // Clear all form fields
+    const fields = [
+        'newLayerTable',
+        'newLayerName', 
+        'newLayerGeometry',
+        'geoJSONTableName'
+    ];
+    
+    fields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            if (field.tagName === 'SELECT') {
+                field.selectedIndex = 0;
+            } else {
+                field.value = '';
+            }
+        }
+    });
+    
+    // Reset color picker
+    const colorField = document.getElementById('newLayerColor');
+    if (colorField) {
+        colorField.value = '#3498db';
+    }
+    
+    // Reset geometry selector
+    const geometrySelector = document.getElementById('newLayerGeometry');
+    if (geometrySelector) {
+        geometrySelector.innerHTML = '<option value="">Auto-detect...</option>';
+    }
+    
+    // Reset linked tables info
+    const linkedTablesInfo = document.getElementById('linkedTablesInfo');
+    if (linkedTablesInfo) {
+        linkedTablesInfo.innerHTML = 'Select a table to see linked information';
+    }
+    
+    // Hide GeoJSON preview
+    const geoJSONPreview = document.getElementById('geoJSONPreview');
+    if (geoJSONPreview) {
+        geoJSONPreview.style.display = 'none';
+    }
+    
+    // Reset upload progress
+    const uploadProgress = document.getElementById('uploadProgress');
+    if (uploadProgress) {
+        uploadProgress.style.display = 'none';
+    }
+    
+    // Reset button visibility
+    const addLayerBtn = document.getElementById('addLayerBtn');
+    const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+    
+    if (addLayerBtn) {
+        addLayerBtn.style.display = 'inline-block';
+    }
+    if (uploadGeoJSONBtn) {
+        uploadGeoJSONBtn.style.display = 'none';
+        uploadGeoJSONBtn.disabled = true;
+    }
+    
+    // Clear any global variables
+    geoJSONData = null;
 }
 
 async function addNewLayer() {
@@ -2847,6 +2962,98 @@ function toggleSection(header) {
         chevron.classList.remove('fa-chevron-down');
         chevron.classList.add('fa-chevron-right');
         section.classList.remove('active');
+    }
+}
+
+// Setup modal event listeners
+function setupModalEventListeners() {
+    // Add Layer Modal tab switching
+    const addLayerModal = document.getElementById('addLayerModal');
+    if (addLayerModal) {
+        // Handle tab clicks
+        const tableTab = document.getElementById('table-tab');
+        const geoJsonTab = document.getElementById('geojson-tab');
+        
+        if (tableTab) {
+            tableTab.addEventListener('click', function(e) {
+                e.preventDefault();
+                switchToTableTab();
+            });
+        }
+        
+        if (geoJsonTab) {
+            geoJsonTab.addEventListener('click', function(e) {
+                e.preventDefault();
+                switchToGeoJSONTab();
+            });
+        }
+        
+        // Handle modal shown event
+        addLayerModal.addEventListener('shown.bs.modal', function() {
+            // Ensure we're on the table tab by default
+            switchToTableTab();
+            // Reload tables when modal is shown
+            loadAvailableTables();
+        });
+        
+        // Handle modal hidden event - cleanup
+        addLayerModal.addEventListener('hidden.bs.modal', function() {
+            resetAddLayerModal();
+        });
+    }
+}
+
+function switchToTableTab() {
+    const tableTab = document.getElementById('table-tab');
+    const geoJsonTab = document.getElementById('geojson-tab');
+    const tablePane = document.getElementById('table-pane');
+    const geoJsonPane = document.getElementById('geojson-pane');
+    const addLayerBtn = document.getElementById('addLayerBtn');
+    const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+    
+    if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+        // Update tab states
+        tableTab.classList.add('active');
+        geoJsonTab.classList.remove('active');
+        
+        // Update pane visibility
+        tablePane.classList.add('show', 'active');
+        geoJsonPane.classList.remove('show', 'active');
+        
+        // Update button visibility
+        if (addLayerBtn) {
+            addLayerBtn.style.display = 'inline-block';
+        }
+        if (uploadGeoJSONBtn) {
+            uploadGeoJSONBtn.style.display = 'none';
+        }
+    }
+}
+
+function switchToGeoJSONTab() {
+    const tableTab = document.getElementById('table-tab');
+    const geoJsonTab = document.getElementById('geojson-tab');
+    const tablePane = document.getElementById('table-pane');
+    const geoJsonPane = document.getElementById('geojson-pane');
+    const addLayerBtn = document.getElementById('addLayerBtn');
+    const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+    
+    if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+        // Update tab states
+        tableTab.classList.remove('active');
+        geoJsonTab.classList.add('active');
+        
+        // Update pane visibility
+        tablePane.classList.remove('show', 'active');
+        geoJsonPane.classList.add('show', 'active');
+        
+        // Update button visibility
+        if (addLayerBtn) {
+            addLayerBtn.style.display = 'none';
+        }
+        if (uploadGeoJSONBtn) {
+            uploadGeoJSONBtn.style.display = 'inline-block';
+        }
     }
 }
 
