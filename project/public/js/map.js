@@ -281,64 +281,79 @@ function handleZoomChange() {
 }
 
 async function loadAvailableTables() {
+    const tableSelector = document.getElementById('newLayerTable');
+    
+    if (!tableSelector) {
+        console.error('Table selector not found');
+        return;
+    }
+
     try {
+        // Show loading state
+        tableSelector.innerHTML = '<option value="">Loading tables...</option>';
+        tableSelector.disabled = true;
+
         // Ensure user is authenticated and API is ready
         if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
             console.log('Authentication or API not ready, skipping table loading');
-            // Still populate with empty option for better UX
-            const tableSelector = document.getElementById('newLayerTable');
-            if (tableSelector) {
-                tableSelector.innerHTML = '<option value="">Select table...</option>';
-            }
+            tableSelector.innerHTML = '<option value="">Authentication required - please login</option>';
+            tableSelector.disabled = false;
             return;
         }
 
+        console.log('Loading tables from Teable API...');
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
 
+        console.log(`Received ${tables.length} tables from API`);
+
         // Filter out system tables
         const userTables = tables.filter(t => 
+            t.name && 
             !t.name.startsWith('app_') && 
             !t.name.startsWith('field_') && 
             !t.name.startsWith('system_') &&
             t.name !== 'data_change_logs'
         );
 
-        // Populate table selector - always reset completely
-        const tableSelector = document.getElementById('newLayerTable');
-        if (tableSelector) {
-            // Clear existing options first
-            tableSelector.innerHTML = '';
-            
-            // Add default option
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = 'Select table...';
-            tableSelector.appendChild(defaultOption);
+        console.log(`Filtered to ${userTables.length} user tables`);
 
-            // Add table options
-            userTables.forEach(table => {
-                const option = document.createElement('option');
-                option.value = table.id;
-                option.textContent = table.name;
-                tableSelector.appendChild(option);
-            });
-            
-            console.log(`Populated table selector with ${userTables.length} tables`);
+        // Clear and populate table selector
+        tableSelector.innerHTML = '';
+        
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = userTables.length > 0 ? 'Select table...' : 'No tables available';
+        tableSelector.appendChild(defaultOption);
+
+        // Add table options
+        userTables.forEach(table => {
+            const option = document.createElement('option');
+            option.value = table.id;
+            option.textContent = table.name;
+            tableSelector.appendChild(option);
+        });
+        
+        tableSelector.disabled = false;
+        
+        console.log(`✅ Populated table selector with ${userTables.length} tables`);
+
+        if (userTables.length === 0) {
+            showWarning('No tables found. Please create tables in your Teable.io workspace first.');
+        } else {
+            showSuccess(`Loaded ${userTables.length} available tables`);
         }
-
-        console.log(`Loaded ${userTables.length} available tables`);
 
     } catch (error) {
         console.error('Error loading tables:', error);
         
-        // Show error in selector if API fails
-        const tableSelector = document.getElementById('newLayerTable');
-        if (tableSelector) {
-            tableSelector.innerHTML = '<option value="">Error loading tables - please refresh</option>';
-        }
+        // Show error in selector
+        tableSelector.innerHTML = '<option value="">Error loading tables - click to retry</option>';
+        tableSelector.disabled = false;
         
-        showError('Failed to load tables: ' + error.message);
+        showError(`Failed to load tables: ${error.message}. Please check your API configuration and try again.`);
+        throw error; // Re-throw to be handled by caller
     }
 }
 
@@ -444,28 +459,34 @@ function showAddLayerModal() {
     resetAddLayerModal();
     
     const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
-    modal.show();
     
-    // Ensure the "From Table" tab is active by default
-    setTimeout(() => {
-        const tableTab = document.getElementById('table-tab');
-        const geoJsonTab = document.getElementById('geojson-tab');
-        const tablePane = document.getElementById('table-pane');
-        const geoJsonPane = document.getElementById('geojson-pane');
+    // Load tables before showing the modal
+    loadAvailableTables().then(() => {
+        modal.show();
         
-        if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
-            // Activate table tab
-            tableTab.classList.add('active');
-            geoJsonTab.classList.remove('active');
+        // Ensure the "From Table" tab is active by default
+        setTimeout(() => {
+            const tableTab = document.getElementById('table-tab');
+            const geoJsonTab = document.getElementById('geojson-tab');
+            const tablePane = document.getElementById('table-pane');
+            const geoJsonPane = document.getElementById('geojson-pane');
             
-            // Show table pane
-            tablePane.classList.add('show', 'active');
-            geoJsonPane.classList.remove('show', 'active');
-        }
-        
-        // Reload available tables
-        loadAvailableTables();
-    }, 100);
+            if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+                // Activate table tab
+                tableTab.classList.add('active');
+                geoJsonTab.classList.remove('active');
+                
+                // Show table pane
+                tablePane.classList.add('show', 'active');
+                geoJsonPane.classList.remove('show', 'active');
+            }
+        }, 100);
+    }).catch(error => {
+        console.error('Error loading tables before showing modal:', error);
+        // Still show modal even if table loading fails
+        modal.show();
+        showError('Failed to load available tables. Please check your connection and try again.');
+    });
 }
 
 function resetAddLayerModal() {
@@ -2993,8 +3014,23 @@ function setupModalEventListeners() {
             // Ensure we're on the table tab by default
             switchToTableTab();
             // Reload tables when modal is shown
-            loadAvailableTables();
+            loadAvailableTables().catch(error => {
+                console.error('Failed to load tables on modal show:', error);
+            });
         });
+        
+        // Add click handler to table selector for retry
+        const tableSelector = document.getElementById('newLayerTable');
+        if (tableSelector) {
+            tableSelector.addEventListener('click', function() {
+                if (this.options.length === 1 && this.options[0].textContent.includes('Error')) {
+                    console.log('Retrying table load...');
+                    loadAvailableTables().catch(error => {
+                        console.error('Retry failed:', error);
+                    });
+                }
+            });
+        }
         
         // Handle modal hidden event - cleanup
         addLayerModal.addEventListener('hidden.bs.modal', function() {
