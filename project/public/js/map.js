@@ -4918,24 +4918,24 @@ function applyLayerStyling(layer) {
     let styledCount = 0;
 
     layer.features.forEach((feature, index) => {
-        if (!feature.setStyle) {
-            console.warn(`Feature ${index} does not have setStyle method`);
+        // Check if feature is a point (marker) or polygon/polyline
+        const isPoint = feature.getLatLng && !feature.setStyle;
+        const isPolygonOrLine = feature.setStyle;
+
+        if (!isPoint && !isPolygonOrLine) {
+            console.warn(`Feature ${index} has unknown geometry type`);
             return;
         }
 
-        // Base style properties
-        let style = {
-            weight: symbology.borderWidth || 2,
-            fillOpacity: symbology.fillOpacity || 0.7,
-            opacity: 1
-        };
+        // Determine style color based on symbology type
+        let fillColor = symbology.fillColor || '#3498db';
+        let borderColor = symbology.borderColor || '#2c3e50';
 
         // Apply styling based on symbology type
         switch (symbology.type) {
             case 'single':
-                style.fillColor = symbology.fillColor || '#3498db';
-                style.color = symbology.borderColor || '#2c3e50';
-                console.log(`Applied single color: fill=${style.fillColor}, border=${style.color}`);
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
                 break;
 
             case 'graduated':
@@ -4950,17 +4950,17 @@ function applyLayerStyling(layer) {
                                 break;
                             }
                         }
-                        style.fillColor = symbology.colors[classIndex] || '#3498db';
-                        style.color = symbology.borderColor || '#2c3e50';
+                        fillColor = symbology.colors[classIndex] || '#3498db';
+                        borderColor = symbology.borderColor || '#2c3e50';
                     } else {
                         // Use default color for non-numeric values
-                        style.fillColor = '#cccccc';
-                        style.color = '#999999';
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
                     }
                 } else {
                     // No field specified or no data - use default
-                    style.fillColor = symbology.fillColor || '#3498db';
-                    style.color = symbology.borderColor || '#2c3e50';
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
@@ -4969,31 +4969,88 @@ function applyLayerStyling(layer) {
                     const featureCategory = String(feature.recordData[symbology.field]);
                     const category = symbology.categories && symbology.categories.find(cat => String(cat.value) === featureCategory);
                     if (category) {
-                        style.fillColor = category.color;
-                        style.color = symbology.borderColor || '#2c3e50';
+                        fillColor = category.color;
+                        borderColor = symbology.borderColor || '#2c3e50';
                     } else {
                         // Use default color for uncategorized values
-                        style.fillColor = '#cccccc';
-                        style.color = '#999999';
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
                     }
                 } else {
                     // No field specified or no data - use default
-                    style.fillColor = symbology.fillColor || '#3498db';
-                    style.color = symbology.borderColor || '#2c3e50';
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
             default:
                 // Fallback to single symbol styling
-                style.fillColor = symbology.fillColor || '#3498db';
-                style.color = symbology.borderColor || '#2c3e50';
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
                 console.warn(`Unknown symbology type "${symbology.type}", using single symbol fallback`);
         }
 
-        // Apply the style to the feature
         try {
-            feature.setStyle(style);
-            styledCount++;
+            if (isPoint) {
+                // For point features (markers), we need to recreate the marker with new styling
+                const latLng = feature.getLatLng();
+                const recordData = feature.recordData;
+                const recordId = feature.recordId;
+                const layerId = feature.layerId;
+                const featureIndex = feature.featureIndex;
+
+                // Remove old marker from layer group
+                if (layer.leafletLayer.hasLayer(feature)) {
+                    layer.leafletLayer.removeLayer(feature);
+                }
+
+                // Create new styled marker
+                const newMarker = L.circleMarker(latLng, {
+                    fillColor: fillColor,
+                    color: borderColor,
+                    weight: symbology.borderWidth || 2,
+                    fillOpacity: symbology.fillOpacity || 0.7,
+                    radius: 8
+                });
+
+                // Copy properties from old marker
+                newMarker.recordData = recordData;
+                newMarker.recordId = recordId;
+                newMarker.layerId = layerId;
+                newMarker.featureIndex = featureIndex;
+
+                // Bind popup if it existed
+                if (feature.getPopup && feature.getPopup()) {
+                    newMarker.bindPopup(feature.getPopup().getContent());
+                }
+
+                // Add click handler
+                newMarker.on('click', function(e) {
+                    window.currentPopupFeature = this;
+                });
+
+                // Add to layer group
+                layer.leafletLayer.addLayer(newMarker);
+
+                // Replace in features array
+                layer.features[index] = newMarker;
+
+                styledCount++;
+
+            } else if (isPolygonOrLine) {
+                // For polygon/polyline features, use setStyle
+                const style = {
+                    fillColor: fillColor,
+                    color: borderColor,
+                    weight: symbology.borderWidth || 2,
+                    fillOpacity: symbology.fillOpacity || 0.7,
+                    opacity: 1
+                };
+
+                feature.setStyle(style);
+                styledCount++;
+            }
+
         } catch (error) {
             console.error(`Error applying style to feature ${index}:`, error);
         }
