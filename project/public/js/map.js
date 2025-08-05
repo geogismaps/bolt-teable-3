@@ -683,9 +683,25 @@ async function createLayerFromData(records, layerConfig) {
 
                     if (leafletGeometry) {
                         if (leafletGeometry.lat && leafletGeometry.lng) {
-                            // Point geometry
+                            // Point geometry - create marker with custom icon
+                            const markerIcon = L.divIcon({
+                                className: 'custom-marker-icon',
+                                html: `<div style="
+                                    width: 12px;
+                                    height: 12px;
+                                    background-color: ${layerConfig.color};
+                                    border: 2px solid #2c3e50;
+                                    border-radius: 50%;
+                                    opacity: 0.8;
+                                    box-shadow: 0 0 4px rgba(0,0,0,0.4);
+                                "></div>`,
+                                iconSize: [16, 16],
+                                iconAnchor: [8, 8],
+                                popupAnchor: [0, -8]
+                            });
+
                             const marker = L.marker([leafletGeometry.lat, leafletGeometry.lng], {
-                                color: layerConfig.color
+                                icon: markerIcon
                             });
 
                             const popupContent = createFeaturePopup(record.fields, layerConfig);
@@ -2520,6 +2536,7 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
     if (!layer || !layer.features[featureIndex]) return;
 
     const feature = layer.features[featureIndex];
+    const isMarker = feature.getLatLng && !feature.getLatLngs;
 
     if (isSelected) {
         // Add to selection
@@ -2527,7 +2544,27 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
             selectedFeatures.push(feature);
 
             // Highlight feature on map in yellow
-            if (feature.setStyle) {
+            if (isMarker) {
+                // Handle marker selection
+                const highlightIcon = L.divIcon({
+                    className: 'custom-marker-icon selected',
+                    html: `<div style="
+                        width: 16px;
+                        height: 16px;
+                        background-color: #ffff00;
+                        border: 3px solid #000000;
+                        border-radius: 50%;
+                        opacity: 1;
+                        box-shadow: 0 0 8px rgba(255,255,0,0.6);
+                        animation: pulse 1s infinite;
+                    "></div>`,
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11],
+                    popupAnchor: [0, -11]
+                });
+                feature.setIcon(highlightIcon);
+            } else if (feature.setStyle) {
+                // Handle polygon/line selection
                 feature.setStyle({
                     fillColor: '#ffff00',   // Yellow highlight
                     color: '#000000',       // Black border
@@ -2543,7 +2580,30 @@ function toggleRowSelection(layerId, featureIndex, isSelected) {
             selectedFeatures.splice(index, 1);
 
             // Reset feature style to original
-            if (feature.setStyle) {
+            if (isMarker) {
+                // Reset marker to original styling
+                const originalStyle = layer.properties?.symbology || {};
+                const fillColor = originalStyle.fillColor || '#3498db';
+                const borderColor = originalStyle.borderColor || '#2c3e50';
+                
+                const originalIcon = L.divIcon({
+                    className: 'custom-marker-icon',
+                    html: `<div style="
+                        width: 12px;
+                        height: 12px;
+                        background-color: ${fillColor};
+                        border: 2px solid ${borderColor};
+                        border-radius: 50%;
+                        opacity: ${originalStyle.fillOpacity || 0.8};
+                        box-shadow: 0 0 4px rgba(0,0,0,0.4);
+                    "></div>`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8],
+                    popupAnchor: [0, -8]
+                });
+                feature.setIcon(originalIcon);
+            } else if (feature.setStyle) {
+                // Reset polygon/line to original styling
                 const originalStyle = layer.properties?.symbology || {};
                 feature.setStyle({
                     fillColor: originalStyle.fillColor || '#3498db',
@@ -4834,24 +4894,21 @@ function applyLayerStyling(layer) {
     let styledCount = 0;
 
     layer.features.forEach((feature, index) => {
-        if (!feature.setStyle) {
+        // Check if this is a marker (point feature) or polygon/line feature
+        const isMarker = feature.getLatLng && !feature.getLatLngs;
+        
+        if (!isMarker && !feature.setStyle) {
             console.warn(`Feature ${index} does not have setStyle method`);
             return;
         }
 
-        // Base style properties
-        let style = {
-            weight: symbology.borderWidth || 2,
-            fillOpacity: symbology.fillOpacity || 0.7,
-            opacity: 1
-        };
+        // Determine colors based on symbology type
+        let fillColor, borderColor;
 
-        // Apply styling based on symbology type
         switch (symbology.type) {
             case 'single':
-                style.fillColor = symbology.fillColor || '#3498db';
-                style.color = symbology.borderColor || '#2c3e50';
-                console.log(`Applied single color: fill=${style.fillColor}, border=${style.color}`);
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
                 break;
 
             case 'graduated':
@@ -4866,17 +4923,17 @@ function applyLayerStyling(layer) {
                                 break;
                             }
                         }
-                        style.fillColor = symbology.colors[classIndex] || '#3498db';
-                        style.color = symbology.borderColor || '#2c3e50';
+                        fillColor = symbology.colors[classIndex] || '#3498db';
+                        borderColor = symbology.borderColor || '#2c3e50';
                     } else {
                         // Use default color for non-numeric values
-                        style.fillColor = '#cccccc';
-                        style.color = '#999999';
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
                     }
                 } else {
                     // No field specified or no data - use default
-                    style.fillColor = symbology.fillColor || '#3498db';
-                    style.color = symbology.borderColor || '#2c3e50';
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
@@ -4885,31 +4942,66 @@ function applyLayerStyling(layer) {
                     const featureCategory = String(feature.recordData[symbology.field]);
                     const category = symbology.categories && symbology.categories.find(cat => String(cat.value) === featureCategory);
                     if (category) {
-                        style.fillColor = category.color;
-                        style.color = symbology.borderColor || '#2c3e50';
+                        fillColor = category.color;
+                        borderColor = symbology.borderColor || '#2c3e50';
                     } else {
                         // Use default color for uncategorized values
-                        style.fillColor = '#cccccc';
-                        style.color = '#999999';
+                        fillColor = '#cccccc';
+                        borderColor = '#999999';
                     }
                 } else {
                     // No field specified or no data - use default
-                    style.fillColor = symbology.fillColor || '#3498db';
-                    style.color = symbology.borderColor || '#2c3e50';
+                    fillColor = symbology.fillColor || '#3498db';
+                    borderColor = symbology.borderColor || '#2c3e50';
                 }
                 break;
 
             default:
                 // Fallback to single symbol styling
-                style.fillColor = symbology.fillColor || '#3498db';
-                style.color = symbology.borderColor || '#2c3e50';
+                fillColor = symbology.fillColor || '#3498db';
+                borderColor = symbology.borderColor || '#2c3e50';
                 console.warn(`Unknown symbology type "${symbology.type}", using single symbol fallback`);
         }
 
-        // Apply the style to the feature
         try {
-            feature.setStyle(style);
+            if (isMarker) {
+                // Handle point features (markers) - create new colored icon
+                const markerIcon = L.divIcon({
+                    className: 'custom-marker-icon',
+                    html: `<div style="
+                        width: 12px;
+                        height: 12px;
+                        background-color: ${fillColor};
+                        border: 2px solid ${borderColor};
+                        border-radius: 50%;
+                        opacity: ${symbology.fillOpacity || 0.8};
+                        box-shadow: 0 0 4px rgba(0,0,0,0.4);
+                    "></div>`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8],
+                    popupAnchor: [0, -8]
+                });
+                
+                // Update the marker icon
+                feature.setIcon(markerIcon);
+                console.log(`Applied marker styling: fill=${fillColor}, border=${borderColor}`);
+                
+            } else {
+                // Handle polygon/line features - use setStyle
+                const style = {
+                    fillColor: fillColor,
+                    color: borderColor,
+                    weight: symbology.borderWidth || 2,
+                    fillOpacity: symbology.fillOpacity || 0.7,
+                    opacity: 1
+                };
+                
+                feature.setStyle(style);
+                console.log(`Applied polygon/line styling: fill=${fillColor}, border=${borderColor}`);
+            }
+            
             styledCount++;
+            
         } catch (error) {
             console.error(`Error applying style to feature ${index}:`, error);
         }
