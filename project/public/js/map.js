@@ -284,28 +284,33 @@ async function loadAvailableTables() {
     const tableSelector = document.getElementById('newLayerTable');
     
     if (!tableSelector) {
-        console.error('Table selector not found');
+        console.error('❌ Table selector not found');
         return;
     }
 
     try {
+        console.log('🔄 Loading available tables...');
+        
         // Show loading state
         tableSelector.innerHTML = '<option value="">Loading tables...</option>';
         tableSelector.disabled = true;
 
         // Ensure user is authenticated and API is ready
-        if (!currentUser || !window.teableAPI || !window.teableAPI.config.baseUrl) {
-            console.log('Authentication or API not ready, skipping table loading');
+        if (!currentUser || !window.teableAPI || !window.teableAPI.config?.baseUrl) {
+            console.log('⚠️ Authentication or API not ready');
             tableSelector.innerHTML = '<option value="">Authentication required - please login</option>';
             tableSelector.disabled = false;
+            
+            // Show message but don't throw error to allow modal to still show
+            showWarning('Please ensure you are logged in to load tables from Teable.io');
             return;
         }
 
-        console.log('Loading tables from Teable API...');
+        console.log('📡 Fetching tables from Teable API...');
         const tablesData = await window.teableAPI.getTables();
         const tables = tablesData.tables || tablesData || [];
 
-        console.log(`Received ${tables.length} tables from API`);
+        console.log(`📊 Received ${tables.length} tables from API`);
 
         // Filter out system tables
         const userTables = tables.filter(t => 
@@ -316,7 +321,7 @@ async function loadAvailableTables() {
             t.name !== 'data_change_logs'
         );
 
-        console.log(`Filtered to ${userTables.length} user tables`);
+        console.log(`🔍 Filtered to ${userTables.length} user tables`);
 
         // Clear and populate table selector
         tableSelector.innerHTML = '';
@@ -340,20 +345,23 @@ async function loadAvailableTables() {
         console.log(`✅ Populated table selector with ${userTables.length} tables`);
 
         if (userTables.length === 0) {
-            showWarning('No tables found. Please create tables in your Teable.io workspace first.');
+            showWarning('No tables found. Please create tables in your Teable.io workspace first, or use the GeoJSON upload option.');
         } else {
-            showSuccess(`Loaded ${userTables.length} available tables`);
+            console.log(`🎉 Successfully loaded ${userTables.length} available tables`);
         }
 
     } catch (error) {
-        console.error('Error loading tables:', error);
+        console.error('❌ Error loading tables:', error);
         
-        // Show error in selector
-        tableSelector.innerHTML = '<option value="">Error loading tables - click to retry</option>';
+        // Show error in selector but keep it functional
+        tableSelector.innerHTML = '<option value="">Error loading tables - you can still use GeoJSON upload</option>';
         tableSelector.disabled = false;
         
-        showError(`Failed to load tables: ${error.message}. Please check your API configuration and try again.`);
-        throw error; // Re-throw to be handled by caller
+        // Show error but don't throw to allow modal to still function
+        showError(`Failed to load tables: ${error.message}. You can still upload GeoJSON files.`);
+        
+        // Don't throw error - let the modal still show
+        console.log('⚠️ Table loading failed but modal will still be functional for GeoJSON upload');
     }
 }
 
@@ -456,49 +464,132 @@ async function loadTableFields() {
 
 function showAddLayerModal() {
     try {
+        console.log('Opening Add Layer modal...');
+        
+        // Clear any conflicting states first
+        clearModalConflicts();
+        
         // Reset modal content before showing
         resetAddLayerModal();
         
         // Clear any existing errors
         clearErrors();
         
-        const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
+        // Ensure modal element exists and is properly structured
+        const modalElement = document.getElementById('addLayerModal');
+        if (!modalElement) {
+            console.error('Add Layer modal element not found');
+            showError('Add Layer modal not found. Please refresh the page.');
+            return;
+        }
         
-        // Load tables before showing the modal
+        // Force show the modal content sections
+        const tablePane = document.getElementById('table-pane');
+        const geoJsonPane = document.getElementById('geojson-pane');
+        const tableTab = document.getElementById('table-tab');
+        const geoJsonTab = document.getElementById('geojson-tab');
+        
+        // Ensure tabs and panes are visible and properly configured
+        if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+            // Reset tab states
+            tableTab.classList.add('active');
+            geoJsonTab.classList.remove('active');
+            
+            // Reset pane states
+            tablePane.classList.add('show', 'active');
+            tablePane.style.display = 'block';
+            geoJsonPane.classList.remove('show', 'active');
+            geoJsonPane.style.display = 'none';
+            
+            console.log('✅ Modal tabs and panes configured');
+        } else {
+            console.error('❌ Modal tab elements not found:', {
+                tableTab: !!tableTab,
+                geoJsonTab: !!geoJsonTab,
+                tablePane: !!tablePane,
+                geoJsonPane: !!geoJsonPane
+            });
+        }
+        
+        // Create modal instance
+        const modal = new bootstrap.Modal(modalElement, {
+            backdrop: 'static',
+            keyboard: true
+        });
+        
+        // Load tables and show modal
+        console.log('Loading available tables...');
         loadAvailableTables().then(() => {
+            console.log('✅ Tables loaded successfully, showing modal');
+            
+            // Show modal
             modal.show();
             
-            // Ensure the "From Table" tab is active by default
+            // Double-check tab state after modal is shown
             setTimeout(() => {
-                const tableTab = document.getElementById('table-tab');
-                const geoJsonTab = document.getElementById('geojson-tab');
-                const tablePane = document.getElementById('table-pane');
-                const geoJsonPane = document.getElementById('geojson-pane');
-                
-                if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
-                    // Activate table tab
+                if (tableTab && tablePane) {
                     tableTab.classList.add('active');
-                    geoJsonTab.classList.remove('active');
-                    
-                    // Show table pane
                     tablePane.classList.add('show', 'active');
-                    geoJsonPane.classList.remove('show', 'active');
+                    tablePane.style.display = 'block';
+                    
+                    // Ensure button visibility
+                    const addLayerBtn = document.getElementById('addLayerBtn');
+                    const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
+                    
+                    if (addLayerBtn) addLayerBtn.style.display = 'inline-block';
+                    if (uploadGeoJSONBtn) uploadGeoJSONBtn.style.display = 'none';
+                    
+                    console.log('✅ Modal fully configured and displayed');
                 }
-            }, 100);
+            }, 200);
+            
         }).catch(error => {
-            console.error('Error loading tables before showing modal:', error);
+            console.error('❌ Error loading tables:', error);
             // Still show modal even if table loading fails
             modal.show();
-            showError('Failed to load available tables. Please check your connection and try again.');
+            showError('Failed to load available tables. You can still upload GeoJSON files.');
+            
+            // Switch to GeoJSON tab if table loading fails
+            setTimeout(() => {
+                if (geoJsonTab && geoJsonPane) {
+                    geoJsonTab.classList.add('active');
+                    tableTab?.classList.remove('active');
+                    geoJsonPane.classList.add('show', 'active');
+                    tablePane?.classList.remove('show', 'active');
+                }
+            }, 100);
         });
+        
     } catch (error) {
-        console.error('Error in showAddLayerModal:', error);
+        console.error('❌ Critical error in showAddLayerModal:', error);
         showError('Failed to open Add Layer dialog: ' + error.message);
     }
 }
 
+function clearModalConflicts() {
+    // Clear any properties modal references that might interfere
+    window.currentPropertiesLayer = null;
+    
+    // Ensure properties modal is closed
+    const propertiesModal = document.getElementById('layerPropertiesModal');
+    if (propertiesModal && propertiesModal.classList.contains('show')) {
+        const modal = bootstrap.Modal.getInstance(propertiesModal);
+        if (modal) {
+            modal.hide();
+        }
+    }
+    
+    // Clear any editing states
+    if (typeof isTableEditingMode !== 'undefined') {
+        isTableEditingMode = false;
+    }
+    
+    console.log('✅ Modal conflicts cleared');
+
 function resetAddLayerModal() {
     try {
+        console.log('Resetting Add Layer modal...');
+        
         // Clear all form fields
         const fields = [
             'newLayerTable',
@@ -552,6 +643,26 @@ function resetAddLayerModal() {
             uploadProgress.style.display = 'none';
         }
         
+        // Force reset tab visibility and states
+        const tableTab = document.getElementById('table-tab');
+        const geoJsonTab = document.getElementById('geojson-tab');
+        const tablePane = document.getElementById('table-pane');
+        const geoJsonPane = document.getElementById('geojson-pane');
+        
+        if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
+            // Force table tab to be active
+            tableTab.classList.add('active');
+            geoJsonTab.classList.remove('active');
+            
+            // Force table pane to be visible
+            tablePane.classList.add('show', 'active');
+            tablePane.style.display = 'block';
+            geoJsonPane.classList.remove('show', 'active');
+            geoJsonPane.style.display = 'none';
+            
+            console.log('✅ Tabs reset to default state');
+        }
+        
         // Reset button visibility
         const addLayerBtn = document.getElementById('addLayerBtn');
         const uploadGeoJSONBtn = document.getElementById('uploadGeoJSONBtn');
@@ -571,8 +682,10 @@ function resetAddLayerModal() {
         // Clear any error states
         clearModalErrors();
         
+        console.log('✅ Add Layer modal reset complete');
+        
     } catch (error) {
-        console.error('Error in resetAddLayerModal:', error);
+        console.error('❌ Error in resetAddLayerModal:', error);
     }
 }
 
