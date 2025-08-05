@@ -889,84 +889,16 @@
                             <div class="section-content">
                                 <div class="mb-3">
                                     <h6 class="small text-muted mb-2">MEASUREMENT TOOLS</h6>
-                                    
-                                    <!-- Distance Measurement -->
-                                    <div class="measurement-tool-group mb-3">
-                                        <button class="btn btn-outline-primary btn-sm w-100 mb-2" onclick="startMeasurement('distance')" id="distanceMeasureBtn">
-                                            <i class="fas fa-ruler me-1"></i>Measure Distance
-                                        </button>
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <label class="form-label small">Distance Unit:</label>
-                                                <select class="form-select form-select-sm" id="distanceUnit">
-                                                    <option value="meters">Meters (m)</option>
-                                                    <option value="kilometers">Kilometers (km)</option>
-                                                    <option value="feet">Feet (ft)</option>
-                                                    <option value="miles">Miles (mi)</option>
-                                                    <option value="yards">Yards (yd)</option>
-                                                    <option value="nautical_miles">Nautical Miles (nmi)</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label small">Precision:</label>
-                                                <select class="form-select form-select-sm" id="distancePrecision">
-                                                    <option value="0">0 decimals</option>
-                                                    <option value="1">1 decimal</option>
-                                                    <option value="2" selected>2 decimals</option>
-                                                    <option value="3">3 decimals</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Area Measurement -->
-                                    <div class="measurement-tool-group mb-3">
-                                        <button class="btn btn-outline-success btn-sm w-100 mb-2" onclick="startMeasurement('area')" id="areaMeasureBtn">
-                                            <i class="fas fa-vector-square me-1"></i>Measure Area
-                                        </button>
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <label class="form-label small">Area Unit:</label>
-                                                <select class="form-select form-select-sm" id="areaUnit">
-                                                    <option value="square_meters">Square Meters (m²)</option>
-                                                    <option value="square_kilometers">Square Kilometers (km²)</option>
-                                                    <option value="square_feet">Square Feet (ft²)</option>
-                                                    <option value="acres">Acres (ac)</option>
-                                                    <option value="hectares">Hectares (ha)</option>
-                                                    <option value="square_miles">Square Miles (mi²)</option>
-                                                    <option value="square_yards">Square Yards (yd²)</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label small">Precision:</label>
-                                                <select class="form-select form-select-sm" id="areaPrecision">
-                                                    <option value="0">0 decimals</option>
-                                                    <option value="1">1 decimal</option>
-                                                    <option value="2" selected>2 decimals</option>
-                                                    <option value="3">3 decimals</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Measurement Controls -->
                                     <div class="d-grid gap-2">
-                                        <button class="btn btn-outline-warning btn-sm" onclick="toggleMeasurementMode()" id="measurementModeBtn">
-                                            <i class="fas fa-edit me-1"></i>Continuous Mode: OFF
+                                        <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
+                                            <i class="fas fa-ruler me-1"></i>Distance
+                                        </button>
+                                        <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
+                                            <i class="fas fa-vector-square me-1"></i>Area
                                         </button>
                                         <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
-                                            <i class="fas fa-trash me-1"></i>Clear All Measurements
+                                            <i class="fas fa-trash me-1"></i>Clear
                                         </button>
-                                    </div>
-
-                                    <!-- Measurement Results -->
-                                    <div class="mt-3" id="measurementResults" style="display: none;">
-                                        <h6 class="small text-muted mb-2">MEASUREMENT RESULTS</h6>
-                                        <div class="bg-light p-2 rounded">
-                                            <div id="measurementResultsList" class="small">
-                                                <!-- Results will be populated here -->
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 
