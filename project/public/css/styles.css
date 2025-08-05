@@ -618,42 +618,6 @@ body {
     }
 }
 
-/* Custom marker styling */
-.custom-marker-icon {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.custom-marker-icon div {
-    transition: all 0.3s ease;
-}
-
-.custom-marker-icon:hover div {
-    transform: scale(1.2);
-    box-shadow: 0 0 8px rgba(0,0,0,0.6) !important;
-}
-
-/* Selection animation for markers */
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        box-shadow: 0 0 8px rgba(255,255,0,0.6);
-    }
-    50% {
-        transform: scale(1.1);
-        box-shadow: 0 0 12px rgba(255,255,0,0.8);
-    }
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 8px rgba(255,255,0,0.6);
-    }
-}
-
-.custom-marker-icon.selected div {
-    animation: pulse 1s infinite;
-}
-
 /* Fullscreen Map Styles */
 .fullscreen-map {
     position: fixed !important;
