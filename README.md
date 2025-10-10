@@ -92,9 +92,9 @@ git push origin main
 
 3. Update DNS records:
 ```
-A     @              <bolt-ip-address>
-A     *              <bolt-ip-address>
-CNAME www            your-domain.com
+A     @              75.2.60.5
+A     *              75.2.60.5
+CNAME www            site-dns.bolt.host
 ```
 
 ### Linode Deployment (Phase 2 - Production)
@@ -182,7 +182,7 @@ See `docs/database-schema.md` for complete schema documentation.
 2. Click "New Customer"
 3. Enter customer name and subdomain
 4. Configure Teable.io credentials (optional)
-5. Customer site will be available at `http://[subdomain].yourdomain.com`
+5. Customer site will be available at `http://[subdomain].mapz.in`
 
 ### Customizing Customer HTML
 
@@ -226,7 +226,7 @@ Proprietary - All Rights Reserved
 
 ## Support
 
-For support, contact: support@yourdomain.com
+For support, contact: support@mapz.in
 
 ## Roadmap
 

@@ -44,12 +44,12 @@ In your DNS provider:
 
 ```dns
 Type    Name    Value
-A       @       <bolt-ip-address>
-A       *       <bolt-ip-address>
-CNAME   www     yourdomain.com
+A       @       75.2.60.5
+A       *       75.2.60.5
+CNAME   www     site-dns.bolt.host
 ```
 
-This enables wildcard subdomains like `customer1.yourdomain.com`
+This enables wildcard subdomains like `customer1.mapz.in`
 
 4. **Deploy**
 
@@ -58,9 +58,9 @@ This enables wildcard subdomains like `customer1.yourdomain.com`
 
 5. **Create First Admin Account**
 
-- Navigate to `https://yourdomain.com/admin-register.html`
+- Navigate to `http://mapz.in/admin-register.html`
 - Create your super admin account
-- Login at `https://yourdomain.com/admin-login.html`
+- Login at `http://mapz.in/admin-login.html`
 
 6. **Test with 10 Customers**
 
@@ -68,10 +68,10 @@ Create test customers and gather feedback:
 
 ```bash
 # Example subdomains:
-customer1.yourdomain.com
-customer2.yourdomain.com
+customer1.mapz.in
+customer2.mapz.in
 ...
-customer10.yourdomain.com
+customer10.mapz.in
 ```
 
 ---
@@ -164,7 +164,7 @@ Add configuration:
 ```nginx
 server {
     listen 80;
-    server_name yourdomain.com *.yourdomain.com;
+    server_name mapz.in *.mapz.in;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -199,7 +199,7 @@ pm2 startup
 ### 8. Configure SSL with Let's Encrypt
 
 ```bash
-certbot --nginx -d yourdomain.com -d *.yourdomain.com
+certbot --nginx -d mapz.in -d *.mapz.in
 ```
 
 Follow prompts to obtain SSL certificates.
@@ -221,7 +221,7 @@ Point your domain to Linode server:
 Type    Name    Value
 A       @       <linode-ip>
 A       *       <linode-ip>
-CNAME   www     yourdomain.com
+CNAME   www     mapz.in
 ```
 
 ---
@@ -272,12 +272,12 @@ pm2 logs teable-gis
 
 2. **Test main domain:**
 ```bash
-curl https://yourdomain.com
+curl https://mapz.in
 ```
 
 3. **Test subdomain:**
 ```bash
-curl https://customer1.yourdomain.com
+curl https://customer1.mapz.in
 ```
 
 4. **Check Nginx:**
@@ -402,7 +402,7 @@ pm2 restart teable-gis
 
 ```bash
 # Check DNS propagation
-dig customer1.yourdomain.com
+dig customer1.mapz.in
 
 # Check Nginx config
 nginx -t

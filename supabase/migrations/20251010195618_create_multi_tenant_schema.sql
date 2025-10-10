@@ -13,7 +13,7 @@
   **Columns:**
   - `id` (uuid, primary key) - Unique customer identifier
   - `name` (text) - Customer organization name
-  - `subdomain` (text, unique) - Unique subdomain for customer (e.g., "acme" for acme.yourdomain.com)
+  - `subdomain` (text, unique) - Unique subdomain for customer (e.g., "acme" for acme.mapz.in)
   - `custom_domain` (text, nullable) - Optional custom domain (e.g., "maps.acme.com")
   - `status` (text) - Customer status: 'active', 'inactive', 'trial', 'suspended'
   - `logo_url` (text, nullable) - URL to customer's logo

@@ -118,7 +118,7 @@ async function seedDatabase() {
       }
 
       createdCustomers.push(customer || customerData);
-      console.log(`   ✅ ${customerData.name} - ${customerData.subdomain}.yourdomain.com`);
+      console.log(`   ✅ ${customerData.name} - ${customerData.subdomain}.mapz.in`);
     }
 
     console.log(`\n✅ Created ${createdCustomers.length} test customers\n`);
@@ -278,13 +278,13 @@ async function seedDatabase() {
     console.log('   Password: admin123\n');
     console.log('🌐 Test Customer Subdomains:');
     testCustomers.forEach(c => {
-      console.log(`   • ${c.subdomain}.yourdomain.com - ${c.name}`);
+      console.log(`   • ${c.subdomain}.mapz.in - ${c.name}`);
     });
     console.log('\n💡 Next Steps:');
     console.log('   1. Start the server: npm run server');
-    console.log('   2. Login at: http://localhost:3000/admin-login.html');
+    console.log('   2. Login at: http://mapz.in/admin-login.html');
     console.log('   3. Explore customers and customize HTML');
-    console.log('   4. Test subdomain routing once deployed');
+    console.log('   4. Test subdomain routing at http://acme.mapz.in');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
   } catch (error) {

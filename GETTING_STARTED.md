@@ -40,27 +40,27 @@ After logging in, you'll see:
 
 The seed script creates 5 test customers:
 
-1. **Acme Corporation** (`acme.yourdomain.com`)
+1. **Acme Corporation** (`acme.mapz.in`)
    - Status: Active
    - Tier: Pro
    - 10 users, 10,000 map views/month
 
-2. **Global Logistics Inc** (`globallogistics.yourdomain.com`)
+2. **Global Logistics Inc** (`globallogistics.mapz.in`)
    - Status: Active
    - Tier: Enterprise
    - 50 users, 100,000 map views/month
 
-3. **City Planning Department** (`cityplanning.yourdomain.com`)
+3. **City Planning Department** (`cityplanning.mapz.in`)
    - Status: Trial
    - Tier: Starter
    - 5 users, 1,000 map views/month
 
-4. **Environmental Research Group** (`envresearch.yourdomain.com`)
+4. **Environmental Research Group** (`envresearch.mapz.in`)
    - Status: Active
    - Tier: Pro
    - 15 users, 50,000 map views/month
 
-5. **Real Estate Analytics** (`realestate.yourdomain.com`)
+5. **Real Estate Analytics** (`realestate.mapz.in`)
    - Status: Trial
    - Tier: Starter
    - 5 users, 5,000 map views/month
