@@ -1,0 +1,577 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Enhanced Dashboard Styles */
+        .dashboard-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 30px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .dashboard-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.1"><circle cx="30" cy="30" r="2"/></g></svg>') repeat;
+            opacity: 0.3;
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .welcome-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .enhanced-stats-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .enhanced-stats-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-bg);
+            border-radius: 20px 20px 0 0;
+        }
+        
+        .enhanced-stats-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        }
+        
+        .enhanced-stats-card.primary::before { background: linear-gradient(45deg, #667eea, #764ba2); }
+        .enhanced-stats-card.success::before { background: linear-gradient(45deg, #28a745, #20c997); }
+        .enhanced-stats-card.info::before { background: linear-gradient(45deg, #17a2b8, #6f42c1); }
+        .enhanced-stats-card.warning::before { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        
+        .stats-icon-enhanced {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        
+        .stats-content-enhanced h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(45deg, #333, #666);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stats-content-enhanced p {
+            color: #6c757d;
+            margin: 0.5rem 0 0 0;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        
+        .trend-indicator {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .quick-actions-section {
+            background: white;
+            border-radius: 25px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            margin: 2rem 0;
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .enhanced-action-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .enhanced-action-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent, rgba(102, 126, 234, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .enhanced-action-card:hover::before {
+            opacity: 1;
+        }
+        
+        .enhanced-action-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+        
+        .action-icon-enhanced {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .enhanced-action-card h5 {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+            font-size: 1.25rem;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .enhanced-action-card p {
+            color: #6c757d;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            flex-grow: 1;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .enhanced-btn {
+            padding: 0.75rem 2rem;
+            border-radius: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+        }
+        
+        .enhanced-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .enhanced-btn:hover::before {
+            left: 100%;
+        }
+        
+        .activity-feed {
+            background: white;
+            border-radius: 25px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            margin-top: 2rem;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            font-size: 1rem;
+        }
+        
+        .activity-content h6 {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .activity-content small {
+            color: #6c757d;
+            font-size: 0.8rem;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-hero {
+                padding: 2rem 0;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .enhanced-action-card {
+                padding: 1.5rem;
+            }
+            
+            .action-icon-enhanced {
+                width: 80px;
+                height: 80px;
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-vh-100 bg-light">
+        <!-- Enhanced Hero Section -->
+        <div class="dashboard-hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <h1 class="display-4 fw-bold mb-3">
+                                <i class="fas fa-database me-3"></i>
+                                Welcome to Teable GIS System
+                            </h1>
+                            <p class="lead mb-0">Your comprehensive spatial data management and visualization platform</p>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="welcome-card">
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="fas fa-user-circle fa-3x"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1" id="userDisplayHero">Loading...</h6>
+                                        <small class="opacity-75">System Administrator</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav position-sticky top-0" style="z-index: 1020;">
+            <div class="container-fluid">
+                <span class="navbar-brand">
+                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                </span>
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <span class="nav-text text-white me-3" id="userDisplay"></span>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>Account
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="showProfile()">
+                                <i class="fas fa-user-circle me-2"></i>Profile
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid py-4">
+            <!-- Enhanced Stats Cards -->
+            <div class="stats-grid">
+                <div class="enhanced-stats-card primary">
+                    <div class="trend-indicator">
+                        <i class="fas fa-arrow-up me-1"></i>+12%
+                    </div>
+                    <div class="stats-icon-enhanced" style="background: linear-gradient(45deg, #667eea, #764ba2);">
+                        <i class="fas fa-table"></i>
+                    </div>
+                    <div class="stats-content-enhanced">
+                        <h2 id="statTables">-</h2>
+                        <p>Data Tables</p>
+                    </div>
+                </div>
+                
+                <div class="enhanced-stats-card success">
+                    <div class="trend-indicator">
+                        <i class="fas fa-arrow-up me-1"></i>+8%
+                    </div>
+                    <div class="stats-icon-enhanced" style="background: linear-gradient(45deg, #28a745, #20c997);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stats-content-enhanced">
+                        <h2 id="statUsers">-</h2>
+                        <p>Active Users</p>
+                    </div>
+                </div>
+                
+                <div class="enhanced-stats-card info">
+                    <div class="trend-indicator">
+                        <i class="fas fa-arrow-up me-1"></i>+24%
+                    </div>
+                    <div class="stats-icon-enhanced" style="background: linear-gradient(45deg, #17a2b8, #6f42c1);">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="stats-content-enhanced">
+                        <h2 id="statRecords">-</h2>
+                        <p>Data Records</p>
+                    </div>
+                </div>
+                
+                <div class="enhanced-stats-card warning">
+                    <div class="trend-indicator">
+                        <i class="fas fa-arrow-up me-1"></i>+16%
+                    </div>
+                    <div class="stats-icon-enhanced" style="background: linear-gradient(45deg, #ffc107, #fd7e14);">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stats-content-enhanced">
+                        <h2 id="statActivity">-</h2>
+                        <p>Recent Activity</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Section -->
+            <div class="quick-actions-section">
+                <div class="section-header">
+                    <h4 class="section-title">
+                        <i class="fas fa-bolt"></i>
+                        Quick Actions
+                    </h4>
+                    <small class="text-muted">Choose an action to get started</small>
+                </div>
+                
+                <div class="row g-4" id="quickActions">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-users text-primary"></i>
+                            </div>
+                            <h5>User Management</h5>
+                            <p>Add, edit, and manage system users with comprehensive role-based permissions and access controls</p>
+                            <button class="btn btn-primary enhanced-btn" onclick="window.location.href='users.html'">
+                                <i class="fas fa-user-cog me-1"></i>Manage Users
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-4 col-lg-6 col-md-6">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-shield-alt text-success"></i>
+                            </div>
+                            <h5>Field Permissions</h5>
+                            <p>Configure granular field-level permissions for tables and users with advanced security settings</p>
+                            <button class="btn btn-success enhanced-btn" onclick="window.location.href='permissions.html'">
+                                <i class="fas fa-key me-1"></i>Set Permissions
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-4 col-lg-6 col-md-6">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-table text-info"></i>
+                            </div>
+                            <h5>Data Management</h5>
+                            <p>View and edit table data with advanced filtering, sorting, and bulk operations capabilities</p>
+                            <button class="btn btn-info enhanced-btn" onclick="window.location.href='table.html'">
+                                <i class="fas fa-database me-1"></i>Manage Data
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-4 col-lg-6 col-md-6" id="mapConfigCard">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-cog text-warning"></i>
+                            </div>
+                            <h5>Map Configuration</h5>
+                            <p>Configure public map settings, layers, styling, and permissions for optimal visualization</p>
+                            <button class="btn btn-warning enhanced-btn" onclick="window.location.href='map-config.html'">
+                                <i class="fas fa-map-marked-alt me-1"></i>Configure Map
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-4 col-lg-6 col-md-6" id="logsCard">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-history text-danger"></i>
+                            </div>
+                            <h5>Data Change Logs</h5>
+                            <p>Complete audit trail of all data modifications, changes, and system activities</p>
+                            <button class="btn btn-danger enhanced-btn" onclick="window.location.href='logs.html'">
+                                <i class="fas fa-clipboard-list me-1"></i>View Logs
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-4 col-lg-6 col-md-6">
+                        <div class="enhanced-action-card">
+                            <div class="action-icon-enhanced">
+                                <i class="fas fa-map text-primary"></i>
+                            </div>
+                            <h5>Interactive Map</h5>
+                            <p>Advanced GIS map with visualization tools, spatial analysis, and interactive features</p>
+                            <button class="btn btn-primary enhanced-btn" onclick="window.location.href='map.html'">
+                                <i class="fas fa-map me-1"></i>Open Map
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div class="activity-feed">
+                <div class="section-header">
+                    <h5 class="section-title">
+                        <i class="fas fa-pulse"></i>
+                        Recent Activity
+                    </h5>
+                    <a href="logs.html" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                
+                <div id="activityFeed">
+                    <div class="activity-item">
+                        <div class="activity-icon bg-primary">
+                            <i class="fas fa-plus text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>New user registered</h6>
+                            <small>A new user has been added to the system</small>
+                        </div>
+                        <small class="text-muted ms-auto">2 min ago</small>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon bg-info">
+                            <i class="fas fa-edit text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>Data updated</h6>
+                            <small>Table records have been modified</small>
+                        </div>
+                        <small class="text-muted ms-auto">5 min ago</small>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <div class="activity-icon bg-success">
+                            <i class="fas fa-check text-white"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>Permissions updated</h6>
+                            <small>Field permissions have been configured</small>
+                        </div>
+                        <small class="text-muted ms-auto">10 min ago</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

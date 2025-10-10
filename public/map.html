@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map View - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://unpkg.com/pannellum/build/pannellum.css" />
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .app-container {
+            display: flex;
+            height: calc(100vh - 120px);
+        }
+
+        .sidebar {
+            width: 380px;
+            background: #2c3e50;
+            color: white;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 15px;
+            background: #34495e;
+            border-bottom: 1px solid #445566;
+        }
+
+        .sidebar-content {
+            padding: 10px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #34495e;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-content {
+            padding: 15px;
+            display: none;
+        }
+
+        .section.active .section-content {
+            display: block;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .layer-item {
+            background: #1a252f;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .layer-item:hover {
+            background: #243342;
+        }
+
+        .layer-item.active {
+            border-color: #3498db;
+            background: #1e3a5f;
+        }
+
+        .layer-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .layer-controls button {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .btn-zoom { background: #3498db; color: white; }
+        .btn-table { background: #2ecc71; color: white; }
+        .btn-properties { background: #f39c12; color: white; }
+        .btn-remove { background: #e74c3c; color: white; }
+
+        .form-control {
+            background: #34495e;
+            color: white;
+            border-color: #445566;
+        }
+
+        .form-control:focus {
+            background: #34495e;
+            color: white;
+            border-color: #3498db;
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+
+        .btn {
+            margin: 2px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            border-color: #3498db;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            border-color: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            border-color: #e74c3c;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            border-color: #f39c12;
+        }
+
+        .filter-rule {
+            background: #1a252f;
+            border: 1px solid #445566;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .geojson-upload {
+            border: 2px dashed #445566;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #34495e;
+            color: white;
+        }
+
+        .geojson-upload:hover {
+            border-color: #3498db;
+            background-color: #2c3e50;
+        }
+
+        .geojson-upload.dragover {
+            border-color: #27ae60;
+            background-color: #1e3a2e;
+        }
+
+        .linked-field {
+            background: #e8f4fd;
+            border: 1px solid #b3d7ff;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.85rem;
+            color: #0066cc;
+        }
+
+        .linked-field .link-icon {
+            color: #0066cc;
+            margin-right: 4px;
+        }
+
+        /* Layer Properties Modal Styles */
+        .properties-modal {
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        .properties-modal .modal-content {
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties-modal .modal-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .properties-modal .modal-footer {
+            flex-shrink: 0;
+            background: #f8f9fa;
+        }
+
+        .properties-tabs {
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .properties-tab {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            color: #6c757d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .properties-tab.active {
+            color: #0d6efd;
+            border-bottom-color: #0d6efd;
+        }
+
+        .properties-tab:hover {
+            color: #495057;
+        }
+
+        .tab-content {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .symbology-controls {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .color-ramp {
+            display: flex;
+            height: 20px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .color-stop {
+            flex: 1;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            margin-right: 10px;
+            border: 1px solid #333;
+        }
+
+        /* Feature label styling */
+        .feature-label {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border: 1px solid #333 !important;
+            border-radius: 3px !important;
+            padding: 2px 6px !important;
+            font-weight: bold !important;
+            font-size: 12px !important;
+            color: #333 !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+        }
+
+        .feature-label:before {
+            display: none !important;
+        }
+
+        /* Enhanced label styling for better visibility */
+        .enhanced-feature-label {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 2px solid #2c3e50 !important;
+            border-radius: 6px !important;
+            padding: 4px 8px !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+            color: #2c3e50 !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8) !important;
+            white-space: nowrap !important;
+            pointer-events: none !important;
+            z-index: 1000 !important;
+            line-height: 1.2 !important;
+            min-width: 40px !important;
+            text-align: center !important;
+        }
+
+        .enhanced-feature-label:before {
+            display: none !important;
+        }
+
+        /* Reduce feature opacity when labels are enabled */
+        .labeled-feature {
+            fill-opacity: 0.5 !important;
+            stroke-opacity: 0.8 !important;
+        }
+
+        .popup-field-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .field-checkbox {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .field-checkbox input {
+            margin-right: 8px;
+        }
+
+        /* Docked Attribute Table Styles */
+        .docked-attribute-table {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30%;
+            background: white;
+            border-top: 2px solid #3498db;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            transition: height 0.3s ease;
+        }
+
+        .docked-attribute-table.expanded {
+            height: 60%;
+        }
+
+        .docked-table-header {
+            background: #3498db;
+            color: white;
+            padding: 8px 15px;
+            border-bottom: 1px solid #2980b9;
+        }
+
+        .docked-table-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .docked-table-toolbar {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #dee2e6;
+            flex-shrink: 0;
+        }
+
+        .docked-table-content {
+            flex: 1;
+            overflow: auto;
+            background: white;
+        }
+
+        .docked-table-content table {
+            font-size: 0.9rem;
+        }
+
+        .docked-table-content .table th {
+            position: sticky;
+            top: 0;
+            background: #343a40;
+            color: white;
+            z-index: 10;
+        }
+
+        /* Adjust map container for docked table */
+        .map-container {
+            position: relative;
+        }
+
+        .btn-xs {
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+        /* Permission Indicators */
+        .permission-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .permission-view {
+            background-color: #17a2b8;
+        }
+
+        .permission-edit {
+            background-color: #28a745;
+        }
+
+        .permission-hidden {
+            background-color: #dc3545;
+        }
+
+        .field-editable {
+            border-left: 3px solid #28a745 !important;
+        }
+
+        .field-viewonly {
+            border-left: 3px solid #17a2b8 !important;
+        }
+
+        .field-hidden {
+            border-left: 3px solid #dc3545 !important;
+        }
+
+        /* Enhanced table styling for permissions */
+        .editable-cell {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .editable-cell:hover {
+            background-color: #f8f9fa;
+        }
+
+        .readonly-cell {
+            background-color: #f8f9fa;
+        }
+
+        /* Permission tooltips */
+        .permission-indicator[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+
+        /* Drone imagery and custom tiles styling */
+        .zoom-display {
+            background: rgba(255, 255, 255, 0.9) !important;
+            padding: 5px 10px !important;
+            border-radius: 5px !important;
+            font-size: 12px !important;
+            font-weight: bold !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+            border: 1px solid #ddd !important;
+        }
+
+        /* Customer context indicator */
+        .customer-context-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            z-index: 1000;
+        }
+
+        /* Drone imagery availability indicator */
+        .drone-available {
+            background: #28a745 !important;
+        }
+
+        .drone-unavailable {
+            background: #6c757d !important;
+        }
+
+        /* High zoom level notification */
+        .zoom-notification {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(40, 167, 69, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            20%, 80% { opacity: 1; }
+        }
+
+        /* Basemap selector drone imagery option styling */
+        option[value="drone_imagery"] {
+            background: #e7f3ff;
+            color: #0066cc;
+            font-weight: bold;
+        }
+
+        /* Tile loading error styling */
+        .leaflet-tile-loaded {
+            opacity: 1;
+        }
+
+        .leaflet-tile-fade-in {
+            animation: tileLoading 0.2s;
+        }
+
+        @keyframes tileLoading {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* 360 Imagery Styles */
+        .camera-360-marker {
+            transition: transform 0.2s ease;
+        }
+
+        .camera-360-marker:hover {
+            transform: scale(1.1);
+        }
+
+        .360-preview {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .360-preview::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0,123,255,0.1) 0%, rgba(0,123,255,0.3) 100%);
+            pointer-events: none;
+        }
+
+        #panorama360 {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Pannellum custom styling */
+        .pnlm-container {
+            border-radius: 8px !important;
+            position: relative;
+        }
+
+        .pannellum-custom-controls {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .pannellum-custom-controls button {
+            outline: none;
+            user-select: none;
+        }
+
+        .pannellum-custom-controls button:focus {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+        }
+
+        .pnlm-ui .pnlm-controls {
+            background: rgba(0, 0, 0, 0.7) !important;
+            border-radius: 8px !important;
+        }
+
+        .pnlm-ui .pnlm-control {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 4px !important;
+            margin: 2px !important;
+        }
+
+        .pnlm-ui .pnlm-control:hover {
+            background: rgba(255, 255, 255, 1) !important;
+        }
+
+        /* Media Layer Styles */
+        .media-marker {
+            transition: transform 0.2s ease;
+            border-radius: 50%;
+        }
+
+        .media-marker:hover {
+            transform: scale(1.15);
+        }
+
+        .video-marker {
+            background: linear-gradient(45deg, #ff4757, #ff3838);
+            color: white;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(255, 71, 87, 0.4);
+        }
+
+        .audio-marker {
+            background: linear-gradient(45deg, #5f27cd, #7c4dff);
+            color: white;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(95, 39, 205, 0.4);
+        }
+
+        .image-marker {
+            background: linear-gradient(45deg, #00d2d3, #54a0ff);
+            color: white;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(0, 210, 211, 0.4);
+        }
+
+        .pdf-marker {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+        }
+
+        /* Media Viewer Styles */
+        .video-container, .image-container {
+            cursor: pointer;
+        }
+
+        .audio-waveform {
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .pdf-toolbar {
+            background: #f8f9fa !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+
+        .pdf-container {
+            text-align: center;
+            padding: 20px;
+        }
+
+        #pdfCanvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Media preview in popups */
+        .media-preview {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .media-preview::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .media-preview-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .media-preview-button:hover {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        /* Image zoom functionality */
+        .image-container img {
+            cursor: zoom-in;
+        }
+
+        .image-container img.zoomed {
+            cursor: zoom-out;
+        }
+
+        /* Media type badges */
+        .media-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .badge-video { background: #ff4757; color: white; }
+        .badge-audio { background: #5f27cd; color: white; }
+        .badge-image { background: #00d2d3; color: white; }
+        .badge-pdf { background: #ff6b6b; color: white; }
+        .badge-360 { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <div class="min-vh-100 bg-light">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="dashboard.html">
+                    <i class="fas fa-database me-2"></i>Teable GIS System
+                </a>
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <span class="nav-text text-white me-3" id="userDisplay"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4><i class="fas fa-map me-2"></i>Advanced GIS Map View</h4>
+                    <p class="text-muted mb-0">Multi-layer visualization with advanced filtering, styling, and GeoJSON support</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportMap()">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                    <button class="btn btn-primary" onclick="fullscreenMap()">
+                        <i class="fas fa-expand me-1"></i>Fullscreen
+                    </button>
+                </div>
+            </div>
+
+            <!-- App Container -->
+            <div class="app-container">
+                <!-- Sidebar -->
+                <div class="sidebar">
+                    <div class="sidebar-header">
+                        <h5><i class="fas fa-layer-group me-2"></i>Map Layers & Tools</h5>
+                    </div>
+
+                    <div class="sidebar-content">
+                        <!-- Base Maps Section -->
+                        <div class="section active">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-map me-2"></i>Base Maps</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <select class="form-control" id="basemapSelector" onchange="changeBasemap()">
+                                    <option value="openstreetmap">OpenStreetMap</option>
+                                    <option value="satellite">Satellite</option>
+                                    <option value="terrain">Terrain</option>
+                                    <option value="dark">Dark Mode</option>
+                                    <!-- Drone imagery option will be dynamically added if available -->
+                                </select>
+                                <small class="text-muted mt-1">Drone imagery auto-detected for customer context</small>
+                            </div>
+                        </div>
+
+                        <!-- Data Layers Section -->
+                        <div class="section active">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-database me-2"></i>Data Layers</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <button class="btn btn-success w-100 mb-3" onclick="showAddLayerModal()">
+                                    <i class="fas fa-plus me-1"></i>Add Layer
+                                </button>
+                                <div id="layersList">
+                                    <!-- Layers will be populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters Section -->
+                        <div class="section">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-filter me-2"></i>Filters</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <div class="mb-3">
+                                    <label class="form-label">Layer:</label>
+                                    <select class="form-control" id="filterLayer" onchange="loadFilterFields()">
+                                        <option value="">Select layer...</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Field:</label>
+                                    <select class="form-control" id="filterField" onchange="loadFilterValues()">
+                                        <option value="">Select field...</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Operator:</label>
+                                    <select class="form-control" id="filterOperator">
+                                        <option value="equals">Equals</option>
+                                        <option value="contains">Contains</option>
+                                        <option value="starts_with">Starts With</option>
+                                        <option value="greater_than">Greater Than</option>
+                                        <option value="less_than">Less Than</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Value:</label>
+                                    <select class="form-control" id="filterValue">
+                                        <option value="">Select value...</option>
+                                    </select>
+                                </div>
+
+                                <button class="btn btn-primary btn-sm" onclick="addFilterRule()">
+                                    <i class="fas fa-plus me-1"></i>Add Filter
+                                </button>
+
+                                <div id="filterRules" class="mt-3"></div>
+
+                                <div class="mt-3">
+                                    <button class="btn btn-success btn-sm" onclick="applyFilters()">
+                                        <i class="fas fa-check me-1"></i>Apply
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="clearAllFilters()">
+                                        <i class="fas fa-times me-1"></i>Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tools Section -->
+                        <div class="section">
+                            <div class="section-header" onclick="toggleSection(this)">
+                                <span><i class="fas fa-tools me-2"></i>Tools</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="section-content">
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">MEASUREMENT TOOLS</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary btn-sm" onclick="startMeasurement('distance')">
+                                            <i class="fas fa-ruler me-1"></i>Distance
+                                        </button>
+                                        <button class="btn btn-outline-success btn-sm" onclick="startMeasurement('area')">
+                                            <i class="fas fa-vector-square me-1"></i>Area
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="clearMeasurements()">
+                                            <i class="fas fa-trash me-1"></i>Clear
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">ZOOM CONTROLS</h6>
+                                    <div class="row g-1">
+                                        <div class="col-6">
+                                            <button class="btn btn-outline-info btn-sm w-100" onclick="map.zoomIn()">
+                                                <i class="fas fa-plus"></i> In
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button class="btn btn-outline-info btn-sm w-100" onclick="map.zoomOut()">
+                                                <i class="fas fa-minus"></i> Out
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-secondary btn-sm w-100" onclick="resetMapView()">
+                                            <i class="fas fa-globe me-1"></i>Reset View
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-warning btn-sm w-100" onclick="zoomToAllLayers()">
+                                            <i class="fas fa-expand me-1"></i>Fit All Layers
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <button class="btn btn-outline-success btn-sm w-100" onclick="zoomToDroneImageryLevel()">
+                                            <i class="fas fa-helicopter me-1"></i>Drone View
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="small text-muted mb-2">HIGH-DETAIL IMAGERY</h6>
+                                    <div class="alert alert-info p-2">
+                                        <small>
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            <strong>Drone Imagery:</strong> Available at zoom levels 18-25 for enhanced detail viewing.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Container -->
+                <div class="map-container">
+                    <div id="map"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Layer Modal -->
+    <div class="modal fade" id="addLayerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Add New Layer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Layer Source Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="layerSourceTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-pane" type="button" role="tab">
+                                <i class="fas fa-table me-1"></i>From Table
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="geojson-tab" data-bs-toggle="tab" data-bs-target="#geojson-pane" type="button" role="tab">
+                                <i class="fas fa-upload me-1"></i>Upload GeoJSON
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="layerSourceContent">
+                        <!-- From Table Tab -->
+                        <div class="tab-pane fade show active" id="table-pane" role="tabpanel">
+                            <div class="mb-3">
+                                <label class="form-label">Data Source (Table):</label>
+                                <select class="form-select" id="newLayerTable" onchange="loadTableFields()">
+                                    <option value="">Select table...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Layer Name:</label>
+                                <input type="text" class="form-control" id="newLayerName" placeholder="Enter layer name">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Layer Color:</label>
+                                <input type="color" class="form-control form-control-color" id="newLayerColor" value="#3498db">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Geometry Field:</label>
+                                <select class="form-select" id="newLayerGeometry">
+                                    <option value="">Auto-detect...</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Linked Tables:</label>
+                                <div id="linkedTablesInfo" class="small text-muted">
+                                    Loading linked table information...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload GeoJSON Tab -->
+                        <div class="tab-pane fade" id="geojson-pane" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Admin/Creator Only:</strong> This feature creates a new table in your Teable.io base.
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">New Table Name:</label>
+                                <input type="text" class="form-control" id="geoJSONTableName" placeholder="Enter table name for the uploaded data">
+                            </div>
+
+                            <div class="geojson-upload" id="geoJSONUploadArea" onclick="document.getElementById('geoJSONFileInput').click()">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <h5>Drop GeoJSON file here or click to browse</h5>
+                                <p class="text-muted">Supports .geojson and .json files (max 10MB)</p>
+                                <input type="file" id="geoJSONFileInput" accept=".geojson,.json" style="display: none;" onchange="handleGeoJSONFile(event)">
+                            </div>
+
+                            <div id="geoJSONPreview" class="mt-3" style="display: none;">
+                                <h6>File Preview:</h6>
+                                <div class="border rounded p-3 bg-light">
+                                    <div id="geoJSONInfo"></div>
+                                </div>
+                            </div>
+
+                            <div id="uploadProgress" class="mt-3" style="display: none;">
+                                <div class="progress">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="text-center mt-2">
+                                    <small id="uploadStatus">Preparing upload...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="addLayerBtn" onclick="addNewLayer()">
+                        <i class="fas fa-plus me-1"></i>Add Layer
+                    </button>
+                    <button type="button" class="btn btn-primary" id="uploadGeoJSONBtn" onclick="uploadGeoJSON()" style="display: none;" disabled>
+                        <i class="fas fa-upload me-1"></i>Upload & Create Table
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layer Properties Modal -->
+    <div class="modal fade" id="layerPropertiesModal" tabindex="-1">
+        <div class="modal-dialog modal-xl properties-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-cog me-2"></i>Layer Properties
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- Properties Tabs -->
+                    <div class="properties-tabs d-flex">
+                        <button class="properties-tab active" onclick="switchPropertiesTab('information')">
+                            <i class="fas fa-info-circle me-2"></i>Information
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('symbology')">
+                            <i class="fas fa-palette me-2"></i>Symbology
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('labels')">
+                            <i class="fas fa-tag me-2"></i>Labels
+                        </button>
+                        <button class="properties-tab" onclick="switchPropertiesTab('itool')">
+                            <i class="fas fa-info me-2"></i>iTool
+                        </button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content">
+                        <!-- Information Tab -->
+                        <div id="information-tab" class="tab-pane active">
+                            <h6>Layer Information</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Layer Name:</label>
+                                        <input type="text" class="form-control" id="propLayerName">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Data Source:</label>
+                                        <input type="text" class="form-control" id="propDataSource" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Geometry Type:</label>
+                                        <input type="text" class="form-control" id="propGeometryType" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Feature Count:</label>
+                                        <input type="text" class="form-control" id="propFeatureCount" readonly>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Linked Tables:</label>
+                                        <div id="propLinkedTables" class="border rounded p-2" style="min-height: 60px;">
+                                            <!-- Linked tables will be shown here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Symbology Tab -->
+                        <div id="symbology-tab" class="tab-pane" style="display: none;">
+                            <h6>Symbology</h6>
+                            <div class="symbology-controls">
+                                <div class="mb-3">
+                                    <label class="form-label">Symbology Type:</label>
+                                    <select class="form-select" id="propSymbologyType" onchange="updateSymbologyType()">
+                                        <option value="single">Single Symbol</option>
+                                        <option value="graduated">Graduated</option>
+                                        <option value="categorized">Categorized</option>
+                                    </select>
+                                </div>
+
+                                <!-- Single Symbol Controls -->
+                                <div id="propSingleSymbol">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Fill Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propFillColor" value="#3498db">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Border Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propBorderColor" value="#2c3e50">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Border Width:</label>
+                                            <input type="range" class="form-range" id="propBorderWidth" min="1" max="5" value="2">
+                                            <div class="text-center small"><span id="borderWidthValue">2px</span></div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Fill Opacity:</label>
+                                            <input type="range" class="form-range" id="propFillOpacity" min="0" max="1" step="0.1" value="0.7">
+                                            <div class="text-center small"><span id="fillOpacityValue">70%</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Graduated Controls -->
+                                <div id="propGraduated" style="display: none;">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Field:</label>
+                                            <select class="form-select" id="propGraduatedField">
+                                                <option value="">Select numeric field...</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Classes:</label>
+                                            <select class="form-select" id="propGraduatedClasses">
+                                                <option value="3">3</option>
+                                                <option value="5" selected>5</option>
+                                                <option value="7">7</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">Method:</label>
+                                            <select class="form-select" id="propClassificationMethod">
+                                                <option value="equal">Equal Interval</option>
+                                                <option value="quantile">Quantile</option>
+                                                <option value="natural">Natural Breaks</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Color Ramp:</label>
+                                        <select class="form-select" id="propColorRamp">
+                                            <option value="blues">Blues</option>
+                                            <option value="greens">Greens</option>
+                                            <option value="reds">Reds</option>
+                                            <option value="oranges">Oranges</option>
+                                            <option value="purples">Purples</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-primary" onclick="generateGraduatedSymbology()">
+                                        <i class="fas fa-magic me-1"></i>Generate
+                                    </button>
+                                    <div id="propGraduatedLegend" class="mt-3"></div>
+                                </div>
+
+                                <!-- Categorized Controls -->
+                                <div id="propCategorized" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Field:</label>
+                                        <select class="form-select" id="propCategorizedField">
+                                            <option value="">Select field...</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-primary" onclick="generateCategorizedSymbology()">
+                                        <i class="fas fa-magic me-1"></i>Generate
+                                    </button>
+                                    <div id="propCategorizedLegend" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Labels Tab -->
+                        <div id="labels-tab" class="tab-pane" style="display: none;">
+                            <h6>Labels</h6>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="propEnableLabels">
+                                <label class="form-check-label" for="propEnableLabels">
+                                    Enable Labels
+                                </label>
+                            </div>
+
+                            <div id="propLabelControls" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Label Field:</label>
+                                            <select class="form-select" id="propLabelField">
+                                                <option value="">Select field...</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Font Size:</label>
+                                            <select class="form-select" id="propLabelSize">
+                                                <option value="10">10px</option>
+                                                <option value="12" selected>12px</option>
+                                                <option value="14">14px</option>
+                                                <option value="16">16px</option>
+                                                <option value="18">18px</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Label Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="propLabelColor" value="#333333">
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propLabelBackground" checked>
+                                            <label class="form-check-label" for="propLabelBackground">
+                                                Show Background
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- iTool Tab -->
+                        <div id="itool-tab" class="tab-pane" style="display: none;">
+                            <h6><i class="fas fa-info-circle me-2"></i>Information Tool Configuration</h6>
+                            <p class="text-muted">Configure what information is displayed when features are clicked.</p>
+
+                            <!-- Popup Enable/Disable -->
+                            <div class="mb-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="propEnablePopups" checked>
+                                    <label class="form-check-label" for="propEnablePopups">
+                                        <strong>Enable Popups</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">Turn on/off popup information display for this layer</small>
+                            </div>
+
+                            <!-- Popup Template Configuration -->
+                            <div id="popupConfigSection">
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-window-restore me-1"></i>Popup Template:</label>
+                                    <select class="form-select" id="propPopupTemplate">
+                                        <option value="default">Default (Field List)</option>
+                                        <option value="table">Table Format</option>
+                                        <option value="card">Card Format</option>
+                                        <option value="custom">Custom HTML Template</option>
+                                    </select>
+                                </div>
+
+                                <!-- Field Selection Section -->
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0"><i class="fas fa-list me-1"></i>Show Fields in Popup:</label>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" onclick="selectAllPopupFields()">
+                                                <i class="fas fa-check-square me-1"></i>Select All
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" onclick="deselectAllPopupFields()">
+                                                <i class="fas fa-square me-1"></i>Deselect All
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                        <div id="propPopupFields">
+                                            <!-- Fields will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Advanced Popup Settings -->
+                                <div class="accordion mb-3" id="advancedPopupSettings">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSettings">
+                                                <i class="fas fa-cogs me-2"></i>Advanced Settings
+                                            </button>
+                                        </h2>
+                                        <div id="advancedSettings" class="accordion-collapse collapse">
+                                            <div class="accordion-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Max Popup Width (px):</label>
+                                                            <input type="number" class="form-control" id="propMaxPopupWidth" value="300" min="200" max="800">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Max Field Value Length:</label>
+                                                            <input type="number" class="form-control" id="propMaxFieldLength" value="100" min="50" max="500">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Popup Position:</label>
+                                                            <select class="form-select" id="propPopupPosition">
+                                                                <option value="auto">Auto</option>
+                                                                <option value="top">Above Feature</option>
+                                                                <option value="bottom">Below Feature</option>
+                                                                <option value="center">At Feature Center</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propShowEmptyFields">
+                                                            <label class="form-check-label" for="propShowEmptyFields">
+                                                                Show fields with empty values
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Field Display Options -->
+                                <div class="accordion mb-3" id="fieldDisplayOptions">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#fieldOptions">
+                                                <i class="fas fa-text-width me-2"></i>Field Display Options
+                                            </button>
+                                        </h2>
+                                        <div id="fieldOptions" class="accordion-collapse collapse">
+                                            <div class="accordion-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propShowFieldIcons" checked>
+                                                            <label class="form-check-label" for="propShowFieldIcons">
+                                                                Show field type icons
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propHighlightLinks" checked>
+                                                            <label class="form-check-label" for="propHighlightLinks">
+                                                                Auto-detect and highlight URLs
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propShowTooltips">
+                                                            <label class="form-check-label" for="propShowTooltips">
+                                                                Show tooltips for long values
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propEnableSearch">
+                                                            <label class="form-check-label" for="propEnableSearch">
+                                                                Enable search within popup
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propShowCopyButtons">
+                                                            <label class="form-check-label" for="propShowCopyButtons">
+                                                                Show copy buttons for field values
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="propEnableFieldSorting">
+                                                            <label class="form-check-label" for="propEnableFieldSorting">
+                                                                Allow field reordering
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Custom Template Editor -->
+                                <div id="customTemplateSection" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Custom HTML Template:</label>
+                                        <textarea class="form-control" id="propCustomTemplate" rows="6" placeholder="Enter custom HTML template using {{fieldName}} placeholders..."></textarea>
+                                        <small class="text-muted">Use {{fieldName}} to insert field values. Available fields will be shown below.</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Available Fields:</label>
+                                        <div id="availableFieldsHelp" class="border rounded p-2 bg-light">
+                                            <!-- Available fields will be listed here -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Popup Preview -->
+                                <div class="mb-3">
+                                    <label class="form-label"><i class="fas fa-eye me-1"></i>Popup Preview:</label>
+                                    <div class="border rounded p-3 bg-light" id="popupPreview" style="min-height: 100px;">
+                                        <div class="text-muted text-center">
+                                            <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
+                                            <p>Click "Preview" to see how the popup will appear</p>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="previewPopup()">
+                                        <i class="fas fa-eye me-1"></i>Preview Popup
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Popup Controls Configuration -->
+                            <div class="mb-3">
+                                <h6><i class="fas fa-tools me-2"></i>Popup Controls</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propShowZoomControls" checked>
+                                            <label class="form-check-label" for="propShowZoomControls">
+                                                Show zoom controls in popup
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propShowCenterControl" checked>
+                                            <label class="form-check-label" for="propShowCenterControl">
+                                                Show center control
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propShowExportControl">
+                                            <label class="form-check-label" for="propShowExportControl">
+                                                Show export feature control
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="propShowEditControl">
+                                            <label class="form-check-label" for="propShowEditControl">
+                                                Show edit feature control (if enabled)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Show Fields in Popup</span>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="selectAllPopupFields()">Select All</button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllPopupFields()">Deselect All</button>
+                                    </div>
+                                </div>
+                                <div class="popup-field-selector" id="propPopupFields">
+                                    <!-- Popup fields will be populated here -->
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Max Popup Width:</label>
+                                        <input type="number" class="form-control" id="propMaxPopupWidth" value="300" min="200" max="600">
+                                        <div class="form-text">Width in pixels (200-600)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="propShowLinkedData" checked>
+                                        <label class="form-check-label" for="propShowLinkedData">
+                                            Show Linked Table Data
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancelProperties()">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="applyProperties()">
+                        <i class="fas fa-check me-1"></i>Apply
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="applyAndCloseProperties()">
+                        <i class="fas fa-save me-1"></i>OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 360 Image Viewer Modal -->
+    <div class="modal fade" id="image360Modal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-360-degrees me-2"></i>360° Image Viewer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="panorama360" style="width: 100%; height: 80vh;"></div>
+                    <div class="p-3">
+                        <div id="image360Info" class="small text-muted">
+                            <!-- 360 image metadata will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="fullscreen360()">
+                        <i class="fas fa-expand me-1"></i>Fullscreen
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Viewer Modal -->
+    <div class="modal fade" id="videoModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-video me-2"></i>Video Player
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0 bg-dark">
+                    <div class="video-container d-flex justify-content-center align-items-center" style="height: 80vh;">
+                        <video id="videoPlayer" controls preload="metadata" style="max-width: 100%; max-height: 100%;">
+                            <source id="videoSource" src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <div class="p-3 bg-white">
+                        <div id="videoInfo" class="small text-muted">
+                            <!-- Video metadata will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="downloadCurrentMedia()">
+                        <i class="fas fa-download me-1"></i>Download
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="fullscreenVideo()">
+                        <i class="fas fa-expand me-1"></i>Fullscreen
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Player Modal -->
+    <div class="modal fade" id="audioModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-music me-2"></i>Audio Player
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="audio-container text-center p-4">
+                        <div class="audio-visualizer mb-4">
+                            <i class="fas fa-music fa-4x text-primary mb-3"></i>
+                            <div class="audio-waveform" id="audioWaveform" style="height: 100px; background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f0f0f0 75%), linear-gradient(-45deg, transparent 75%, #f0f0f0 75%); background-size: 4px 4px; background-position: 0 0, 0 2px, 2px -2px, -2px 0px;">
+                            </div>
+                        </div>
+                        <audio id="audioPlayer" controls class="w-100 mb-3" preload="metadata">
+                            <source id="audioSource" src="" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div class="audio-controls">
+                            <button class="btn btn-outline-primary me-2" onclick="adjustPlaybackRate(-0.25)">
+                                <i class="fas fa-backward"></i> 0.75x
+                            </button>
+                            <button class="btn btn-outline-primary me-2" onclick="adjustPlaybackRate(0)">
+                                <i class="fas fa-play"></i> 1x
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="adjustPlaybackRate(0.25)">
+                                <i class="fas fa-forward"></i> 1.25x
+                            </button>
+                        </div>
+                    </div>
+                    <div id="audioInfo" class="mt-3 small text-muted">
+                        <!-- Audio metadata will be displayed here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="downloadCurrentMedia()">
+                        <i class="fas fa-download me-1"></i>Download
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-image me-2"></i>Image Viewer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0 bg-dark">
+                    <div class="image-container d-flex justify-content-center align-items-center" style="height: 80vh; position: relative; overflow: hidden;">
+                        <img id="imageViewer" src="" alt="Image" style="max-width: 100%; max-height: 100%; transform-origin: center; transition: transform 0.3s ease;" onclick="toggleImageZoom(event)">
+                        <div class="image-controls position-absolute top-0 end-0 p-3">
+                            <button class="btn btn-light btn-sm me-2" onclick="zoomImage(0.8)">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button class="btn btn-light btn-sm me-2" onclick="zoomImage(1.25)">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button class="btn btn-light btn-sm" onclick="resetImageZoom()">
+                                <i class="fas fa-expand-arrows-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-white">
+                        <div id="imageInfo" class="small text-muted">
+                            <!-- Image metadata will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="downloadCurrentMedia()">
+                        <i class="fas fa-download me-1"></i>Download
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="fullscreenImage()">
+                        <i class="fas fa-expand me-1"></i>Fullscreen
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Viewer Modal -->
+    <div class="modal fade" id="pdfModal" tabindex="-1">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-pdf me-2"></i>PDF Document Viewer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="pdf-toolbar bg-light p-2 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="pdf-navigation">
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="previousPDFPage()" id="prevPageBtn">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </button>
+                                <span class="me-2">Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="nextPDFPage()" id="nextPageBtn">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="pdf-zoom">
+                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="zoomPDF(0.8)">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <span class="me-2" id="pdfZoomLevel">100%</span>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="zoomPDF(1.25)">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pdf-container" style="height: calc(80vh - 60px); overflow: auto; background: #f5f5f5;">
+                        <canvas id="pdfCanvas" style="display: block; margin: 0 auto; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></canvas>
+                    </div>
+                    <div class="p-3">
+                        <div id="pdfInfo" class="small text-muted">
+                            <!-- PDF metadata will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="downloadCurrentMedia()">
+                        <i class="fas fa-download me-1"></i>Download PDF
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="printPDF()">
+                        <i class="fas fa-print me-1"></i>Print
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://unpkg.com/pannellum/build/pannellum.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map.js"></script>
+</body>
+</html>
