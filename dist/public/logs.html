@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Change Logs - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .log-entry {
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .log-entry:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .log-entry.create {
+            border-left-color: #28a745;
+        }
+        
+        .log-entry.update {
+            border-left-color: #ffc107;
+        }
+        
+        .log-entry.delete {
+            border-left-color: #dc3545;
+        }
+        
+        .log-header {
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            padding: 15px 20px;
+            border-radius: 0 8px 0 0;
+        }
+        
+        .log-body {
+            padding: 15px 20px;
+        }
+        
+        .field-change {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .field-change:last-child {
+            margin-bottom: 0;
+        }
+        
+        .field-name {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .value-comparison {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .old-value, .new-value {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        
+        .old-value {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .new-value {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .change-arrow {
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+        
+        .log-meta {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .log-timestamp {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .log-user {
+            background: #e7f3ff;
+            color: #0066cc;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .log-table {
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .log-action {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .log-action.create {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .log-action.update {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .log-action.delete {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .filter-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .stats-row {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+        
+        .export-options {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        /* Table View Styles */
+        .logs-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .logs-table table {
+            margin-bottom: 0;
+        }
+        
+        .logs-table th {
+            background: #f8f9fa;
+            border-top: none;
+            font-weight: 600;
+            color: #495057;
+            padding: 15px 12px;
+            vertical-align: middle;
+        }
+        
+        .logs-table td {
+            padding: 12px;
+            vertical-align: middle;
+            border-color: #e9ecef;
+        }
+        
+        .action-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .action-badge.create {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .action-badge.update {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .action-badge.delete {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .field-changes-summary {
+            max-width: 300px;
+            overflow: hidden;
+        }
+        
+        .field-change-item {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
+            padding: 2px 4px;
+            background: #f8f9fa;
+            border-radius: 3px;
+        }
+        
+        .old-value-inline {
+            color: #dc3545;
+            text-decoration: line-through;
+            font-family: monospace;
+        }
+        
+        .new-value-inline {
+            color: #28a745;
+            font-family: monospace;
+        }
+        
+        .table-responsive {
+            border-radius: 12px;
+        }
+        
+        /* Enhanced Field Changes Table Styles */
+        .old-value-cell {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .new-value-cell {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .value-preview {
+            max-width: 200px;
+            word-wrap: break-word;
+        }
+        
+        .value-content {
+            word-wrap: break-word;
+            display: inline-block;
+            max-width: 100%;
+        }
+        
+        .history-container {
+            max-width: 300px;
+        }
+        
+        .history-toggle {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+        }
+        
+        .history-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            font-size: 0.85rem;
+        }
+        
+        .history-change {
+            word-wrap: break-word;
+        }
+        
+        .history-change strong {
+            display: inline-block;
+            min-width: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .value-comparison {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .change-arrow {
+                transform: rotate(90deg);
+            }
+            
+            .log-meta {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            .export-options {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .logs-table th,
+            .logs-table td {
+                padding: 8px 6px;
+                font-size: 0.85rem;
+            }
+            
+            .field-changes-summary {
+                max-width: 200px;
+            }
+            
+            .old-value-cell,
+            .new-value-cell {
+                padding: 6px 8px;
+                font-size: 0.8rem;
+            }
+            
+            .history-container {
+                max-width: 250px;
+            }
+            
+            .value-preview {
+                max-width: 150px;
+            }
+        }
+    </style>
+  <link rel="stylesheet" crossorigin href="/assets/styles-BRGBj_cd.css">
+</head>
+<body>
+    <div class="min-vh-100 bg-light">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="dashboard.html">
+                    <i class="fas fa-database me-2"></i>Teable GIS System
+                </a>
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <span class="nav-text text-white me-3" id="userDisplay"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4><i class="fas fa-history me-2"></i>Data Change Logs</h4>
+                    <p class="text-muted mb-0">Complete audit trail of all data modifications</p>
+                </div>
+                <div class="export-options">
+                    <button class="btn btn-success" onclick="exportLogs('csv')">
+                        <i class="fas fa-file-csv me-1"></i>Export CSV
+                    </button>
+                    <button class="btn btn-info" onclick="exportLogs('json')">
+                        <i class="fas fa-file-code me-1"></i>Export JSON
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="refreshLogs()">
+                        <i class="fas fa-sync me-1"></i>Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistics Row -->
+            <div class="stats-row">
+                <div class="row">
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalChanges">0</div>
+                            <div class="stat-label">Total Changes</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-number" id="todayChanges">0</div>
+                            <div class="stat-label">Today's Changes</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-number" id="activeUsers">0</div>
+                            <div class="stat-label">Active Users</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-number" id="affectedTables">0</div>
+                            <div class="stat-label">Affected Tables</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="filter-panel">
+                <h6 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Logs</h6>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Date Range:</label>
+                        <select class="form-select" id="dateRange" onchange="applyFilters()">
+                            <option value="all">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Table:</label>
+                        <select class="form-select" id="tableFilter" onchange="applyFilters()">
+                            <option value="">All Tables</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">User:</label>
+                        <select class="form-select" id="userFilter" onchange="applyFilters()">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Action:</label>
+                        <select class="form-select" id="actionFilter" onchange="applyFilters()">
+                            <option value="">All Actions</option>
+                            <option value="create">Create</option>
+                            <option value="update">Update</option>
+                            <option value="delete">Delete</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Custom Date Range -->
+                <div class="row" id="customDateRange" style="display: none;">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">From Date:</label>
+                        <input type="date" class="form-control" id="fromDate" onchange="applyFilters()">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">To Date:</label>
+                        <input type="date" class="form-control" id="toDate" onchange="applyFilters()">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Search:</label>
+                        <input type="text" class="form-control" id="searchText" placeholder="Search in field names or values..." onkeyup="applyFilters()">
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <button class="btn btn-primary btn-sm" onclick="applyFilters()">
+                            <i class="fas fa-search me-1"></i>Apply Filters
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm ms-2" onclick="clearFilters()">
+                            <i class="fas fa-times me-1"></i>Clear All
+                        </button>
+                    </div>
+                    <div class="text-muted small">
+                        Showing <span id="filteredCount">0</span> of <span id="totalCount">0</span> log entries
+                    </div>
+                </div>
+            </div>
+
+            <!-- Field Changes Table Header -->
+            <div class="mb-3">
+                <h5><i class="fas fa-table me-2"></i>Field Changes History</h5>
+                <p class="text-muted mb-0">Recent changes with complete history tracking</p>
+            </div>
+
+            <!-- Logs Container -->
+            <div id="logsContainer">
+                <div class="loading-spinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span class="ms-3">Loading change logs...</span>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <nav id="logsPagination" class="mt-4" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted small">
+                        Showing <span id="pageStart">0</span>-<span id="pageEnd">0</span> of <span id="pageTotal">0</span> entries
+                    </div>
+                    <ul class="pagination mb-0">
+                        <!-- Pagination will be generated dynamically -->
+                    </ul>
+                    <div>
+                        <select class="form-select form-select-sm" id="pageSize" onchange="changePageSize()" style="width: auto;">
+                            <option value="10">10 per page</option>
+                            <option value="25" selected>25 per page</option>
+                            <option value="50">50 per page</option>
+                            <option value="100">100 per page</option>
+                        </select>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/logs.js"></script>
+</body>
+</html>

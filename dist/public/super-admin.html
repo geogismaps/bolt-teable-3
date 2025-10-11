@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Configuration - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" crossorigin href="/assets/styles-BRGBj_cd.css">
+</head>
+<body>
+    <div class="min-vh-100 d-flex align-items-center justify-content-center bg-gradient">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-10">
+                    <div class="glass-card p-5">
+                        <div class="text-center mb-5">
+                            <i class="fas fa-crown fa-4x text-warning mb-3"></i>
+                            <h2 class="fw-bold">Super Admin Portal</h2>
+                            <p class="text-muted">Configure new Teable.io client instances with automatic setup</p>
+                        </div>
+
+                        <!-- Quick Stats -->
+                        <div class="row mb-5">
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-building"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="totalClients">0</h3>
+                                        <p>Active Clients</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="totalUsers">0</h3>
+                                        <p>Total Users</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stat-card">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-database"></i>
+                                    </div>
+                                    <div class="stat-content">
+                                        <h3 id="totalSpaces">0</h3>
+                                        <p>Teable Spaces</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Client Configuration Form -->
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-plus-circle me-2"></i>Create New Client Configuration
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <form id="clientConfigForm">
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-building me-2"></i>Client Name
+                                                    </label>
+                                                    <input type="text" class="form-control" id="clientName" 
+                                                           placeholder="e.g., Acme Corporation" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-envelope me-2"></i>Owner Email
+                                                    </label>
+                                                    <input type="email" class="form-control" id="ownerEmail" 
+                                                           placeholder="owner@client.com" required>
+                                                </div>
+                                            </div>
+
+                                            
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-lock me-2"></i>Owner Password
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" id="ownerPassword" 
+                                                           placeholder="Secure password for owner" required>
+                                                    <button class="btn btn-outline-secondary" type="button" 
+                                                            onclick="togglePasswordVisibility('ownerPassword')">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-link me-2"></i>Teable Instance URL
+                                                </label>
+                                                <input type="url" class="form-control" id="teableUrl" 
+                                                       placeholder="https://your-instance.teable.io" required>
+                                                <div class="form-text">The base URL of your Teable.io instance</div>
+                                            </div>
+
+                                            <div class="row mb-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-layer-group me-2"></i>Space ID
+                                                    </label>
+                                                    <input type="text" class="form-control" id="spaceId" 
+                                                           placeholder="spc_xxxxxxxxxxxxx" required>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-database me-2"></i>Base ID
+                                                    </label>
+                                                    <input type="text" class="form-control" id="baseId" 
+                                                           placeholder="bse_xxxxxxxxxxxxx" required>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-key me-2"></i>API Token
+                                                </label>
+                                                <div class="input-group">
+                                                    <input type="password" class="form-control" id="apiToken" 
+                                                           placeholder="Enter API token..." required>
+                                                    <button class="btn btn-outline-secondary" type="button" 
+                                                            onclick="togglePasswordVisibility('apiToken')">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="form-text">API token with admin permissions for this space</div>
+                                            </div>
+
+                                            <!-- Test Connection -->
+                                            <div class="mb-4">
+                                                <button type="button" class="btn btn-info me-2" onclick="testConnection()">
+                                                    <i class="fas fa-wifi me-2"></i>Test Connection
+                                                </button>
+                                                <button type="button" class="btn btn-warning" onclick="autoSetup()">
+                                                    <i class="fas fa-magic me-2"></i>Auto Setup System Tables
+                                                </button>
+                                                <div id="connectionStatus" class="mt-2"></div>
+                                            </div>
+
+                                            <!-- Action Buttons -->
+                                            <div class="d-flex gap-3">
+                                                <button type="submit" class="btn btn-success btn-lg flex-fill">
+                                                    <i class="fas fa-rocket me-2"></i>Create Client & Deploy
+                                                </button>
+                                                <button type="button" class="btn btn-outline-secondary btn-lg" 
+                                                        onclick="resetForm()">
+                                                    <i class="fas fa-undo me-2"></i>Reset Form
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Existing Configurations -->
+                            <div class="col-lg-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-list me-2"></i>Existing Clients
+                                        </h6>
+                                    </div>
+                                    <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                                        <div id="existingConfigs">
+                                            <div class="text-center text-muted py-3">
+                                                <i class="fas fa-inbox fa-2x mb-2"></i>
+                                                <p>No clients configured</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Quick Actions -->
+                                <div class="card mt-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-tools me-2"></i>Quick Actions
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-outline-primary btn-sm" onclick="exportConfigs()">
+                                                <i class="fas fa-download me-1"></i>Export Configs
+                                            </button>
+                                            <button class="btn btn-outline-info btn-sm" onclick="viewSystemLogs()">
+                                                <i class="fas fa-file-alt me-1"></i>View System Logs
+                                            </button>
+                                            <button class="btn btn-outline-warning btn-sm" onclick="backupData()">
+                                                <i class="fas fa-shield-alt me-1"></i>Backup All Data
+                                            </button>
+                                            <hr>
+                                            <a href="login.html" class="btn btn-outline-secondary btn-sm">
+                                                <i class="fas fa-sign-in-alt me-1"></i>User Login Portal
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle me-2"></i>Client Created Successfully!
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div id="successContent">
+                        <!-- Success details will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" onclick="proceedToClient()" id="proceedBtn">
+                        <i class="fas fa-arrow-right me-1"></i>Proceed to Client Portal
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Create Another Client
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/super-admin.js"></script>
+</body>
+</html>

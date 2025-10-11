@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Multi-Tenant GIS System</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .stat-card .icon {
+            font-size: 24px;
+            color: #3b82f6;
+            margin-bottom: 12px;
+        }
+
+        .customers-table {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 32px;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            position: relative;
+            width: 300px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 40px 10px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .search-box i {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8fafc;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            font-size: 13px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-trial {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #2563eb;
+        }
+
+        .btn-html {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .btn-html:hover {
+            background: #7c3aed;
+        }
+
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <h1><i class="fas fa-crown"></i> Super Admin Dashboard</h1>
+            <div class="user-menu">
+                <span id="adminName"></span>
+                <button class="btn-secondary" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <i class="fas fa-building icon"></i>
+                <h3>Total Customers</h3>
+                <p class="value" id="totalCustomers">0</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-check-circle icon" style="color: #10b981;"></i>
+                <h3>Active Customers</h3>
+                <p class="value" id="activeCustomers">0</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-clock icon" style="color: #f59e0b;"></i>
+                <h3>Trial Customers</h3>
+                <p class="value" id="trialCustomers">0</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-users icon" style="color: #6366f1;"></i>
+                <h3>Total Users</h3>
+                <p class="value" id="totalUsers">0</p>
+            </div>
+        </div>
+
+        <div class="customers-table">
+            <div class="table-header">
+                <h2>Customers</h2>
+                <div style="display: flex; gap: 12px;">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Search customers...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <button class="btn-primary" onclick="showNewCustomerModal()">
+                        <i class="fas fa-plus"></i> New Customer
+                    </button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Customer Name</th>
+                        <th>Subdomain</th>
+                        <th>Status</th>
+                        <th>Tier</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="customersTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #cbd5e1;"></i>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module" src="/js/admin-dashboard.js"></script>
+</body>
+</html>
