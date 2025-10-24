@@ -243,7 +243,15 @@ async function handleClientCreation(event) {
 }
 
 async function testConnection() {
+    const statusDiv = document.getElementById('connectionStatus');
+
     try {
+        statusDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>Testing connection...
+            </div>
+        `;
+
         const config = {
             baseUrl: document.getElementById('teableUrl').value.trim(),
             spaceId: document.getElementById('spaceId').value.trim(),
@@ -255,18 +263,20 @@ async function testConnection() {
             throw new Error('Please fill in URL, Base ID, and API Token first');
         }
 
+        console.log('Testing connection with config:', { ...config, accessToken: '***' });
+
         await testConnectionInternal(config);
-        
-        document.getElementById('connectionStatus').innerHTML = `
+
+        statusDiv.innerHTML = `
             <div class="alert alert-success">
-                <i class="fas fa-check-circle me-2"></i>Connection successful! 
+                <i class="fas fa-check-circle me-2"></i>Connection successful!
                 Ready to create client configuration.
             </div>
         `;
 
     } catch (error) {
         console.error('Connection test failed:', error);
-        document.getElementById('connectionStatus').innerHTML = `
+        statusDiv.innerHTML = `
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle me-2"></i>Connection failed: ${error.message}
             </div>
