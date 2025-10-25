@@ -456,30 +456,40 @@ async function loadTableFields() {
 
 function showAddLayerModal() {
     try {
+        console.log('showAddLayerModal called');
+
         // Reset modal content before showing
         resetAddLayerModal();
-        
+
         // Clear any existing errors
         clearErrors();
-        
-        const modal = new bootstrap.Modal(document.getElementById('addLayerModal'));
-        
+
+        const modalElement = document.getElementById('addLayerModal');
+        if (!modalElement) {
+            console.error('Add Layer Modal element not found');
+            return;
+        }
+
+        const modal = new bootstrap.Modal(modalElement);
+
         // Load tables before showing the modal
+        console.log('Loading tables...');
         loadAvailableTables().then(() => {
+            console.log('Tables loaded successfully, showing modal');
             modal.show();
-            
+
             // Ensure the "From Table" tab is active by default
             setTimeout(() => {
                 const tableTab = document.getElementById('table-tab');
                 const geoJsonTab = document.getElementById('geojson-tab');
                 const tablePane = document.getElementById('table-pane');
                 const geoJsonPane = document.getElementById('geojson-pane');
-                
+
                 if (tableTab && geoJsonTab && tablePane && geoJsonPane) {
                     // Activate table tab
                     tableTab.classList.add('active');
                     geoJsonTab.classList.remove('active');
-                    
+
                     // Show table pane
                     tablePane.classList.add('show', 'active');
                     geoJsonPane.classList.remove('show', 'active');
@@ -5138,35 +5148,36 @@ function applyLayerStyling(layer) {
 }
 
 function ensureAddLayerFunctionality() {
-    // Reset any global variables that might interfere with add layer
-    if (window.currentPropertiesLayer) {
-        // Clear the reference to avoid conflicts
-        const tempLayer = window.currentPropertiesLayer;
-        window.currentPropertiesLayer = null;
-        
-        // Restore it after a short delay to allow add layer to work properly
-        setTimeout(() => {
-            if (!document.getElementById('addLayerModal').classList.contains('show')) {
-                window.currentPropertiesLayer = tempLayer;
-            }
-        }, 100);
-    }
-    
+    // Don't interfere with currentPropertiesLayer - it's managed elsewhere
+    // Just ensure the Add Layer modal functionality is working
+
     // Ensure the add layer modal event listeners are still active
     const addLayerBtn = document.querySelector('[onclick*="showAddLayerModal"]');
     if (addLayerBtn && !addLayerBtn.onclick) {
         addLayerBtn.onclick = showAddLayerModal;
     }
-    
+
     // Re-enable table loading functionality
     const tableSelector = document.getElementById('newLayerTable');
     if (tableSelector) {
         // Remove any disabled state that might have been applied
         tableSelector.disabled = false;
-        
+
         // Ensure change event listener is active
         if (!tableSelector.onchange) {
             tableSelector.onchange = loadTableFields;
+        }
+    }
+
+    // Ensure modal event listeners are properly attached
+    const addLayerModal = document.getElementById('addLayerModal');
+    if (addLayerModal) {
+        // Check if event listeners are attached (this is a defensive check)
+        const hasShownListener = addLayerModal.getAttribute('data-has-shown-listener');
+        if (!hasShownListener) {
+            addLayerModal.addEventListener('shown.bs.modal', handleAddLayerModalShown);
+            addLayerModal.addEventListener('hidden.bs.modal', handleAddLayerModalHidden);
+            addLayerModal.setAttribute('data-has-shown-listener', 'true');
         }
     }
 }
