@@ -5184,6 +5184,11 @@ function applyLabelsToLayer(layer) {
     const labelElements = [];
 
     layer.features.forEach((feature, index) => {
+        // Only show labels for features that are currently visible (not filtered out)
+        if (layer.leafletLayer && !layer.leafletLayer.hasLayer(feature)) {
+            return;
+        }
+
         const record = layer.records[index];
         if (!record || !record.fields[labels.field]) return;
 
@@ -7840,6 +7845,10 @@ function applyFilters() {
                         layer.leafletLayer.addLayer(feature);
                     }
                 });
+                // Update labels to show all features
+                if (layer.properties.labels && layer.properties.labels.enabled) {
+                    applyLabelsToLayer(layer);
+                }
             }
         });
         showSuccess('All filters cleared - showing all features');
@@ -7902,6 +7911,11 @@ function applyFilters() {
                 }
             }
         });
+
+        // Update labels after filtering to show only visible features
+        if (layer.properties.labels && layer.properties.labels.enabled) {
+            applyLabelsToLayer(layer);
+        }
     });
 
     let message = `Filters applied: showing ${filteredCount} of ${totalCount} features`;
