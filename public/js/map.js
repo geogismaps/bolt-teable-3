@@ -214,6 +214,80 @@ async function initializeMap() {
         // Add zoom event listener to show appropriate basemap recommendations
         map.on('zoomend', handleZoomChange);
 
+        // Handle popup close to reset feature selection and styling
+        map.on('popupclose', function(e) {
+            // Find the feature that had the popup
+            if (e.popup && e.popup._source) {
+                const feature = e.popup._source;
+
+                // Find the layer this feature belongs to
+                let featureLayer = null;
+                let featureIndex = -1;
+
+                for (const layer of mapLayers) {
+                    const index = layer.features.indexOf(feature);
+                    if (index !== -1) {
+                        featureLayer = layer;
+                        featureIndex = index;
+                        break;
+                    }
+                }
+
+                if (featureLayer && featureIndex !== -1) {
+                    // Clear selection for this feature
+                    const selectedIndex = selectedFeatures.indexOf(feature);
+                    if (selectedIndex !== -1) {
+                        selectedFeatures.splice(selectedIndex, 1);
+                        updateSelectionCount();
+
+                        // Uncheck the corresponding checkbox in attribute table if visible
+                        const checkbox = document.querySelector(`tr[data-feature-index="${featureIndex}"] .row-selector`);
+                        if (checkbox) {
+                            checkbox.checked = false;
+                        }
+                    }
+
+                    // Reset feature to its original style based on layer symbology
+                    if (feature.setStyle) {
+                        const symbology = featureLayer.properties?.symbology || {};
+
+                        // If using categorized symbology, restore the category-specific style
+                        if (symbology.type === 'categorized' && symbology.field && feature.recordData) {
+                            const fieldValue = feature.recordData[symbology.field];
+                            const category = symbology.categories?.find(cat =>
+                                String(cat.value) === String(fieldValue)
+                            );
+
+                            if (category) {
+                                feature.setStyle({
+                                    fillColor: category.color || symbology.fillColor || '#3498db',
+                                    color: symbology.borderColor || '#2c3e50',
+                                    weight: symbology.borderWidth || 2,
+                                    fillOpacity: symbology.fillOpacity || 0.7
+                                });
+                            } else {
+                                // Use default style for uncategorized values
+                                feature.setStyle({
+                                    fillColor: symbology.fillColor || '#3498db',
+                                    color: symbology.borderColor || '#2c3e50',
+                                    weight: symbology.borderWidth || 2,
+                                    fillOpacity: symbology.fillOpacity || 0.7
+                                });
+                            }
+                        } else {
+                            // Use regular symbology
+                            feature.setStyle({
+                                fillColor: symbology.fillColor || '#3498db',
+                                color: symbology.borderColor || '#2c3e50',
+                                weight: symbology.borderWidth || 2,
+                                fillOpacity: symbology.fillOpacity || 0.7
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
         // Load available tables
         await loadAvailableTables();
 
@@ -5450,13 +5524,6 @@ function handleTemplateChange() {
     } else if (customSection) {
         customSection.style.display = 'none';
     }
-}
-
-// Handle feature click without auto-playing media
-function handleFeatureClick(feature, index, layerConfig) {
-    // This function is called when a feature is clicked
-    // It should only show the popup, not auto-play any media
-    console.log('Feature clicked, showing popup only');
 }
 
 // Global popup control functions
