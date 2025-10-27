@@ -12,6 +12,8 @@ let selectedFeatures = [];
 let currentUser = null;
 let geoJSONData = null;
 let fieldPermissionsCache = {};
+let currentBasemapType = 'openstreetmap';
+let satelliteZoomWarningShown = false;
 
 // Base map configurations
 const baseMaps = {
@@ -332,6 +334,23 @@ function addZoomLevelDisplay() {
         zoomElements.forEach(element => {
             element.innerHTML = `Zoom: ${map.getZoom()}`;
         });
+    });
+
+    // Add zoom constraint handler for satellite basemap
+    map.on('zoomend', function() {
+        if (currentBasemapType === 'satellite') {
+            const currentZoom = map.getZoom();
+            if (currentZoom > 19) {
+                map.setZoom(19, { animate: false });
+                if (!satelliteZoomWarningShown) {
+                    showWarning('Oops! You\'ve reached the maximum zoom level of the Satellite View!');
+                    satelliteZoomWarningShown = true;
+                    setTimeout(() => {
+                        satelliteZoomWarningShown = false;
+                    }, 3000);
+                }
+            }
+        }
     });
 }
 
@@ -3110,6 +3129,10 @@ function removeLayer(layerId) {
 // Basemap functionality
 function changeBasemap() {
     const basemapType = document.getElementById('basemapSelector').value;
+
+    // Update current basemap type
+    currentBasemapType = basemapType;
+    satelliteZoomWarningShown = false;
 
     // Remove current base layer
     map.eachLayer(layer => {
