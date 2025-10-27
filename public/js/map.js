@@ -1688,62 +1688,19 @@ function updateLayersList() {
         const geometryIcon = getGeometryIcon(layer);
         const mediaTypeBadge = layer.mediaType ? `<span class="badge bg-info ms-2">${layer.mediaType}</span>` : '';
 
-        const legendExpanded = layer.legendExpanded !== false;
-        const legendIcon = legendExpanded ? 'fa-chevron-down' : 'fa-chevron-right';
-
-        const symbology = layer.properties?.symbology || {};
-        let legendHTML = '';
-
-        if (symbology.type === 'categorized' && symbology.categories && symbology.categories.length > 0) {
-            const legendItems = symbology.categories.map(category => {
-                const count = category.count || 0;
-                return `
-                    <div class="legend-item">
-                        <div class="legend-color-box" style="background-color: ${category.color}; border: 1px solid rgba(0,0,0,0.2);"></div>
-                        <span class="legend-label">${category.value}</span>
-                        <span class="legend-count">${count}</span>
-                    </div>
-                `;
-            }).join('');
-
-            legendHTML = `
-                <div class="layer-legend ${legendExpanded ? '' : 'collapsed'}" id="legend-${layer.id}">
-                    <div class="legend-items">
-                        ${legendItems}
-                    </div>
-                </div>
-            `;
-        } else if (symbology.type === 'single' || !symbology.type) {
-            const fillColor = symbology.fillColor || '#3498db';
-            const count = layer.featureCount || 0;
-            legendHTML = `
-                <div class="layer-legend ${legendExpanded ? '' : 'collapsed'}" id="legend-${layer.id}">
-                    <div class="legend-items">
-                        <div class="legend-item">
-                            <div class="legend-color-box" style="background-color: ${fillColor}; border: 1px solid rgba(0,0,0,0.2);"></div>
-                            <span class="legend-label">All Features</span>
-                            <span class="legend-count">${count}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
         html += `
             <div class="layer-item ${layer.visible ? 'active' : ''}" data-layer-id="${layer.id}">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center mb-1">
-                            <i class="fas ${visibilityIcon} me-2" onclick="toggleLayerVisibility('${layer.id}')" style="cursor: pointer;"></i>
+                            <i class="fas ${visibilityIcon} me-2" onclick="toggleLayerVisibility('${layer.id}')"></i>
                             <i class="${geometryIcon} me-2"></i>
                             <strong>${layer.name}</strong>
                             ${mediaTypeBadge}
-                            ${legendHTML ? `<i class="fas ${legendIcon} ms-2 legend-toggle" onclick="toggleLegend('${layer.id}')" title="Toggle Legend" style="cursor: pointer; font-size: 0.9em;"></i>` : ''}
                         </div>
                         <div class="small text-muted">
                             ${layer.featureCount} features • ${layer.mediaType || layer.type}
                         </div>
-                        ${legendHTML}
                     </div>
                     <div class="layer-controls">
                         <button class="btn-zoom" onclick="zoomToLayer('${layer.id}')" title="Zoom to Layer">
@@ -1810,14 +1767,6 @@ function toggleLayerVisibility(layerId) {
 
     updateLayersList();
 	updateMapStatistics();
-}
-
-function toggleLegend(layerId) {
-    const layer = mapLayers.find(l => l.id === layerId);
-    if (!layer) return;
-
-    layer.legendExpanded = !layer.legendExpanded;
-    updateLayersList();
 }
 
 function zoomToLayer(layerId) {
@@ -7301,7 +7250,6 @@ window.showAddLayerModal = showAddLayerModal;
 window.addNewLayer = addNewLayer;
 window.loadTableFields = loadTableFields;
 window.toggleLayerVisibility = toggleLayerVisibility;
-window.toggleLegend = toggleLegend;
 window.zoomToLayer = zoomToLayer;
 window.showAttributeTable = showAttributeTable;
 window.showLayerProperties = showLayerProperties;
