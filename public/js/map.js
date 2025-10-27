@@ -23,7 +23,8 @@ const baseMaps = {
     satellite: {
         url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attribution: '© Esri',
-        maxZoom: 21
+        maxZoom: 19,
+        maxNativeZoom: 19
     },
     terrain: {
         url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
