@@ -7,6 +7,7 @@ class TeableAuth {
     constructor() {
         this.currentSession = null;
         this.clientConfig = null;
+        this.supabase = null;
     }
 
     /**
@@ -15,6 +16,26 @@ class TeableAuth {
     init() {
         this.loadSession();
         this.loadClientConfig();
+        this.initializeSupabase();
+    }
+
+    /**
+     * Initialize Supabase client for data persistence
+     */
+    async initializeSupabase() {
+        try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            if (supabaseUrl && supabaseAnonKey && window.supabase) {
+                this.supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+                console.log('✅ Supabase client initialized for data persistence');
+            } else {
+                console.warn('⚠️ Supabase credentials not available');
+            }
+        } catch (error) {
+            console.error('Error initializing Supabase:', error);
+        }
     }
 
     /**

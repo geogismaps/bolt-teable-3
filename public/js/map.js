@@ -191,6 +191,15 @@ async function initializeMap() {
         // Initialize customer-specific basemaps
         await initializeCustomerBaseMaps();
 
+        // Initialize Layer Preferences Manager with Supabase client
+        if (window.layerPreferencesManager && window.teableAuth.supabase) {
+            window.layerPreferencesManager.initialize(
+                window.teableAuth.supabase,
+                currentUser
+            );
+            console.log('✅ Layer Preferences Manager initialized');
+        }
+
         // Initialize Leaflet map with maximum zoom level 25
         map = L.map('map', {
             maxZoom: 25,
@@ -1011,6 +1020,40 @@ async function createLayerFromData(records, layerConfig) {
 
         // Add to layers array
         mapLayers.push(layer);
+
+        // Load and apply saved preferences for this layer
+        if (window.layerPreferencesManager) {
+            const savedConfig = await window.layerPreferencesManager.loadLayerPreference(layer.id);
+            if (savedConfig) {
+                console.log(`📂 Applying saved preferences for layer "${layerConfig.name}"`);
+                window.layerPreferencesManager.applyConfigurationToLayer(layer, savedConfig);
+
+                // Apply the visual styles to features
+                if (savedConfig.symbology) {
+                    applyLayerStyling(layer);
+                }
+
+                // Apply labels if enabled
+                if (savedConfig.labels && savedConfig.labels.enabled) {
+                    applyLabelsToLayer(layer);
+                }
+
+                // Apply saved filters
+                if (savedConfig.filters && savedConfig.filters.length > 0) {
+                    savedConfig.filters.forEach(filter => {
+                        if (!currentFilters.find(f => f.layerId === filter.layerId && f.field === filter.field)) {
+                            currentFilters.push(filter);
+                        }
+                    });
+                    console.log(`📂 Restored ${savedConfig.filters.length} filter(s) for layer "${layerConfig.name}"`);
+                }
+
+                // Update visibility
+                if (savedConfig.visibility === false && layer.leafletLayer) {
+                    map.removeLayer(layer.leafletLayer);
+                }
+            }
+        }
 
         console.log(`Created layer "${layerConfig.name}" with ${validFeatureCount} features`);
         return layer;
@@ -5216,7 +5259,14 @@ function applyLayerStyling(layer) {
     if (layer.properties.labels && layer.properties.labels.enabled) {
         applyLabelsToLayer(layer);
     }
-    
+
+    // Save layer preferences automatically
+    if (window.layerPreferencesManager) {
+        const configuration = window.layerPreferencesManager.extractLayerConfiguration(layer);
+        window.layerPreferencesManager.scheduleAutoSave(layer.id, layer.name, configuration);
+        console.log(`💾 Scheduled auto-save for layer "${layer.name}"`);
+    }
+
     // Ensure add layer functionality remains intact after styling
     ensureAddLayerFunctionality();
 }
@@ -7993,6 +8043,13 @@ function applyFilters() {
         // Update labels after filtering to show only visible features
         if (layer.properties.labels && layer.properties.labels.enabled) {
             applyLabelsToLayer(layer);
+        }
+
+        // Save filters for this layer
+        if (window.layerPreferencesManager && layerFilters.length > 0) {
+            layer.filters = layerFilters;
+            const configuration = window.layerPreferencesManager.extractLayerConfiguration(layer);
+            window.layerPreferencesManager.scheduleAutoSave(layer.id, layer.name, configuration);
         }
     });
 
