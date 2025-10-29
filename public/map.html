@@ -110,52 +110,47 @@
         .btn-properties { background: #f39c12; color: white; }
         .btn-remove { background: #e74c3c; color: white; }
 
-        .legend-preview-container {
-            background: #1a252f;
-            border: 1px solid #445566;
-            border-radius: 5px;
-            overflow: hidden;
+        .layer-legend-container {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #445566;
         }
 
-        .legend-preview-header {
-            background: #243342;
-            padding: 10px 15px;
-            cursor: pointer;
+        .layer-legend-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 5px 0;
+            cursor: pointer;
             user-select: none;
+            margin-bottom: 8px;
         }
 
-        .legend-preview-header:hover {
-            background: #2a3d4f;
+        .layer-legend-header:hover {
+            opacity: 0.8;
         }
 
-        .legend-preview-content {
-            padding: 10px;
-            max-height: 400px;
+        .layer-legend-content {
+            max-height: 300px;
             overflow-y: auto;
         }
 
-        .legend-preview-content.hidden {
+        .layer-legend-content.hidden {
             display: none;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            padding: 6px 8px;
-            margin-bottom: 5px;
-            background: #2c3e50;
-            border-radius: 3px;
-            font-size: 0.9rem;
+            padding: 5px 0;
+            font-size: 0.85rem;
         }
 
         .legend-symbol {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 3px;
-            margin-right: 10px;
+            margin-right: 8px;
             flex-shrink: 0;
             border: 1px solid rgba(255,255,255,0.2);
         }
@@ -171,12 +166,12 @@
 
         .legend-label {
             flex-grow: 1;
-            color: #ecf0f1;
+            color: #bdc3c7;
         }
 
         .legend-count {
-            color: #95a5a6;
-            font-size: 0.85rem;
+            color: #7f8c8d;
+            font-size: 0.8rem;
             margin-left: 5px;
         }
 
@@ -891,17 +886,6 @@
                                 <button class="btn btn-success w-100 mb-3" onclick="showAddLayerModal()">
                                     <i class="fas fa-plus me-1"></i>Add Layer
                                 </button>
-
-                                <!-- Legend Preview Section -->
-                                <div id="legendPreviewContainer" class="legend-preview-container mb-3" style="display: none;">
-                                    <div class="legend-preview-header" onclick="toggleLegendPreview()">
-                                        <span><i class="fas fa-list-ul me-2"></i>Legend</span>
-                                        <i id="legendToggleIcon" class="fas fa-eye"></i>
-                                    </div>
-                                    <div id="legendPreviewContent" class="legend-preview-content">
-                                        <!-- Legend items will be populated dynamically -->
-                                    </div>
-                                </div>
 
                                 <div id="layersList">
                                     <!-- Layers will be populated dynamically -->

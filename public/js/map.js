@@ -1688,6 +1688,8 @@ function updateLayersList() {
         const geometryIcon = getGeometryIcon(layer);
         const mediaTypeBadge = layer.mediaType ? `<span class="badge bg-info ms-2">${layer.mediaType}</span>` : '';
 
+        const legendHtml = generateLayerLegendHtml(layer);
+
         html += `
             <div class="layer-item ${layer.visible ? 'active' : ''}" data-layer-id="${layer.id}">
                 <div class="d-flex justify-content-between align-items-start">
@@ -1717,78 +1719,69 @@ function updateLayersList() {
                         </button>
                     </div>
                 </div>
+                ${legendHtml}
             </div>
         `;
     });
 
     container.innerHTML = html;
-    updateLegendPreview();
 }
 
-function updateLegendPreview() {
-    const legendContainer = document.getElementById('legendPreviewContainer');
-    const legendContent = document.getElementById('legendPreviewContent');
-
-    if (!legendContainer || !legendContent) return;
-
-    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.properties?.symbology);
-
-    if (visibleLayers.length === 0) {
-        legendContainer.style.display = 'none';
-        return;
+function generateLayerLegendHtml(layer) {
+    if (!layer.properties?.symbology || !layer.visible) {
+        return '';
     }
 
-    legendContainer.style.display = 'block';
+    const symbology = layer.properties.symbology;
+    let legendItemsHtml = '';
 
-    let html = '';
-
-    visibleLayers.forEach(layer => {
-        const symbology = layer.properties.symbology;
-
-        if (symbology.type === 'categorized' && symbology.categories) {
-            html += `<div class="mb-3">
-                <div class="text-muted small mb-2"><strong>${layer.name}</strong></div>`;
-
-            symbology.categories.forEach(category => {
-                const symbolClass = layer.type === 'point' ? 'circle' :
-                                  layer.type === 'line' ? 'line' : '';
-                const count = category.count || '';
-
-                html += `
-                    <div class="legend-item">
-                        <div class="legend-symbol ${symbolClass}" style="background-color: ${category.color}"></div>
-                        <span class="legend-label">${category.value}</span>
-                        ${count ? `<span class="legend-count">(${count})</span>` : ''}
-                    </div>
-                `;
-            });
-
-            html += `</div>`;
-        } else if (symbology.type === 'simple') {
+    if (symbology.type === 'categorized' && symbology.categories) {
+        symbology.categories.forEach(category => {
             const symbolClass = layer.type === 'point' ? 'circle' :
                               layer.type === 'line' ? 'line' : '';
+            const count = category.count || '';
 
-            html += `<div class="mb-3">
-                <div class="text-muted small mb-2"><strong>${layer.name}</strong></div>
+            legendItemsHtml += `
                 <div class="legend-item">
-                    <div class="legend-symbol ${symbolClass}" style="background-color: ${symbology.color || '#3498db'}"></div>
-                    <span class="legend-label">${layer.name}</span>
-                    <span class="legend-count">(${layer.featureCount})</span>
+                    <div class="legend-symbol ${symbolClass}" style="background-color: ${category.color}"></div>
+                    <span class="legend-label">${category.value}</span>
+                    ${count ? `<span class="legend-count">(${count})</span>` : ''}
                 </div>
-            </div>`;
-        }
-    });
+            `;
+        });
+    } else if (symbology.type === 'simple') {
+        const symbolClass = layer.type === 'point' ? 'circle' :
+                          layer.type === 'line' ? 'line' : '';
 
-    if (html === '') {
-        legendContainer.style.display = 'none';
-    } else {
-        legendContent.innerHTML = html;
+        legendItemsHtml += `
+            <div class="legend-item">
+                <div class="legend-symbol ${symbolClass}" style="background-color: ${symbology.color || '#3498db'}"></div>
+                <span class="legend-label">All Features</span>
+                <span class="legend-count">(${layer.featureCount})</span>
+            </div>
+        `;
     }
+
+    if (legendItemsHtml === '') {
+        return '';
+    }
+
+    return `
+        <div class="layer-legend-container">
+            <div class="layer-legend-header" onclick="toggleLayerLegend('${layer.id}')">
+                <span><i class="fas fa-list-ul me-2"></i>Legend</span>
+                <i id="legend-icon-${layer.id}" class="fas fa-eye"></i>
+            </div>
+            <div id="legend-content-${layer.id}" class="layer-legend-content">
+                ${legendItemsHtml}
+            </div>
+        </div>
+    `;
 }
 
-function toggleLegendPreview() {
-    const content = document.getElementById('legendPreviewContent');
-    const icon = document.getElementById('legendToggleIcon');
+function toggleLayerLegend(layerId) {
+    const content = document.getElementById(`legend-content-${layerId}`);
+    const icon = document.getElementById(`legend-icon-${layerId}`);
 
     if (!content || !icon) return;
 
@@ -1843,7 +1836,6 @@ function toggleLayerVisibility(layerId) {
     }
 
     updateLayersList();
-    updateLegendPreview();
 	updateMapStatistics();
 }
 
