@@ -1749,6 +1749,23 @@ function generateLayerLegendHtml(layer) {
                 </div>
             `;
         });
+    } else if (symbology.type === 'graduated' && symbology.breaks && symbology.colors) {
+        const symbolClass = layer.type === 'point' ? 'circle' :
+                          layer.type === 'line' ? 'line' : '';
+
+        symbology.breaks.forEach((breakRange, index) => {
+            const color = symbology.colors[index];
+            const label = `${breakRange.min.toFixed(2)} - ${breakRange.max.toFixed(2)}`;
+            const count = breakRange.count || '';
+
+            legendItemsHtml += `
+                <div class="legend-item">
+                    <div class="legend-symbol ${symbolClass}" style="background-color: ${color}"></div>
+                    <span class="legend-label">${label}</span>
+                    ${count ? `<span class="legend-count">(${count})</span>` : ''}
+                </div>
+            `;
+        });
     } else if (symbology.type === 'simple') {
         const symbolClass = layer.type === 'point' ? 'circle' :
                           layer.type === 'line' ? 'line' : '';
