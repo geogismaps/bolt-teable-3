@@ -1722,6 +1722,83 @@ function updateLayersList() {
     });
 
     container.innerHTML = html;
+    updateLegendPreview();
+}
+
+function updateLegendPreview() {
+    const legendContainer = document.getElementById('legendPreviewContainer');
+    const legendContent = document.getElementById('legendPreviewContent');
+
+    if (!legendContainer || !legendContent) return;
+
+    const visibleLayers = mapLayers.filter(layer => layer.visible && layer.properties?.symbology);
+
+    if (visibleLayers.length === 0) {
+        legendContainer.style.display = 'none';
+        return;
+    }
+
+    legendContainer.style.display = 'block';
+
+    let html = '';
+
+    visibleLayers.forEach(layer => {
+        const symbology = layer.properties.symbology;
+
+        if (symbology.type === 'categorized' && symbology.categories) {
+            html += `<div class="mb-3">
+                <div class="text-muted small mb-2"><strong>${layer.name}</strong></div>`;
+
+            symbology.categories.forEach(category => {
+                const symbolClass = layer.type === 'point' ? 'circle' :
+                                  layer.type === 'line' ? 'line' : '';
+                const count = category.count || '';
+
+                html += `
+                    <div class="legend-item">
+                        <div class="legend-symbol ${symbolClass}" style="background-color: ${category.color}"></div>
+                        <span class="legend-label">${category.value}</span>
+                        ${count ? `<span class="legend-count">(${count})</span>` : ''}
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        } else if (symbology.type === 'simple') {
+            const symbolClass = layer.type === 'point' ? 'circle' :
+                              layer.type === 'line' ? 'line' : '';
+
+            html += `<div class="mb-3">
+                <div class="text-muted small mb-2"><strong>${layer.name}</strong></div>
+                <div class="legend-item">
+                    <div class="legend-symbol ${symbolClass}" style="background-color: ${symbology.color || '#3498db'}"></div>
+                    <span class="legend-label">${layer.name}</span>
+                    <span class="legend-count">(${layer.featureCount})</span>
+                </div>
+            </div>`;
+        }
+    });
+
+    if (html === '') {
+        legendContainer.style.display = 'none';
+    } else {
+        legendContent.innerHTML = html;
+    }
+}
+
+function toggleLegendPreview() {
+    const content = document.getElementById('legendPreviewContent');
+    const icon = document.getElementById('legendToggleIcon');
+
+    if (!content || !icon) return;
+
+    content.classList.toggle('hidden');
+
+    if (content.classList.contains('hidden')) {
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        icon.className = 'fas fa-eye';
+    }
 }
 
 function getGeometryIcon(layer) {
@@ -1766,6 +1843,7 @@ function toggleLayerVisibility(layerId) {
     }
 
     updateLayersList();
+    updateLegendPreview();
 	updateMapStatistics();
 }
 
