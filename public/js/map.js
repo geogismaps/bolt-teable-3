@@ -3207,6 +3207,12 @@ function removeLayer(layerId) {
             map.removeLayer(layer.leafletLayer);
         }
 
+        // Remove labels if they exist
+        if (layer.labelGroup) {
+            map.removeLayer(layer.labelGroup);
+            layer.labelGroup = null;
+        }
+
         // Remove from array
         mapLayers.splice(layerIndex, 1);
 
