@@ -1753,16 +1753,18 @@ function generateLayerLegendHtml(layer) {
         const symbolClass = layer.type === 'point' ? 'circle' :
                           layer.type === 'line' ? 'line' : '';
 
-        symbology.breaks.forEach((breakRange, index) => {
+        const min = symbology.min || 0;
+
+        symbology.breaks.forEach((breakValue, index) => {
             const color = symbology.colors[index];
-            const label = `${breakRange.min.toFixed(2)} - ${breakRange.max.toFixed(2)}`;
-            const count = breakRange.count || '';
+            const minVal = index === 0 ? min : symbology.breaks[index - 1];
+            const maxVal = breakValue;
+            const label = `${minVal.toFixed(2)} - ${maxVal.toFixed(2)}`;
 
             legendItemsHtml += `
                 <div class="legend-item">
                     <div class="legend-symbol ${symbolClass}" style="background-color: ${color}"></div>
                     <span class="legend-label">${label}</span>
-                    ${count ? `<span class="legend-count">(${count})</span>` : ''}
                 </div>
             `;
         });
