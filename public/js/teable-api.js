@@ -66,28 +66,50 @@ class TeableAPI {
      */
     async testConnection() {
         try {
+            console.log('🔍 Testing API connection with config:', {
+                baseUrl: this.config.baseUrl,
+                spaceId: this.config.spaceId,
+                baseId: this.config.baseId,
+                hasToken: !!this.config.accessToken
+            });
+
             // Test multiple endpoints to find working one
             const testEndpoints = [
-                `/api/table/${this.config.baseId}`, // Try base as table ID first
                 `/api/base/${this.config.baseId}/table`,
                 `/api/base/${this.config.baseId}`,
-                `/api/space/${this.config.spaceId}`,
-                `/api/space`
+                `/api/table/${this.config.baseId}`,
+                `/api/space/${this.config.spaceId}/base`,
+                `/api/space/${this.config.spaceId}`
             ];
+
+            const errors = [];
 
             for (const endpoint of testEndpoints) {
                 try {
-                    console.log(`Testing endpoint: ${endpoint}`);
-                    await this.request(endpoint);
-                    console.log(`✅ Success: ${endpoint}`);
-                    return { success: true, endpoint };
+                    console.log(`🔍 Testing endpoint: ${this.config.baseUrl}${endpoint}`);
+                    const result = await this.request(endpoint);
+                    console.log(`✅ Success with endpoint: ${endpoint}`, result);
+                    return { success: true, endpoint, result };
                 } catch (error) {
-                    console.log(`❌ Failed: ${endpoint} - ${error.message}`);
+                    const errorDetails = {
+                        endpoint,
+                        message: error.message,
+                        url: `${this.config.baseUrl}${endpoint}`
+                    };
+                    console.log(`❌ Failed: ${endpoint}`, errorDetails);
+                    errors.push(errorDetails);
                 }
             }
 
-            throw new Error('All test endpoints failed. Please check your credentials and Base ID.');
+            console.error('❌ All test endpoints failed:', errors);
+
+            const errorSummary = errors.map(e =>
+                `${e.endpoint}: ${e.message}`
+            ).join('\n');
+
+            throw new Error(`All test endpoints failed. Please check your credentials and Base ID.\n\nTried:\n${errorSummary}`);
         } catch (error) {
+            console.error('❌ Connection test error:', error);
             return { success: false, error: error.message };
         }
     }
