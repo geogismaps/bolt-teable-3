@@ -599,6 +599,20 @@ function showAlert(type, message) {
     }, 8000);
 }
 
+// Expose functions to global window object for inline onclick handlers
+window.testConnection = testConnection;
+window.autoSetup = autoSetup;
+window.resetForm = resetForm;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.activateConfig = activateConfig;
+window.editConfig = editConfig;
+window.testConfigConnection = testConfigConnection;
+window.deleteConfig = deleteConfig;
+window.proceedToClient = proceedToClient;
+window.exportConfigs = exportConfigs;
+window.viewSystemLogs = viewSystemLogs;
+window.backupData = backupData;
+
 // Add CSS for better styling
 const style = document.createElement('style');
 style.textContent = `
@@ -611,28 +625,28 @@ style.textContent = `
         display: flex;
         align-items: center;
     }
-    
+
     .stat-icon {
         font-size: 2rem;
         margin-right: 1rem;
         opacity: 0.8;
     }
-    
+
     .stat-content h3 {
         font-size: 2.5rem;
         font-weight: bold;
         margin: 0;
     }
-    
+
     .stat-content p {
         margin: 0;
         opacity: 0.9;
     }
-    
+
     .config-card {
         transition: all 0.3s ease;
     }
-    
+
     .config-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
