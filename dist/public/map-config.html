@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Configuration - Teable GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .config-tabs {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .config-tab {
+            background: #f8f9fa;
+            border: none;
+            padding: 15px 20px;
+            color: #6c757d;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .config-tab:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .config-tab.active {
+            background: white;
+            color: #0d6efd;
+            border-bottom-color: #0d6efd;
+        }
+        
+        .tab-content {
+            padding: 30px;
+            background: white;
+        }
+        
+        .preview-map {
+            height: 400px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-toggle {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-toggle.enabled {
+            background: #e7f3ff;
+            border-color: #0d6efd;
+        }
+        
+        .feature-toggle h6 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .feature-toggle.enabled h6 {
+            color: #0d6efd;
+        }
+        
+        .feature-options {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .layer-config-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .layer-config-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .save-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+        }
+        
+        .style-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            border: 2px solid #333;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .coordinate-input {
+            position: relative;
+        }
+        
+        .coordinate-input .btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+        
+        .center-options {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .styling-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .graduated-controls, .categorized-controls {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+    </style>
+  <link rel="stylesheet" crossorigin href="/assets/styles-BRGBj_cd.css">
+</head>
+<body>
+    <div class="min-vh-100 bg-light">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="dashboard.html">
+                    <i class="fas fa-database me-2"></i>Teable GIS System
+                </a>
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <span class="nav-text text-white me-3" id="userDisplay"></span>
+                    <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid py-4">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4><i class="fas fa-cog me-2"></i>Map Configuration</h4>
+                    <p class="text-muted mb-0">Configure public map settings, layers, and permissions</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" onclick="saveAllConfigurations()">
+                        <i class="fas fa-save me-1"></i>Save All Changes
+                    </button>
+                    <button class="btn btn-info" onclick="previewPublicMap()">
+                        <i class="fas fa-external-link-alt me-1"></i>Preview Public Map
+                    </button>
+                </div>
+            </div>
+
+            <!-- Save Indicator -->
+            <div id="saveIndicator" class="save-indicator" style="display: none;"></div>
+
+            <!-- Configuration Tabs -->
+            <div class="config-tabs">
+                <div class="d-flex">
+                    <button class="config-tab active" onclick="switchTab('general')">
+                        <i class="fas fa-cog me-2"></i>General Settings
+                    </button>
+                    <button class="config-tab" onclick="switchTab('features')">
+                        <i class="fas fa-tools me-2"></i>Features
+                    </button>
+                    <button class="config-tab" onclick="switchTab('layers')">
+                        <i class="fas fa-layer-group me-2"></i>Public Layers
+                    </button>
+                    <button class="config-tab" onclick="switchTab('fields')">
+                        <i class="fas fa-list me-2"></i>Field Configuration
+                    </button>
+                    <button class="config-tab" onclick="switchTab('styling')">
+                        <i class="fas fa-palette me-2"></i>Labelling & Styling
+                    </button>
+                    <button class="config-tab" onclick="switchTab('permissions')">
+                        <i class="fas fa-shield-alt me-2"></i>Permissions
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content-container">
+                <!-- General Settings Tab -->
+                <div id="generalTab" class="tab-content">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <h5><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Map Title</label>
+                                <input type="text" class="form-control" id="mapTitle" placeholder="Enter map title">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Map Description</label>
+                                <textarea class="form-control" id="mapDescription" rows="3" placeholder="Enter map description"></textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Default Base Map</label>
+                                <select class="form-select" id="defaultBasemap">
+                                    <option value="openstreetmap">OpenStreetMap</option>
+                                    <option value="satellite">Satellite</option>
+                                    <option value="terrain">Terrain</option>
+                                    <option value="dark">Dark Mode</option>
+                                    <option value="light">Light Mode</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Default Zoom Level: <span id="zoomDisplay">10</span></label>
+                                <input type="range" class="form-range" id="defaultZoom" min="1" max="18" value="10" 
+                                       oninput="updateZoomDisplay(this.value)">
+                            </div>
+                            
+                            <h6><i class="fas fa-crosshairs me-2"></i>Map Center</h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Center Latitude</label>
+                                    <div class="coordinate-input">
+                                        <input type="number" class="form-control" id="centerLat" step="0.000001" 
+                                               placeholder="20.5937" onchange="updatePreviewCenter()">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCenterMarker()">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Center Longitude</label>
+                                    <div class="coordinate-input">
+                                        <input type="number" class="form-control" id="centerLng" step="0.000001" 
+                                               placeholder="78.9629" onchange="updatePreviewCenter()">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCenterMarker()">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="center-options">
+                                <h6><i class="fas fa-layer-group me-2"></i>Center to Layer</h6>
+                                <div class="row">
+                                    <div class="col-md-8 mb-2">
+                                        <select class="form-select" id="centerToLayerSelector">
+                                            <option value="">Select layer to center map...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <button class="btn btn-outline-success w-100" onclick="centerToLayer()">
+                                            <i class="fas fa-crosshairs me-1"></i>Center
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" id="enablePublicAccess" checked>
+                                <label class="form-check-label" for="enablePublicAccess">
+                                    <strong>Enable Public Access</strong>
+                                    <div class="text-muted small">Allow public users to access this map without login</div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <h5><i class="fas fa-eye me-2"></i>Live Preview</h5>
+                            <div id="previewMap" class="preview-map"></div>
+                            <button class="btn btn-primary w-100" onclick="updatePreview()">
+                                <i class="fas fa-sync me-1"></i>Update Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Features Tab -->
+                <div id="featuresTab" class="tab-content" style="display: none;">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <!-- Measurement Tools -->
+                            <div class="feature-toggle" id="measurementToggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableMeasurement">
+                                    <label class="form-check-label" for="enableMeasurement">
+                                        <h6><i class="fas fa-ruler me-2"></i>Measurement Tools</h6>
+                                        <p class="text-muted mb-0">Allow users to measure distances and areas</p>
+                                    </label>
+                                </div>
+                                <div class="feature-options" id="measurementOptions" style="display: none;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enableDistance" checked>
+                                        <label class="form-check-label" for="enableDistance">Distance measurement</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enableArea" checked>
+                                        <label class="form-check-label" for="enableArea">Area measurement</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Filtering -->
+                            <div class="feature-toggle" id="filterToggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableFiltering">
+                                    <label class="form-check-label" for="enableFiltering">
+                                        <h6><i class="fas fa-filter me-2"></i>Data Filtering</h6>
+                                        <p class="text-muted mb-0">Enable data filtering capabilities</p>
+                                    </label>
+                                </div>
+                                <div class="feature-options" id="filterOptions" style="display: none;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enableQuickSearch" checked>
+                                        <label class="form-check-label" for="enableQuickSearch">Quick search</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="enableAdvancedFilters">
+                                        <label class="form-check-label" for="enableAdvancedFilters">Advanced filters</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Popups -->
+                            <div class="feature-toggle" id="popupToggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enablePopups" checked>
+                                    <label class="form-check-label" for="enablePopups">
+                                        <h6><i class="fas fa-info-circle me-2"></i>Feature Popups</h6>
+                                        <p class="text-muted mb-0">Show information popups when clicking features</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <!-- Other Features -->
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableBasemapSwitcher" checked>
+                                    <label class="form-check-label" for="enableBasemapSwitcher">
+                                        <h6><i class="fas fa-map me-2"></i>Base Map Switcher</h6>
+                                        <p class="text-muted mb-0">Allow users to change base maps</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableLegend" checked>
+                                    <label class="form-check-label" for="enableLegend">
+                                        <h6><i class="fas fa-list-ul me-2"></i>Map Legend</h6>
+                                        <p class="text-muted mb-0">Show legend for map layers</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableCoordinates">
+                                    <label class="form-check-label" for="enableCoordinates">
+                                        <h6><i class="fas fa-crosshairs me-2"></i>Coordinate Display</h6>
+                                        <p class="text-muted mb-0">Show mouse coordinates</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableExport">
+                                    <label class="form-check-label" for="enableExport">
+                                        <h6><i class="fas fa-download me-2"></i>Data Export</h6>
+                                        <p class="text-muted mb-0">Allow users to export map data</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Public Layers Tab -->
+                <div id="layersTab" class="tab-content" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5><i class="fas fa-layer-group me-2"></i>Public Layers</h5>
+                        <button class="btn btn-success" onclick="addPublicLayer()">
+                            <i class="fas fa-plus me-1"></i>Add Public Layer
+                        </button>
+                    </div>
+                    
+                    <div id="publicLayersList">
+                        <!-- Public layers will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Field Configuration Tab -->
+                <div id="fieldsTab" class="tab-content" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Select Layer:</label>
+                            <select class="form-select" id="fieldLayerSelector" onchange="loadLayerFields()">
+                                <option value="">Choose a layer...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Field Selection Mode:</label>
+                            <select class="form-select" id="fieldSelectionMode" onchange="updateFieldSelection()">
+                                <option value="whitelist">Whitelist (show selected fields)</option>
+                                <option value="blacklist">Blacklist (hide selected fields)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h6><i class="fas fa-list me-2"></i>Layer Fields</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="layerFieldsList">
+                                <p class="text-muted text-center py-3">Select a layer to configure field visibility</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6><i class="fas fa-info-circle me-2"></i>Popup Fields Configuration</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Select Layer for Popup:</label>
+                                <select class="form-select" id="popupLayerSelector" onchange="loadPopupFields()">
+                                    <option value="">Choose a layer...</option>
+                                </select>
+                            </div>
+                            <div id="popupFieldsList">
+                                <p class="text-muted text-center py-3">Select a layer to configure popup fields</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Labelling & Styling Tab -->
+                <div id="stylingTab" class="tab-content" style="display: none;">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="styling-section">
+                                <h6><i class="fas fa-palette me-2"></i>Layer Styling</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Select Layer:</label>
+                                    <select class="form-select" id="styleLayerSelector" onchange="loadLayerStyling()">
+                                        <option value="">Choose a layer...</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Styling Type:</label>
+                                    <select class="form-select" id="stylingType" onchange="updateStylingType()">
+                                        <option value="single">Single Color</option>
+                                        <option value="graduated">Graduated Styling</option>
+                                        <option value="categorized">Categorized Styling</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Single Color Controls -->
+                                <div id="singleColorControls">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Fill Color:</label>
+                                            <div class="d-flex align-items-center">
+                                                <input type="color" class="form-control form-control-color" id="fillColor" value="#3498db" onchange="updateStylePreview()">
+                                                <div id="fillPreview" class="style-preview ms-2"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Border Color:</label>
+                                            <div class="d-flex align-items-center">
+                                                <input type="color" class="form-control form-control-color" id="borderColor" value="#2c3e50" onchange="updateStylePreview()">
+                                                <div id="borderPreview" class="style-preview ms-2"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Fill Opacity: <span id="opacityDisplay">70%</span></label>
+                                        <input type="range" class="form-range" id="fillOpacity" min="0" max="1" step="0.1" value="0.7">
+                                    </div>
+                                </div>
+                                
+                                <!-- Graduated Styling Controls -->
+                                <div id="graduatedControls" class="graduated-controls" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Field for Graduated Styling:</label>
+                                        <select class="form-select" id="graduatedField">
+                                            <option value="">Select field...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Number of Classes:</label>
+                                        <select class="form-select" id="graduatedClasses">
+                                            <option value="3">3 Classes</option>
+                                            <option value="5" selected>5 Classes</option>
+                                            <option value="7">7 Classes</option>
+                                            <option value="10">10 Classes</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Color Scheme:</label>
+                                        <select class="form-select" id="graduatedColorScheme">
+                                            <option value="blues">Blues</option>
+                                            <option value="greens">Greens</option>
+                                            <option value="reds">Reds</option>
+                                            <option value="oranges">Oranges</option>
+                                            <option value="purples">Purples</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Categorized Styling Controls -->
+                                <div id="categorizedControls" class="categorized-controls" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Field for Categorized Styling:</label>
+                                        <select class="form-select" id="categorizedField">
+                                            <option value="">Select field...</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Auto-generate Colors:</label>
+                                        <button class="btn btn-outline-primary" onclick="generateCategorizedColors()">
+                                            <i class="fas fa-palette me-1"></i>Generate Colors
+                                        </button>
+                                    </div>
+                                    <div id="categorizedColorList">
+                                        <!-- Category colors will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="styling-section">
+                                <h6><i class="fas fa-tag me-2"></i>Layer Labelling</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Select Layer:</label>
+                                    <select class="form-select" id="labelLayerSelector" onchange="loadLayerLabelling()">
+                                        <option value="">Choose a layer...</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enableLabels">
+                                    <label class="form-check-label" for="enableLabels">
+                                        <strong>Enable Labels</strong>
+                                    </label>
+                                </div>
+                                
+                                <div id="labelOptions" style="display: none;">
+                                    <div class="mb-3">
+                                        <label class="form-label">Label Field:</label>
+                                        <select class="form-select" id="labelField">
+                                            <option value="">Select field for labels...</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Font Size:</label>
+                                            <select class="form-select" id="labelFontSize">
+                                                <option value="10">10px</option>
+                                                <option value="12" selected>12px</option>
+                                                <option value="14">14px</option>
+                                                <option value="16">16px</option>
+                                                <option value="18">18px</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Label Color:</label>
+                                            <input type="color" class="form-control form-control-color" id="labelColor" value="#333333">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="labelBackground" checked>
+                                        <label class="form-check-label" for="labelBackground">
+                                            Show label background
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="styling-section mt-4">
+                                <h6><i class="fas fa-eye me-2"></i>Style Preview</h6>
+                                <div class="border rounded p-3 bg-white text-center">
+                                    <div class="d-inline-block position-relative">
+                                        <div style="width: 60px; height: 60px; background: #3498db; border: 2px solid #2c3e50; border-radius: 6px;"></div>
+                                        <div class="position-absolute top-50 start-50 translate-middle text-white small fw-bold">Sample</div>
+                                    </div>
+                                    <p class="mt-2 mb-0 small text-muted">Preview of current styling</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permissions Tab -->
+                <div id="permissionsTab" class="tab-content" style="display: none;">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <h5><i class="fas fa-shield-alt me-2"></i>Public Access Permissions</h5>
+                            
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="allowPublicEditing">
+                                    <label class="form-check-label" for="allowPublicEditing">
+                                        <h6><i class="fas fa-edit me-2"></i>Allow Public Editing</h6>
+                                        <p class="text-muted mb-0">Allow public users to edit data (not recommended)</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="allowPublicExport">
+                                    <label class="form-check-label" for="allowPublicExport">
+                                        <h6><i class="fas fa-download me-2"></i>Allow Public Export</h6>
+                                        <p class="text-muted mb-0">Allow public users to export data</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="allowPublicPrint" checked>
+                                    <label class="form-check-label" for="allowPublicPrint">
+                                        <h6><i class="fas fa-print me-2"></i>Allow Public Print</h6>
+                                        <p class="text-muted mb-0">Allow public users to print the map</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <h5><i class="fas fa-share-alt me-2"></i>Sharing & Embedding</h5>
+                            
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableMapSharing" checked>
+                                    <label class="form-check-label" for="enableMapSharing">
+                                        <h6><i class="fas fa-share me-2"></i>Enable Map Sharing</h6>
+                                        <p class="text-muted mb-0">Allow users to share map links</p>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="feature-toggle">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableEmbedding">
+                                    <label class="form-check-label" for="enableEmbedding">
+                                        <h6><i class="fas fa-code me-2"></i>Enable Map Embedding</h6>
+                                        <p class="text-muted mb-0">Allow embedding map in other websites</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Public Layer Modal -->
+    <div class="modal fade" id="addPublicLayerModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Add Public Layer
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data Source (Table):</label>
+                            <select class="form-select" id="publicLayerTable">
+                                <option value="">Select table...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Layer Name:</label>
+                            <input type="text" class="form-control" id="publicLayerName" placeholder="Enter layer name">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Visibility:</label>
+                            <select class="form-select" id="publicLayerVisibility">
+                                <option value="visible">Visible by default</option>
+                                <option value="hidden">Hidden by default</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Display Order:</label>
+                            <input type="number" class="form-control" id="publicLayerOrder" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (Optional):</label>
+                        <textarea class="form-control" id="publicLayerDescription" rows="2" placeholder="Enter layer description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="savePublicLayer()">
+                        <i class="fas fa-save me-1"></i>Add Layer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/teable-api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map-config.js"></script>
+</body>
+</html>
