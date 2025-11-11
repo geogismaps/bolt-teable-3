@@ -6,6 +6,9 @@ import dotenv from 'dotenv';
 import { customerRouter } from './routes/customers.js';
 import { htmlEditorRouter } from './routes/html-editor.js';
 import { authRouter } from './routes/auth.js';
+import { dataRouter } from './routes/data.js';
+import { googleOAuthRouter } from './routes/google-oauth.js';
+import { googleSheetsRouter } from './routes/google-sheets.js';
 import { tenantMiddleware } from './middleware/tenant.js';
 import { serveCustomerHTML } from './middleware/customer-html.js';
 
@@ -26,6 +29,9 @@ app.use(tenantMiddleware);
 app.use('/api/auth', authRouter);
 app.use('/api/customers', customerRouter);
 app.use('/api/html-editor', htmlEditorRouter);
+app.use('/api/data', dataRouter);
+app.use('/api/auth/google', googleOAuthRouter);
+app.use('/api/google-sheets', googleSheetsRouter);
 
 app.use(serveCustomerHTML);
 
