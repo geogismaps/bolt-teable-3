@@ -93,7 +93,7 @@ customerRouter.post('/', async (req, res) => {
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         trial_ends_at: trialEndsAt.toISOString(),
-        data_source_type: dataSourceType
+        data_source: dataSourceType
       })
       .select()
       .single();
@@ -306,7 +306,7 @@ customerRouter.post('/:id/complete-setup', async (req, res) => {
     if (dataSourceType) {
       await supabase
         .from('customers')
-        .update({ data_source_type: dataSourceType })
+        .update({ data_source: dataSourceType })
         .eq('id', id);
     }
 

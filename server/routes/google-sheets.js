@@ -258,7 +258,7 @@ googleSheetsRouter.post('/:customerId/save-config', async (req, res) => {
 
     await supabase
       .from('customers')
-      .update({ data_source_type: 'google_sheets' })
+      .update({ data_source: 'google_sheets' })
       .eq('id', customerId);
 
     res.json({ success: true });

@@ -15,7 +15,7 @@ export class AdapterFactory {
 
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, data_source_type')
+      .select('id, data_source')
       .eq('id', customerId)
       .single();
 
@@ -25,12 +25,12 @@ export class AdapterFactory {
 
     let adapter;
 
-    if (customer.data_source_type === 'teable') {
+    if (customer.data_source === 'teable') {
       adapter = await this.createTeableAdapter(customerId, tableId);
-    } else if (customer.data_source_type === 'google_sheets') {
+    } else if (customer.data_source === 'google_sheets') {
       adapter = await this.createGoogleSheetsAdapter(customerId);
     } else {
-      throw new Error(`Unsupported data source type: ${customer.data_source_type}`);
+      throw new Error(`Unsupported data source type: ${customer.data_source}`);
     }
 
     await adapter.connect();
@@ -103,7 +103,7 @@ export class AdapterFactory {
   static async getDataSourceType(customerId) {
     const { data: customer, error } = await supabase
       .from('customers')
-      .select('data_source_type')
+      .select('data_source')
       .eq('id', customerId)
       .single();
 
@@ -111,6 +111,6 @@ export class AdapterFactory {
       throw new Error(`Customer not found: ${customerId}`);
     }
 
-    return customer.data_source_type;
+    return customer.data_source;
   }
 }
