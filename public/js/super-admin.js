@@ -822,9 +822,10 @@ async function startGoogleOAuth() {
 
         const responseText = await response.text();
         console.log('OAuth response text:', responseText.substring(0, 200));
+        alert(`DEBUG: Response status=${response.status}, body length=${responseText.length}, first 100 chars=${responseText.substring(0, 100)}`);
 
         if (!responseText) {
-            throw new Error('Empty response from OAuth endpoint');
+            throw new Error('Empty response from OAuth endpoint - server returned nothing');
         }
 
         let data;
@@ -833,7 +834,8 @@ async function startGoogleOAuth() {
         } catch (parseError) {
             console.error('Failed to parse OAuth response:', parseError);
             console.error('Response text:', responseText);
-            throw new Error(`Invalid JSON response: ${parseError.message}`);
+            alert(`DEBUG: JSON Parse Failed! Response was: ${responseText.substring(0, 500)}`);
+            throw new Error(`Invalid JSON response: ${parseError.message}. Server returned: ${responseText.substring(0, 100)}`);
         }
 
         if (data.authUrl) {
