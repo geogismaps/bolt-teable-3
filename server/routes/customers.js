@@ -1,7 +1,12 @@
 import express from 'express';
+import crypto from 'crypto';
 import { supabase, logCustomerActivity } from '../config/supabase.js';
 
 export const customerRouter = express.Router();
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password + 'teable_salt_2024').digest('hex');
+}
 
 customerRouter.get('/', async (req, res) => {
   try {
@@ -48,11 +53,18 @@ customerRouter.post('/', async (req, res) => {
       maxUsers = 5,
       maxMapViews = 1000,
       primaryColor = '#2563eb',
-      secondaryColor = '#1e40af'
+      secondaryColor = '#1e40af',
+      adminEmail,
+      adminPassword,
+      dataSourceType = 'teable'
     } = req.body;
 
     if (!name || !subdomain) {
       return res.status(400).json({ error: 'Name and subdomain are required' });
+    }
+
+    if (adminEmail && !adminPassword) {
+      return res.status(400).json({ error: 'Admin password is required when creating admin user' });
     }
 
     const { data: existing } = await supabase
@@ -80,21 +92,50 @@ customerRouter.post('/', async (req, res) => {
         max_map_views: maxMapViews,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
-        trial_ends_at: trialEndsAt.toISOString()
+        trial_ends_at: trialEndsAt.toISOString(),
+        data_source_type: dataSourceType
       })
       .select()
       .single();
 
     if (error) throw error;
 
+    let ownerUser = null;
+    if (adminEmail && adminPassword) {
+      const passwordHash = hashPassword(adminPassword);
+      const emailParts = adminEmail.split('@')[0];
+      const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
+
+      const { data: user, error: userError } = await supabase
+        .from('customer_users')
+        .insert({
+          customer_id: customer.id,
+          email: adminEmail.toLowerCase(),
+          first_name: firstName,
+          last_name: 'Admin',
+          role: 'owner',
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (userError) {
+        console.error('Error creating customer user:', userError);
+        await supabase.from('customers').delete().eq('id', customer.id);
+        return res.status(500).json({ error: 'Failed to create customer user' });
+      }
+
+      ownerUser = user;
+    }
+
     await logCustomerActivity(
       customer.id,
-      req.body.adminEmail || 'system',
+      adminEmail || 'system',
       'customer_created',
       `Customer ${name} created with subdomain ${subdomain}`
     );
 
-    res.json({ success: true, customer });
+    res.json({ success: true, customer, ownerUser });
   } catch (error) {
     console.error('Error creating customer:', error);
     res.status(500).json({ error: 'Failed to create customer' });
@@ -207,5 +248,78 @@ customerRouter.get('/:id/teable-config', async (req, res) => {
   } catch (error) {
     console.error('Error fetching Teable config:', error);
     res.status(500).json({ error: 'Failed to fetch Teable config' });
+  }
+});
+
+customerRouter.post('/:id/complete-setup', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminEmail, adminPassword, dataSourceType } = req.body;
+
+    if (!adminEmail || !adminPassword) {
+      return res.status(400).json({ error: 'Admin email and password are required' });
+    }
+
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (customerError || !customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const { data: existingUser } = await supabase
+      .from('customer_users')
+      .select('id')
+      .eq('customer_id', id)
+      .eq('email', adminEmail.toLowerCase())
+      .maybeSingle();
+
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists for this customer' });
+    }
+
+    const passwordHash = hashPassword(adminPassword);
+    const emailParts = adminEmail.split('@')[0];
+    const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
+
+    const { data: user, error: userError } = await supabase
+      .from('customer_users')
+      .insert({
+        customer_id: id,
+        email: adminEmail.toLowerCase(),
+        first_name: firstName,
+        last_name: 'Admin',
+        role: 'owner',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      console.error('Error creating customer user:', userError);
+      return res.status(500).json({ error: 'Failed to create customer user' });
+    }
+
+    if (dataSourceType) {
+      await supabase
+        .from('customers')
+        .update({ data_source_type: dataSourceType })
+        .eq('id', id);
+    }
+
+    await logCustomerActivity(
+      id,
+      adminEmail,
+      'customer_setup_completed',
+      `Customer setup completed for ${customer.name}`
+    );
+
+    res.json({ success: true, customer, user });
+  } catch (error) {
+    console.error('Error completing customer setup:', error);
+    res.status(500).json({ error: 'Failed to complete customer setup' });
   }
 });
