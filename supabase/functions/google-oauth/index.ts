@@ -98,11 +98,25 @@ Deno.serve(async (req: Request) => {
     const path = url.pathname.replace('/google-oauth/', '');
 
     if (path === 'test' && req.method === 'GET') {
+      const hasClientId = !!Deno.env.get('GOOGLE_CLIENT_ID');
+      const hasClientSecret = !!Deno.env.get('GOOGLE_CLIENT_SECRET');
+      const hasRedirectUri = !!Deno.env.get('GOOGLE_REDIRECT_URI');
+      const hasEncryptionKey = !!Deno.env.get('ENCRYPTION_KEY');
+
+      const isConfigured = hasClientId && hasClientSecret && hasRedirectUri && hasEncryptionKey;
+
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Google OAuth router is working',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          configured: isConfigured,
+          environment: {
+            GOOGLE_CLIENT_ID: hasClientId ? 'SET' : 'MISSING',
+            GOOGLE_CLIENT_SECRET: hasClientSecret ? 'SET' : 'MISSING',
+            GOOGLE_REDIRECT_URI: hasRedirectUri ? 'SET' : 'MISSING',
+            ENCRYPTION_KEY: hasEncryptionKey ? 'SET' : 'MISSING'
+          }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

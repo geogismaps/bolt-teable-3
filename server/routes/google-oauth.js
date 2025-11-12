@@ -13,17 +13,23 @@ googleOAuthRouter.get('/test', (req, res) => {
   });
 });
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/userinfo.email'
 ];
+
+function getOAuth2Client() {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+    throw new Error('Google OAuth credentials not configured');
+  }
+
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
+}
 
 googleOAuthRouter.get('/start', async (req, res) => {
   try {
@@ -65,6 +71,7 @@ googleOAuthRouter.get('/start', async (req, res) => {
 
     console.log('✅ OAuth state saved successfully');
 
+    const oauth2Client = getOAuth2Client();
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
@@ -108,6 +115,7 @@ googleOAuthRouter.get('/callback', async (req, res) => {
       return res.status(400).send('OAuth state expired. Please try again.');
     }
 
+    const oauth2Client = getOAuth2Client();
     const { tokens } = await oauth2Client.getToken(code);
 
     oauth2Client.setCredentials(tokens);
@@ -181,6 +189,7 @@ googleOAuthRouter.post('/refresh', async (req, res) => {
     const encryptionService = getEncryptionService();
     const refreshToken = encryptionService.decrypt(config.oauth_refresh_token);
 
+    const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials({
       refresh_token: refreshToken
     });

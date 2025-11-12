@@ -808,35 +808,15 @@ async function startGoogleOAuth() {
         console.log('Customer created, starting OAuth:', currentCustomerId);
 
         const oauthUrl = `${window.apiConfig.endpoints.googleOAuth}/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`;
-        console.log('Fetching OAuth URL:', oauthUrl);
 
         const response = await fetch(oauthUrl);
-        console.log('OAuth response status:', response.status, response.statusText);
-        console.log('OAuth response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OAuth error response:', errorText);
-            throw new Error(`OAuth request failed: ${response.status} ${response.statusText} - ${errorText}`);
+            const errorData = await response.json().catch(() => ({ error: response.statusText }));
+            throw new Error(errorData.error || `OAuth request failed: ${response.status}`);
         }
 
-        const responseText = await response.text();
-        console.log('OAuth response text:', responseText.substring(0, 200));
-        alert(`DEBUG: Response status=${response.status}, body length=${responseText.length}, first 100 chars=${responseText.substring(0, 100)}`);
-
-        if (!responseText) {
-            throw new Error('Empty response from OAuth endpoint - server returned nothing');
-        }
-
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('Failed to parse OAuth response:', parseError);
-            console.error('Response text:', responseText);
-            alert(`DEBUG: JSON Parse Failed! Response was: ${responseText.substring(0, 500)}`);
-            throw new Error(`Invalid JSON response: ${parseError.message}. Server returned: ${responseText.substring(0, 100)}`);
-        }
+        const data = await response.json();
 
         if (data.authUrl) {
             sessionStorage.setItem('pendingCustomerId', currentCustomerId);
@@ -844,11 +824,16 @@ async function startGoogleOAuth() {
             sessionStorage.setItem('pendingOwnerPassword', ownerPassword);
             sessionStorage.setItem('pendingClientName', clientName);
             sessionStorage.setItem('pendingSubdomain', subdomain);
-            window.location.href = data.authUrl;
+
+            showAlert('info', 'Redirecting to Google for authentication...');
+
+            setTimeout(() => {
+                window.location.href = data.authUrl;
+            }, 500);
         } else if (data.error) {
             throw new Error(data.error);
         } else {
-            throw new Error('Failed to get OAuth URL');
+            throw new Error('Failed to get OAuth URL from server');
         }
     } catch (error) {
         console.error('Error starting OAuth:', error);
