@@ -130,74 +130,85 @@ function updateStats() {
 async function handleClientCreation(event) {
     event.preventDefault();
 
-    try {
-        const config = {
-            clientName: document.getElementById('clientName').value.trim(),
-            ownerEmail: document.getElementById('ownerEmail').value.trim(),
-            ownerPassword: document.getElementById('ownerPassword').value.trim(),
-            baseUrl: document.getElementById('teableUrl').value.trim(),
-            spaceId: document.getElementById('spaceId').value.trim(),
-            baseId: document.getElementById('baseId').value.trim(),
-            accessToken: document.getElementById('apiToken').value.trim()
-        };
+    const selectedSource = document.querySelector('input[name="dataSource"]:checked').value;
 
-        // Validation
-        if (!config.clientName || !config.ownerEmail || !config.ownerPassword || 
-            !config.baseUrl || !config.baseId || !config.accessToken) {
+    if (selectedSource === 'google_sheets') {
+        await handleGoogleSheetsClientCreation();
+    } else {
+        await handleTeableClientCreation();
+    }
+}
+
+async function handleTeableClientCreation() {
+    try {
+        const clientName = document.getElementById('clientName').value.trim();
+        const ownerEmail = document.getElementById('ownerEmail').value.trim();
+        const ownerPassword = document.getElementById('ownerPassword').value.trim();
+        const baseUrl = document.getElementById('teableUrl').value.trim();
+        const spaceId = document.getElementById('spaceId').value.trim();
+        const baseId = document.getElementById('baseId').value.trim();
+        const accessToken = document.getElementById('apiToken').value.trim();
+
+        if (!clientName || !ownerEmail || !ownerPassword || !baseUrl || !baseId || !accessToken) {
             throw new Error('Please fill in all required fields');
         }
 
-        if (!config.ownerEmail.includes('@')) {
+        if (!ownerEmail.includes('@')) {
             throw new Error('Please enter a valid email address');
         }
 
-        if (config.ownerPassword.length < 6) {
+        if (ownerPassword.length < 6) {
             throw new Error('Owner password must be at least 6 characters long');
         }
 
-        // Show loading
         showLoadingState(true);
+        console.log('Creating Teable client...');
 
-        console.log('Creating client configuration...');
+        const subdomain = clientName.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-        // Test connection first
-        await testConnectionInternal(config);
+        const customerResponse = await fetch('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: clientName,
+                subdomain: subdomain,
+                adminEmail: ownerEmail,
+                adminPassword: ownerPassword,
+                dataSourceType: 'teable'
+            })
+        });
 
-        // Initialize API with new config
-        window.teableAPI.init(config);
+        if (!customerResponse.ok) {
+            const errorData = await customerResponse.json();
+            throw new Error(errorData.error || 'Failed to create customer');
+        }
 
-        // Create system tables
-        console.log('Creating system tables...');
-        await window.teableAPI.ensureSystemTables();
+        const { customer, ownerUser } = await customerResponse.json();
+        console.log('Customer created:', customer.id);
 
-        // Create Owner user in app_users table
-        console.log('Creating Owner user...');
-        const ownerPasswordHash = await window.teableAPI.hashPassword(config.ownerPassword);
-        
-        // Extract name from email if no separate name provided
-        const emailParts = config.ownerEmail.split('@')[0];
-        const firstName = emailParts.charAt(0).toUpperCase() + emailParts.slice(1);
-        
-        const ownerUserData = {
-            email: config.ownerEmail,
-            password_hash: ownerPasswordHash,
-            first_name: firstName,
-            last_name: 'Owner',
-            role: 'Owner', // Using Teable.io nomenclature with proper case
-            is_active: true,
-            created_date: new Date().toISOString().split('T')[0],
-            last_login: null,
-            synced_from_teable: false,
-            teable_user_id: null,
-            admin_password_hash: ownerPasswordHash // Owner can use same password for admin functions
-        };
+        const configResponse = await fetch(`/api/customers/${customer.id}/teable-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                baseUrl: baseUrl,
+                spaceId: spaceId,
+                baseId: baseId,
+                accessToken: accessToken,
+                adminEmail: ownerEmail
+            })
+        });
 
-        await window.teableAPI.createRecord(window.teableAPI.systemTables.users, ownerUserData);
+        if (!configResponse.ok) {
+            throw new Error('Failed to save Teable configuration');
+        }
 
-        // Save configuration
         const fullConfig = {
-            ...config,
-            id: Date.now().toString(),
+            clientName: clientName,
+            ownerEmail: ownerEmail,
+            subdomain: subdomain,
+            customerId: customer.id,
+            dataSource: 'teable',
+            id: customer.id,
             created: new Date().toISOString(),
             status: 'active',
             userCount: 1
@@ -207,38 +218,133 @@ async function handleClientCreation(event) {
         configs.push(fullConfig);
         localStorage.setItem('teable_client_configs', JSON.stringify(configs));
 
-        // Set as active configuration
-        localStorage.setItem('teable_client_config', JSON.stringify(fullConfig));
-
-        // Log initial activity
-        try {
-            await window.teableAPI.logActivity(
-                config.ownerEmail,
-                'system_initialized',
-                `Client "${config.clientName}" configured and system initialized`
-            );
-        } catch (logError) {
-            console.log('Failed to log initial activity:', logError.message);
-        }
-
         showLoadingState(false);
-
-        // Show success modal
         showSuccessModal(fullConfig);
 
-        // Reset form
         document.getElementById('clientConfigForm').reset();
-
-        // Refresh displays
         loadExistingConfigs();
         updateStats();
 
-        console.log('Client created successfully:', fullConfig);
+        console.log('Teable client created successfully');
 
     } catch (error) {
-        console.error('Client creation failed:', error);
+        console.error('Teable client creation failed:', error);
         showLoadingState(false);
-        showAlert('danger', 'Failed to create client: ' + error.message);
+        showAlert('danger', 'Failed to create Teable client: ' + error.message);
+    }
+}
+
+async function handleGoogleSheetsClientCreation() {
+    try {
+        if (!currentCustomerId) {
+            throw new Error('Please complete Google OAuth authentication first');
+        }
+
+        const clientName = document.getElementById('clientName').value.trim();
+        const ownerEmail = document.getElementById('ownerEmail').value.trim();
+        const ownerPassword = document.getElementById('ownerPassword').value.trim();
+        const spreadsheetId = document.getElementById('spreadsheetSelect').value;
+        const sheetName = document.getElementById('sheetSelect').value;
+        const geometryColumn = document.getElementById('geometryColumn').value;
+        const idColumn = document.getElementById('idColumn').value;
+        const nameColumn = document.getElementById('nameColumn').value;
+        const latColumn = document.getElementById('latColumn').value;
+        const lngColumn = document.getElementById('lngColumn').value;
+
+        if (!clientName || !ownerEmail || !ownerPassword) {
+            throw new Error('Please fill in client name, email, and password');
+        }
+
+        if (!spreadsheetId || !sheetName) {
+            throw new Error('Please select a spreadsheet and sheet');
+        }
+
+        if (!geometryColumn && (!latColumn || !lngColumn)) {
+            throw new Error('Please select either a geometry column or latitude/longitude columns');
+        }
+
+        if (!idColumn || !nameColumn) {
+            throw new Error('Please select ID and name columns');
+        }
+
+        showLoadingState(true);
+        console.log('Completing Google Sheets client setup...');
+
+        const fieldMappings = {
+            geometry_column: geometryColumn || null,
+            id_column: idColumn,
+            name_column: nameColumn,
+            latitude_column: latColumn || null,
+            longitude_column: lngColumn || null
+        };
+
+        const configResponse = await fetch(`/api/google-sheets/${currentCustomerId}/save-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                spreadsheetId: spreadsheetId,
+                sheetName: sheetName,
+                fieldMappings: fieldMappings
+            })
+        });
+
+        if (!configResponse.ok) {
+            const errorData = await configResponse.json();
+            throw new Error(errorData.error || 'Failed to save Google Sheets configuration');
+        }
+
+        const setupResponse = await fetch(`/api/customers/${currentCustomerId}/complete-setup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                adminEmail: ownerEmail,
+                adminPassword: ownerPassword,
+                dataSourceType: 'google_sheets'
+            })
+        });
+
+        if (!setupResponse.ok) {
+            const errorData = await setupResponse.json();
+            throw new Error(errorData.error || 'Failed to complete customer setup');
+        }
+
+        const { customer } = await setupResponse.json();
+
+        const fullConfig = {
+            clientName: clientName,
+            ownerEmail: ownerEmail,
+            subdomain: customer.subdomain,
+            customerId: customer.id,
+            dataSource: 'google_sheets',
+            id: customer.id,
+            created: new Date().toISOString(),
+            status: 'active',
+            userCount: 1
+        };
+
+        const configs = getStoredConfigs();
+        configs.push(fullConfig);
+        localStorage.setItem('teable_client_configs', JSON.stringify(configs));
+
+        currentCustomerId = null;
+        currentOAuthEmail = null;
+
+        showLoadingState(false);
+        showSuccessModal(fullConfig);
+
+        document.getElementById('clientConfigForm').reset();
+        document.getElementById('googleAuthSection').style.display = 'block';
+        document.getElementById('googleConfigSection').style.display = 'none';
+
+        loadExistingConfigs();
+        updateStats();
+
+        console.log('Google Sheets client created successfully');
+
+    } catch (error) {
+        console.error('Google Sheets client creation failed:', error);
+        showLoadingState(false);
+        showAlert('danger', 'Failed to create Google Sheets client: ' + error.message);
     }
 }
 
@@ -445,12 +551,15 @@ function deleteConfig(index) {
 
 function showSuccessModal(config) {
     const content = document.getElementById('successContent');
+    const loginUrl = `https://${config.subdomain}.mapz.in/login.html`;
+    const dataSourceLabel = config.dataSource === 'google_sheets' ? 'Google Sheets' : 'Teable.io';
+
     content.innerHTML = `
         <div class="text-center mb-4">
             <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
             <h4>Client "${config.clientName}" Created Successfully!</h4>
         </div>
-        
+
         <div class="row">
             <div class="col-md-6">
                 <h6><i class="fas fa-user me-2"></i>Owner Details</h6>
@@ -459,26 +568,35 @@ function showSuccessModal(config) {
                     <li><strong>Role:</strong> Owner (Full Access)</li>
                     <li><strong>Status:</strong> Active</li>
                 </ul>
-            </div></div>
-        </div>
+            </div>
             <div class="col-md-6">
                 <h6><i class="fas fa-database me-2"></i>System Setup</h6>
                 <ul class="list-unstyled">
-                    <li><i class="fas fa-check text-success me-1"></i>System tables created</li>
+                    <li><i class="fas fa-check text-success me-1"></i>Customer created</li>
                     <li><i class="fas fa-check text-success me-1"></i>Owner account created</li>
-                    <li><i class="fas fa-check text-success me-1"></i>Configuration saved</li>
-                    <li><i class="fas fa-check text-success me-1"></i>API connection verified</li>
+                    <li><i class="fas fa-check text-success me-1"></i>Data source configured (${dataSourceLabel})</li>
+                    <li><i class="fas fa-check text-success me-1"></i>Ready to use</li>
                 </ul>
             </div>
         </div>
-        
+
         <div class="alert alert-info mt-3">
-            <h6><i class="fas fa-info-circle me-2"></i>Next Steps</h6>
+            <h6><i class="fas fa-info-circle me-2"></i>Login Information</h6>
+            <ul class="mb-0">
+                <li><strong>Login URL:</strong> <a href="${loginUrl}" target="_blank">${loginUrl}</a></li>
+                <li><strong>Email:</strong> <code>${config.ownerEmail}</code></li>
+                <li><strong>Password:</strong> <em>As configured</em></li>
+                <li><strong>Subdomain:</strong> <code>${config.subdomain}</code></li>
+            </ul>
+        </div>
+
+        <div class="alert alert-success mt-2">
+            <h6><i class="fas fa-rocket me-2"></i>Next Steps</h6>
             <ol class="mb-0">
-                <li>Proceed to the client portal to start using the system</li>
-                <li>Owner can log in using email: <code>${config.ownerEmail}</code></li>
-                <li>Access map.html and table.html for data management</li>
-                <li>Configure additional users through the user management panel</li>
+                <li>Share the login URL with the customer owner</li>
+                <li>Owner logs in with their email and password</li>
+                <li>Customer can access their maps and data</li>
+                <li>Owner can invite additional users through user management</li>
             </ol>
         </div>
     `;
@@ -490,9 +608,8 @@ function showSuccessModal(config) {
 
 function proceedToClient() {
     if (currentClientConfig) {
-        // Set the configuration as active and redirect to login
-        localStorage.setItem('teable_client_config', JSON.stringify(currentClientConfig));
-        window.location.href = 'login.html';
+        const loginUrl = `https://${currentClientConfig.subdomain}.mapz.in/login.html`;
+        window.open(loginUrl, '_blank');
     }
 }
 
