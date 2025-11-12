@@ -807,8 +807,34 @@ async function startGoogleOAuth() {
 
         console.log('Customer created, starting OAuth:', currentCustomerId);
 
-        const response = await fetch(`/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`);
-        const data = await response.json();
+        const oauthUrl = `/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`;
+        console.log('Fetching OAuth URL:', oauthUrl);
+
+        const response = await fetch(oauthUrl);
+        console.log('OAuth response status:', response.status, response.statusText);
+        console.log('OAuth response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OAuth error response:', errorText);
+            throw new Error(`OAuth request failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const responseText = await response.text();
+        console.log('OAuth response text:', responseText.substring(0, 200));
+
+        if (!responseText) {
+            throw new Error('Empty response from OAuth endpoint');
+        }
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Failed to parse OAuth response:', parseError);
+            console.error('Response text:', responseText);
+            throw new Error(`Invalid JSON response: ${parseError.message}`);
+        }
 
         if (data.authUrl) {
             sessionStorage.setItem('pendingCustomerId', currentCustomerId);
@@ -817,6 +843,8 @@ async function startGoogleOAuth() {
             sessionStorage.setItem('pendingClientName', clientName);
             sessionStorage.setItem('pendingSubdomain', subdomain);
             window.location.href = data.authUrl;
+        } else if (data.error) {
+            throw new Error(data.error);
         } else {
             throw new Error('Failed to get OAuth URL');
         }

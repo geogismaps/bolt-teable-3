@@ -5,6 +5,14 @@ import { getEncryptionService, EncryptionService } from '../utils/encryption.js'
 
 export const googleOAuthRouter = express.Router();
 
+googleOAuthRouter.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Google OAuth router is working',
+    timestamp: new Date().toISOString()
+  });
+});
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
