@@ -242,7 +242,11 @@ async function handleGoogleSheetsClientCreation() {
 
         const clientName = document.getElementById('clientName').value.trim();
         const ownerEmail = document.getElementById('ownerEmail').value.trim();
-        const ownerPassword = document.getElementById('ownerPassword').value.trim();
+        let ownerPassword = document.getElementById('ownerPassword').value.trim();
+
+        if (!ownerPassword) {
+            ownerPassword = sessionStorage.getItem('pendingOwnerPassword');
+        }
         const spreadsheetId = document.getElementById('spreadsheetSelect').value;
         const sheetName = document.getElementById('sheetSelect').value;
         const geometryColumn = document.getElementById('geometryColumn').value;
@@ -328,6 +332,12 @@ async function handleGoogleSheetsClientCreation() {
 
         currentCustomerId = null;
         currentOAuthEmail = null;
+
+        sessionStorage.removeItem('pendingCustomerId');
+        sessionStorage.removeItem('pendingOwnerEmail');
+        sessionStorage.removeItem('pendingOwnerPassword');
+        sessionStorage.removeItem('pendingClientName');
+        sessionStorage.removeItem('pendingSubdomain');
 
         showLoadingState(false);
         showSuccessModal(fullConfig);
@@ -759,44 +769,60 @@ function toggleDataSource() {
 
 async function startGoogleOAuth() {
     try {
-        if (!currentCustomerId) {
-            const clientName = document.getElementById('clientName').value;
-            const ownerEmail = document.getElementById('ownerEmail').value;
+        const clientName = document.getElementById('clientName').value.trim();
+        const ownerEmail = document.getElementById('ownerEmail').value.trim();
+        const ownerPassword = document.getElementById('ownerPassword').value.trim();
 
-            if (!clientName || !ownerEmail) {
-                alert('Please fill in Client Name and Owner Email first');
-                return;
-            }
-
-            const customerResponse = await fetch('/api/customers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: clientName,
-                    subdomain: clientName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-                    adminEmail: ownerEmail
-                })
-            });
-
-            if (!customerResponse.ok) {
-                throw new Error('Failed to create customer');
-            }
-
-            const customerData = await customerResponse.json();
-            currentCustomerId = customerData.customer.id;
+        if (!clientName || !ownerEmail || !ownerPassword) {
+            showAlert('danger', 'Please fill in Client Name, Owner Email, and Owner Password before connecting Google account');
+            return;
         }
 
-        const response = await fetch(`/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${document.getElementById('ownerEmail').value}`);
+        if (ownerPassword.length < 6) {
+            showAlert('danger', 'Owner password must be at least 6 characters long');
+            return;
+        }
+
+        showAlert('info', 'Creating customer record...');
+
+        const subdomain = clientName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+        const customerResponse = await fetch('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: clientName,
+                subdomain: subdomain,
+                dataSourceType: 'google_sheets'
+            })
+        });
+
+        if (!customerResponse.ok) {
+            const errorData = await customerResponse.json();
+            throw new Error(errorData.error || 'Failed to create customer');
+        }
+
+        const customerData = await customerResponse.json();
+        currentCustomerId = customerData.customer.id;
+
+        console.log('Customer created, starting OAuth:', currentCustomerId);
+
+        const response = await fetch(`/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`);
         const data = await response.json();
 
         if (data.authUrl) {
+            sessionStorage.setItem('pendingCustomerId', currentCustomerId);
+            sessionStorage.setItem('pendingOwnerEmail', ownerEmail);
+            sessionStorage.setItem('pendingOwnerPassword', ownerPassword);
+            sessionStorage.setItem('pendingClientName', clientName);
+            sessionStorage.setItem('pendingSubdomain', subdomain);
             window.location.href = data.authUrl;
         } else {
-            alert('Failed to start OAuth flow');
+            throw new Error('Failed to get OAuth URL');
         }
     } catch (error) {
         console.error('Error starting OAuth:', error);
-        alert(`Error: ${error.message}`);
+        showAlert('danger', `Error starting OAuth: ${error.message}`);
     }
 }
 
@@ -961,15 +987,27 @@ if (window.location.search.includes('oauth=success')) {
         currentCustomerId = customerId;
         currentOAuthEmail = email;
 
+        const pendingClientName = sessionStorage.getItem('pendingClientName');
+        const pendingOwnerEmail = sessionStorage.getItem('pendingOwnerEmail');
+
         setTimeout(() => {
             document.getElementById('sourceGoogleSheets').checked = true;
             toggleDataSource();
+
+            if (pendingClientName) {
+                document.getElementById('clientName').value = pendingClientName;
+            }
+            if (pendingOwnerEmail) {
+                document.getElementById('ownerEmail').value = pendingOwnerEmail;
+            }
 
             document.getElementById('googleAuthSection').style.display = 'none';
             document.getElementById('googleConfigSection').style.display = 'block';
             document.getElementById('googleEmail').textContent = email;
 
             loadSpreadsheets();
+
+            showAlert('success', 'Google account connected successfully! Now select your spreadsheet and configure field mappings.');
 
             window.history.replaceState({}, document.title, window.location.pathname);
         }, 500);
