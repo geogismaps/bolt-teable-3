@@ -92,65 +92,179 @@
                                                     <i class="fas fa-lock me-2"></i>Owner Password
                                                 </label>
                                                 <div class="input-group">
-                                                    <input type="password" class="form-control" id="ownerPassword" 
+                                                    <input type="password" class="form-control" id="ownerPassword"
                                                            placeholder="Secure password for owner" required>
-                                                    <button class="btn btn-outline-secondary" type="button" 
+                                                    <button class="btn btn-outline-secondary" type="button"
                                                             onclick="togglePasswordVisibility('ownerPassword')">
                                                         <i class="fas fa-eye"></i>
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            <div class="mb-3">
-                                                <label class="form-label fw-semibold">
-                                                    <i class="fas fa-link me-2"></i>Teable Instance URL
-                                                </label>
-                                                <input type="url" class="form-control" id="teableUrl" 
-                                                       placeholder="https://your-instance.teable.io" required>
-                                                <div class="form-text">The base URL of your Teable.io instance</div>
-                                            </div>
-
-                                            <div class="row mb-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-semibold">
-                                                        <i class="fas fa-layer-group me-2"></i>Space ID
-                                                    </label>
-                                                    <input type="text" class="form-control" id="spaceId" 
-                                                           placeholder="spc_xxxxxxxxxxxxx" required>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-semibold">
-                                                        <i class="fas fa-database me-2"></i>Base ID
-                                                    </label>
-                                                    <input type="text" class="form-control" id="baseId" 
-                                                           placeholder="bse_xxxxxxxxxxxxx" required>
-                                                </div>
-                                            </div>
-
+                                            <!-- Data Source Selection -->
                                             <div class="mb-4">
                                                 <label class="form-label fw-semibold">
-                                                    <i class="fas fa-key me-2"></i>API Token
+                                                    <i class="fas fa-database me-2"></i>Data Source
                                                 </label>
-                                                <div class="input-group">
-                                                    <input type="password" class="form-control" id="apiToken" 
-                                                           placeholder="Enter API token..." required>
-                                                    <button class="btn btn-outline-secondary" type="button" 
-                                                            onclick="togglePasswordVisibility('apiToken')">
-                                                        <i class="fas fa-eye"></i>
+                                                <div class="btn-group w-100" role="group">
+                                                    <input type="radio" class="btn-check" name="dataSource" id="sourceTable" value="teable" checked onchange="toggleDataSource()">
+                                                    <label class="btn btn-outline-primary" for="sourceTable">
+                                                        <i class="fas fa-table me-2"></i>Teable.io
+                                                    </label>
+                                                    <input type="radio" class="btn-check" name="dataSource" id="sourceGoogleSheets" value="google_sheets" onchange="toggleDataSource()">
+                                                    <label class="btn btn-outline-success" for="sourceGoogleSheets">
+                                                        <i class="fab fa-google me-2"></i>Google Sheets
+                                                    </label>
+                                                </div>
+                                                <div class="form-text">Choose where customer parcel data will be stored</div>
+                                            </div>
+
+                                            <!-- Teable Configuration Section -->
+                                            <div id="teableConfig">
+                                                <h6 class="mb-3 text-primary"><i class="fas fa-table me-2"></i>Teable Configuration</h6>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-link me-2"></i>Teable Instance URL
+                                                    </label>
+                                                    <input type="url" class="form-control" id="teableUrl"
+                                                           placeholder="https://your-instance.teable.io">
+                                                    <div class="form-text">The base URL of your Teable.io instance</div>
+                                                </div>
+
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-semibold">
+                                                            <i class="fas fa-layer-group me-2"></i>Space ID
+                                                        </label>
+                                                        <input type="text" class="form-control" id="spaceId"
+                                                               placeholder="spc_xxxxxxxxxxxxx">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-semibold">
+                                                            <i class="fas fa-database me-2"></i>Base ID
+                                                        </label>
+                                                        <input type="text" class="form-control" id="baseId"
+                                                               placeholder="bse_xxxxxxxxxxxxx">
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <label class="form-label fw-semibold">
+                                                        <i class="fas fa-key me-2"></i>API Token
+                                                    </label>
+                                                    <div class="input-group">
+                                                        <input type="password" class="form-control" id="apiToken"
+                                                               placeholder="Enter API token...">
+                                                        <button class="btn btn-outline-secondary" type="button"
+                                                                onclick="togglePasswordVisibility('apiToken')">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </div>
+                                                    <div class="form-text">API token with admin permissions for this space</div>
+                                                </div>
+
+                                                <!-- Test Connection -->
+                                                <div class="mb-4">
+                                                    <button type="button" class="btn btn-info me-2" onclick="testTeableConnection()">
+                                                        <i class="fas fa-wifi me-2"></i>Test Connection
                                                     </button>
+                                                    <button type="button" class="btn btn-warning" onclick="autoSetup()">
+                                                        <i class="fas fa-magic me-2"></i>Auto Setup System Tables
+                                                    </button>
+                                                    <div id="teableConnectionStatus" class="mt-2"></div>
                                                 </div>
-                                                <div class="form-text">API token with admin permissions for this space</div>
                                             </div>
 
-                                            <!-- Test Connection -->
-                                            <div class="mb-4">
-                                                <button type="button" class="btn btn-info me-2" onclick="testConnection()">
-                                                    <i class="fas fa-wifi me-2"></i>Test Connection
-                                                </button>
-                                                <button type="button" class="btn btn-warning" onclick="autoSetup()">
-                                                    <i class="fas fa-magic me-2"></i>Auto Setup System Tables
-                                                </button>
-                                                <div id="connectionStatus" class="mt-2"></div>
+                                            <!-- Google Sheets Configuration Section -->
+                                            <div id="googleSheetsConfig" style="display:none;">
+                                                <h6 class="mb-3 text-success"><i class="fab fa-google me-2"></i>Google Sheets Configuration</h6>
+
+                                                <div id="googleAuthSection" class="mb-4">
+                                                    <button type="button" class="btn btn-success" onclick="startGoogleOAuth()">
+                                                        <i class="fab fa-google me-2"></i>Connect Google Account
+                                                    </button>
+                                                    <div class="form-text">Authenticate with Google to access your spreadsheets</div>
+                                                </div>
+
+                                                <div id="googleConfigSection" style="display:none;">
+                                                    <div class="alert alert-success mb-3">
+                                                        <i class="fas fa-check-circle me-2"></i>Connected as: <strong id="googleEmail"></strong>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">
+                                                            <i class="fas fa-file-spreadsheet me-2"></i>Select Spreadsheet
+                                                        </label>
+                                                        <select class="form-control" id="spreadsheetSelect" onchange="loadSheets()">
+                                                            <option value="">Loading spreadsheets...</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">
+                                                            <i class="fas fa-file-alt me-2"></i>Select Sheet
+                                                        </label>
+                                                        <select class="form-control" id="sheetSelect">
+                                                            <option value="">First select a spreadsheet</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <button type="button" class="btn btn-info" onclick="autoDetectFields()">
+                                                            <i class="fas fa-magic me-2"></i>Auto-Detect Fields
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-info" onclick="previewData()">
+                                                            <i class="fas fa-eye me-2"></i>Preview Data
+                                                        </button>
+                                                    </div>
+
+                                                    <div class="row mb-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-semibold">Geometry Column</label>
+                                                            <select class="form-control" id="geometryColumn">
+                                                                <option value="">Select column...</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-semibold">ID Column</label>
+                                                            <select class="form-control" id="idColumn">
+                                                                <option value="">Select column...</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="row mb-3">
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-semibold">Name Column</label>
+                                                            <select class="form-control" id="nameColumn">
+                                                                <option value="">Select column...</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-semibold">Latitude Column (Optional)</label>
+                                                            <select class="form-control" id="latColumn">
+                                                                <option value="">None</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-semibold">Longitude Column (Optional)</label>
+                                                            <select class="form-control" id="lngColumn">
+                                                                <option value="">None</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <div id="previewContainer" class="mb-3" style="display:none;">
+                                                        <h6 class="mb-2">Data Preview</h6>
+                                                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                                            <table class="table table-sm table-bordered" id="previewTable">
+                                                                <thead></thead>
+                                                                <tbody></tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <!-- Action Buttons -->

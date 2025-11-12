@@ -599,6 +599,266 @@ function showAlert(type, message) {
     }, 8000);
 }
 
+// Expose functions to global window object for inline onclick handlers
+window.testConnection = testConnection;
+window.autoSetup = autoSetup;
+window.resetForm = resetForm;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.activateConfig = activateConfig;
+window.editConfig = editConfig;
+window.testConfigConnection = testConfigConnection;
+window.deleteConfig = deleteConfig;
+window.proceedToClient = proceedToClient;
+window.exportConfigs = exportConfigs;
+window.viewSystemLogs = viewSystemLogs;
+window.backupData = backupData;
+
+let currentCustomerId = null;
+let currentOAuthEmail = null;
+
+function toggleDataSource() {
+    const selectedSource = document.querySelector('input[name="dataSource"]:checked').value;
+    const teableConfig = document.getElementById('teableConfig');
+    const googleSheetsConfig = document.getElementById('googleSheetsConfig');
+
+    if (selectedSource === 'teable') {
+        teableConfig.style.display = 'block';
+        googleSheetsConfig.style.display = 'none';
+
+        document.getElementById('teableUrl').required = true;
+        document.getElementById('spaceId').required = true;
+        document.getElementById('baseId').required = true;
+        document.getElementById('apiToken').required = true;
+    } else {
+        teableConfig.style.display = 'none';
+        googleSheetsConfig.style.display = 'block';
+
+        document.getElementById('teableUrl').required = false;
+        document.getElementById('spaceId').required = false;
+        document.getElementById('baseId').required = false;
+        document.getElementById('apiToken').required = false;
+    }
+}
+
+async function startGoogleOAuth() {
+    try {
+        if (!currentCustomerId) {
+            const clientName = document.getElementById('clientName').value;
+            const ownerEmail = document.getElementById('ownerEmail').value;
+
+            if (!clientName || !ownerEmail) {
+                alert('Please fill in Client Name and Owner Email first');
+                return;
+            }
+
+            const customerResponse = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: clientName,
+                    subdomain: clientName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                    adminEmail: ownerEmail
+                })
+            });
+
+            if (!customerResponse.ok) {
+                throw new Error('Failed to create customer');
+            }
+
+            const customerData = await customerResponse.json();
+            currentCustomerId = customerData.customer.id;
+        }
+
+        const response = await fetch(`/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${document.getElementById('ownerEmail').value}`);
+        const data = await response.json();
+
+        if (data.authUrl) {
+            window.location.href = data.authUrl;
+        } else {
+            alert('Failed to start OAuth flow');
+        }
+    } catch (error) {
+        console.error('Error starting OAuth:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function loadSpreadsheets() {
+    try {
+        const response = await fetch(`/api/google-sheets/${currentCustomerId}/spreadsheets`);
+        const data = await response.json();
+
+        const select = document.getElementById('spreadsheetSelect');
+        select.innerHTML = '<option value="">Select a spreadsheet...</option>';
+
+        data.spreadsheets.forEach(sheet => {
+            const option = document.createElement('option');
+            option.value = sheet.id;
+            option.textContent = sheet.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading spreadsheets:', error);
+        alert(`Error loading spreadsheets: ${error.message}`);
+    }
+}
+
+async function loadSheets() {
+    const spreadsheetId = document.getElementById('spreadsheetSelect').value;
+    if (!spreadsheetId) return;
+
+    try {
+        const response = await fetch(`/api/google-sheets/${currentCustomerId}/sheets?spreadsheetId=${spreadsheetId}`);
+        const data = await response.json();
+
+        const select = document.getElementById('sheetSelect');
+        select.innerHTML = '<option value="">Select a sheet...</option>';
+
+        data.sheets.forEach(sheet => {
+            const option = document.createElement('option');
+            option.value = sheet.title;
+            option.textContent = sheet.title;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading sheets:', error);
+        alert(`Error loading sheets: ${error.message}`);
+    }
+}
+
+async function autoDetectFields() {
+    const spreadsheetId = document.getElementById('spreadsheetSelect').value;
+    const sheetName = document.getElementById('sheetSelect').value;
+
+    if (!spreadsheetId || !sheetName) {
+        alert('Please select a spreadsheet and sheet first');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/google-sheets/${currentCustomerId}/detect-fields`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spreadsheetId, sheetName })
+        });
+
+        const suggestions = await response.json();
+
+        populateColumnDropdowns(suggestions.all_columns);
+
+        if (suggestions.geometry_column) {
+            document.getElementById('geometryColumn').value = suggestions.geometry_column;
+        }
+        if (suggestions.id_column) {
+            document.getElementById('idColumn').value = suggestions.id_column;
+        }
+        if (suggestions.name_column) {
+            document.getElementById('nameColumn').value = suggestions.name_column;
+        }
+        if (suggestions.latitude_column) {
+            document.getElementById('latColumn').value = suggestions.latitude_column;
+        }
+        if (suggestions.longitude_column) {
+            document.getElementById('lngColumn').value = suggestions.longitude_column;
+        }
+
+        showAlert('success', 'Fields auto-detected! Please review the selections.');
+    } catch (error) {
+        console.error('Error detecting fields:', error);
+        alert(`Error detecting fields: ${error.message}`);
+    }
+}
+
+function populateColumnDropdowns(columns) {
+    const dropdowns = ['geometryColumn', 'idColumn', 'nameColumn', 'latColumn', 'lngColumn'];
+
+    dropdowns.forEach(dropdownId => {
+        const select = document.getElementById(dropdownId);
+        if (!select) return;
+
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Select column...</option>';
+
+        columns.forEach(col => {
+            const option = document.createElement('option');
+            option.value = col;
+            option.textContent = col;
+            select.appendChild(option);
+        });
+
+        if (currentValue) {
+            select.value = currentValue;
+        }
+    });
+}
+
+async function previewData() {
+    const spreadsheetId = document.getElementById('spreadsheetSelect').value;
+    const sheetName = document.getElementById('sheetSelect').value;
+
+    if (!spreadsheetId || !sheetName) {
+        alert('Please select a spreadsheet and sheet first');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/google-sheets/${currentCustomerId}/preview?spreadsheetId=${spreadsheetId}&sheetName=${encodeURIComponent(sheetName)}`);
+        const data = await response.json();
+
+        const previewTable = document.getElementById('previewTable');
+        const thead = previewTable.querySelector('thead');
+        const tbody = previewTable.querySelector('tbody');
+
+        thead.innerHTML = '<tr>' + data.headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        tbody.innerHTML = data.rows.map(row =>
+            '<tr>' + row.map(cell => `<td>${cell || ''}</td>`).join('') + '</tr>'
+        ).join('');
+
+        document.getElementById('previewContainer').style.display = 'block';
+
+        populateColumnDropdowns(data.headers);
+        showAlert('success', 'Data preview loaded!');
+    } catch (error) {
+        console.error('Error previewing data:', error);
+        alert(`Error previewing data: ${error.message}`);
+    }
+}
+
+function testTeableConnection() {
+    testConnection();
+}
+
+window.toggleDataSource = toggleDataSource;
+window.startGoogleOAuth = startGoogleOAuth;
+window.loadSheets = loadSheets;
+window.autoDetectFields = autoDetectFields;
+window.previewData = previewData;
+window.testTeableConnection = testTeableConnection;
+
+if (window.location.search.includes('oauth=success')) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const email = urlParams.get('email');
+    const customerId = urlParams.get('customer');
+
+    if (email && customerId) {
+        currentCustomerId = customerId;
+        currentOAuthEmail = email;
+
+        setTimeout(() => {
+            document.getElementById('sourceGoogleSheets').checked = true;
+            toggleDataSource();
+
+            document.getElementById('googleAuthSection').style.display = 'none';
+            document.getElementById('googleConfigSection').style.display = 'block';
+            document.getElementById('googleEmail').textContent = email;
+
+            loadSpreadsheets();
+
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 500);
+    }
+}
+
 // Add CSS for better styling
 const style = document.createElement('style');
 style.textContent = `
@@ -611,28 +871,28 @@ style.textContent = `
         display: flex;
         align-items: center;
     }
-    
+
     .stat-icon {
         font-size: 2rem;
         margin-right: 1rem;
         opacity: 0.8;
     }
-    
+
     .stat-content h3 {
         font-size: 2.5rem;
         font-weight: bold;
         margin: 0;
     }
-    
+
     .stat-content p {
         margin: 0;
         opacity: 0.9;
     }
-    
+
     .config-card {
         transition: all 0.3s ease;
     }
-    
+
     .config-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
