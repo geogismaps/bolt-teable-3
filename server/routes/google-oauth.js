@@ -19,13 +19,27 @@ const SCOPES = [
 
 googleOAuthRouter.get('/start', async (req, res) => {
   try {
+    console.log('🔵 Google OAuth start request:', req.query);
+
     const { customerId, adminEmail } = req.query;
 
     if (!customerId || !adminEmail) {
+      console.error('❌ Missing required parameters:', { customerId, adminEmail });
       return res.status(400).json({ error: 'customerId and adminEmail are required' });
     }
 
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('❌ Missing Google OAuth credentials in environment');
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server' });
+    }
+
+    if (!process.env.ENCRYPTION_KEY) {
+      console.error('❌ Missing encryption key in environment');
+      return res.status(500).json({ error: 'Encryption is not configured on the server' });
+    }
+
     const stateToken = EncryptionService.generateToken();
+    console.log('🔑 Generated state token:', stateToken.substring(0, 10) + '...');
 
     const { error } = await supabase
       .from('google_oauth_state')
@@ -37,9 +51,11 @@ googleOAuthRouter.get('/start', async (req, res) => {
       });
 
     if (error) {
-      console.error('Error saving OAuth state:', error);
-      return res.status(500).json({ error: 'Failed to initiate OAuth flow' });
+      console.error('❌ Error saving OAuth state:', error);
+      return res.status(500).json({ error: 'Failed to initiate OAuth flow', details: error.message });
     }
+
+    console.log('✅ OAuth state saved successfully');
 
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -48,10 +64,12 @@ googleOAuthRouter.get('/start', async (req, res) => {
       prompt: 'consent'
     });
 
+    console.log('✅ Generated auth URL:', authUrl.substring(0, 50) + '...');
+
     res.json({ authUrl });
   } catch (error) {
-    console.error('Error starting OAuth:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error starting OAuth:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 

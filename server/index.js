@@ -26,12 +26,12 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(tenantMiddleware);
 
+app.use('/api/auth/google', googleOAuthRouter);
+app.use('/api/google-sheets', googleSheetsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/customers', customerRouter);
 app.use('/api/html-editor', htmlEditorRouter);
 app.use('/api/data', dataRouter);
-app.use('/api/auth/google', googleOAuthRouter);
-app.use('/api/google-sheets', googleSheetsRouter);
 
 app.use(serveCustomerHTML);
 
