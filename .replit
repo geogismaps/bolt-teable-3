@@ -3,21 +3,25 @@ modules = ["nodejs-20"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "Dev Server"
+runButton = "Start Servers"
 
 [[workflows.workflow]]
-name = "Dev Server"
+name = "Start Servers"
 author = 42569924
-mode = "sequential"
+mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd project && npm run dev -- --host 0.0.0.0 --port 5000"
+args = "npm run server"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- --host 0.0.0.0 --port 5000"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
