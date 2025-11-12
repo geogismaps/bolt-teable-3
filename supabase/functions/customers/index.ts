@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
           max_map_views: maxMapViews, primary_color: primaryColor,
           secondary_color: secondaryColor,
           trial_ends_at: trialEndsAt.toISOString(),
-          data_source_type: dataSourceType
+          data_source: dataSourceType
         })
         .select()
         .single();
@@ -282,7 +282,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (dataSourceType) {
-        await supabase.from('customers').update({ data_source_type: dataSourceType }).eq('id', id);
+        await supabase.from('customers').update({ data_source: dataSourceType }).eq('id', id);
       }
 
       await logActivity(supabase, id, adminEmail, 'customer_setup_completed', `Customer setup completed for ${customer.name}`);

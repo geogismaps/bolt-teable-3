@@ -276,7 +276,7 @@ Deno.serve(async (req: Request) => {
 
       await supabase
         .from('customers')
-        .update({ data_source_type: 'google_sheets' })
+        .update({ data_source: 'google_sheets' })
         .eq('id', customerId);
 
       return new Response(
