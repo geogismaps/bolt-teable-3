@@ -166,9 +166,9 @@ async function handleTeableClientCreation() {
 
         const subdomain = clientName.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-        const customerResponse = await fetch('/api/customers', {
+        const customerResponse = await fetch(window.apiConfig.endpoints.customers, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({
                 name: clientName,
                 subdomain: subdomain,
@@ -186,9 +186,9 @@ async function handleTeableClientCreation() {
         const { customer, ownerUser } = await customerResponse.json();
         console.log('Customer created:', customer.id);
 
-        const configResponse = await fetch(`/api/customers/${customer.id}/teable-config`, {
+        const configResponse = await fetch(`${window.apiConfig.endpoints.customers}/${customer.id}/teable-config`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({
                 baseUrl: baseUrl,
                 spaceId: spaceId,
@@ -282,9 +282,9 @@ async function handleGoogleSheetsClientCreation() {
             longitude_column: lngColumn || null
         };
 
-        const configResponse = await fetch(`/api/google-sheets/${currentCustomerId}/save-config`, {
+        const configResponse = await fetch(`${window.apiConfig.endpoints.googleSheets}/${currentCustomerId}/save-config`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({
                 spreadsheetId: spreadsheetId,
                 sheetName: sheetName,
@@ -297,9 +297,9 @@ async function handleGoogleSheetsClientCreation() {
             throw new Error(errorData.error || 'Failed to save Google Sheets configuration');
         }
 
-        const setupResponse = await fetch(`/api/customers/${currentCustomerId}/complete-setup`, {
+        const setupResponse = await fetch(`${window.apiConfig.endpoints.customers}/${currentCustomerId}/complete-setup`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({
                 adminEmail: ownerEmail,
                 adminPassword: ownerPassword,
@@ -787,9 +787,9 @@ async function startGoogleOAuth() {
 
         const subdomain = clientName.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-        const customerResponse = await fetch('/api/customers', {
+        const customerResponse = await fetch(window.apiConfig.endpoints.customers, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({
                 name: clientName,
                 subdomain: subdomain,
@@ -807,8 +807,36 @@ async function startGoogleOAuth() {
 
         console.log('Customer created, starting OAuth:', currentCustomerId);
 
-        const response = await fetch(`/api/auth/google/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`);
-        const data = await response.json();
+        const oauthUrl = `${window.apiConfig.endpoints.googleOAuth}/start?customerId=${currentCustomerId}&adminEmail=${ownerEmail}`;
+        console.log('Fetching OAuth URL:', oauthUrl);
+
+        const response = await fetch(oauthUrl);
+        console.log('OAuth response status:', response.status, response.statusText);
+        console.log('OAuth response headers:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OAuth error response:', errorText);
+            throw new Error(`OAuth request failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        const responseText = await response.text();
+        console.log('OAuth response text:', responseText.substring(0, 200));
+        alert(`DEBUG: Response status=${response.status}, body length=${responseText.length}, first 100 chars=${responseText.substring(0, 100)}`);
+
+        if (!responseText) {
+            throw new Error('Empty response from OAuth endpoint - server returned nothing');
+        }
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Failed to parse OAuth response:', parseError);
+            console.error('Response text:', responseText);
+            alert(`DEBUG: JSON Parse Failed! Response was: ${responseText.substring(0, 500)}`);
+            throw new Error(`Invalid JSON response: ${parseError.message}. Server returned: ${responseText.substring(0, 100)}`);
+        }
 
         if (data.authUrl) {
             sessionStorage.setItem('pendingCustomerId', currentCustomerId);
@@ -817,6 +845,8 @@ async function startGoogleOAuth() {
             sessionStorage.setItem('pendingClientName', clientName);
             sessionStorage.setItem('pendingSubdomain', subdomain);
             window.location.href = data.authUrl;
+        } else if (data.error) {
+            throw new Error(data.error);
         } else {
             throw new Error('Failed to get OAuth URL');
         }
@@ -828,7 +858,7 @@ async function startGoogleOAuth() {
 
 async function loadSpreadsheets() {
     try {
-        const response = await fetch(`/api/google-sheets/${currentCustomerId}/spreadsheets`);
+        const response = await fetch(`${window.apiConfig.endpoints.googleSheets}/${currentCustomerId}/spreadsheets`, { headers: window.apiConfig.getHeaders() });
         const data = await response.json();
 
         const select = document.getElementById('spreadsheetSelect');
@@ -851,7 +881,7 @@ async function loadSheets() {
     if (!spreadsheetId) return;
 
     try {
-        const response = await fetch(`/api/google-sheets/${currentCustomerId}/sheets?spreadsheetId=${spreadsheetId}`);
+        const response = await fetch(`${window.apiConfig.endpoints.googleSheets}/${currentCustomerId}/sheets?spreadsheetId=${spreadsheetId}`, { headers: window.apiConfig.getHeaders() });
         const data = await response.json();
 
         const select = document.getElementById('sheetSelect');
@@ -879,9 +909,9 @@ async function autoDetectFields() {
     }
 
     try {
-        const response = await fetch(`/api/google-sheets/${currentCustomerId}/detect-fields`, {
+        const response = await fetch(`${window.apiConfig.endpoints.googleSheets}/${currentCustomerId}/detect-fields`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: window.apiConfig.getHeaders(),
             body: JSON.stringify({ spreadsheetId, sheetName })
         });
 
@@ -945,7 +975,7 @@ async function previewData() {
     }
 
     try {
-        const response = await fetch(`/api/google-sheets/${currentCustomerId}/preview?spreadsheetId=${spreadsheetId}&sheetName=${encodeURIComponent(sheetName)}`);
+        const response = await fetch(`${window.apiConfig.endpoints.googleSheets}/${currentCustomerId}/preview?spreadsheetId=${spreadsheetId}&sheetName=${encodeURIComponent(sheetName)}`, { headers: window.apiConfig.getHeaders() });
         const data = await response.json();
 
         const previewTable = document.getElementById('previewTable');
