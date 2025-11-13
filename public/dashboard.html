@@ -375,6 +375,26 @@
 
         <!-- Main Content -->
         <div class="container-fluid py-4">
+            <!-- Onboarding Progress Banner -->
+            <div id="onboardingBanner" class="alert alert-info border-0 shadow-sm mb-4" style="display: none; border-radius: 15px; background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);">
+                <div class="d-flex align-items-center justify-content-between flex-wrap">
+                    <div class="flex-grow-1 mb-3 mb-md-0">
+                        <h5 class="mb-2">
+                            <i class="fas fa-rocket me-2"></i>Complete Your Setup
+                        </h5>
+                        <p class="mb-3 text-muted">Finish setting up your account to unlock all features</p>
+                        <div class="progress" style="height: 8px; border-radius: 10px; max-width: 400px;">
+                            <div id="onboardingProgress" class="progress-bar bg-primary" role="progressbar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <a href="customer-onboarding.html" class="btn btn-primary">
+                            <i class="fas fa-arrow-right me-2"></i>Continue Setup
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Enhanced Stats Cards -->
             <div class="stats-grid">
                 <div class="enhanced-stats-card primary">

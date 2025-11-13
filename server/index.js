@@ -9,6 +9,8 @@ import { authRouter } from './routes/auth.js';
 import { dataRouter } from './routes/data.js';
 import { googleOAuthRouter } from './routes/google-oauth.js';
 import { googleSheetsRouter } from './routes/google-sheets.js';
+import { customerAuthRouter } from './routes/customer-auth.js';
+import { onboardingRouter } from './routes/onboarding.js';
 import { tenantMiddleware } from './middleware/tenant.js';
 import { serveCustomerHTML } from './middleware/customer-html.js';
 
@@ -67,6 +69,8 @@ app.use(tenantMiddleware);
 
 app.use('/api/auth/google', googleOAuthRouter);
 app.use('/api/google-sheets', googleSheetsRouter);
+app.use('/api/auth/customer', customerAuthRouter);
+app.use('/api/onboarding', onboardingRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/customers', customerRouter);
 app.use('/api/html-editor', htmlEditorRouter);

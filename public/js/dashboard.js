@@ -12,10 +12,13 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
-        
+
         // Display user info
         displayUserInfo(session);
-        
+
+        // Check onboarding status
+        await checkOnboardingStatus(session);
+
         // Show admin features if user is admin or creator
         if (session.isAdmin || session.role === 'creator') {
             document.getElementById('quickActions').style.display = 'block';
@@ -37,10 +40,37 @@ async function initializeDashboard() {
 
         // Load dashboard data
         await loadDashboardStats();
-        
+
     } catch (error) {
         console.error('Dashboard initialization failed:', error);
         showError('Failed to load dashboard: ' + error.message);
+    }
+}
+
+async function checkOnboardingStatus(session) {
+    try {
+        const customerSession = localStorage.getItem('customer_session');
+        if (!customerSession) return;
+
+        const customerData = JSON.parse(customerSession);
+        if (!customerData.customerId) return;
+
+        const response = await fetch(`${window.location.origin}/api/onboarding/status/${customerData.customerId}`);
+        const data = await response.json();
+
+        if (data.success && data.status && !data.status.is_complete) {
+            const banner = document.getElementById('onboardingBanner');
+            const progressBar = document.getElementById('onboardingProgress');
+
+            const stepsCompleted = Object.keys(data.status.steps_completed || {}).length;
+            const totalSteps = 3;
+            const progressPercent = (stepsCompleted / totalSteps) * 100;
+
+            progressBar.style.width = `${progressPercent}%`;
+            banner.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking onboarding status:', error);
     }
 }
 
