@@ -171,3 +171,58 @@ dataRouter.get('/:customerId/tables', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+dataRouter.get('/:customerId/tables/:tableId/fields', async (req, res) => {
+  try {
+    const { customerId, tableId } = req.params;
+
+    const adapter = await AdapterFactory.getAdapter(customerId, tableId);
+    const fields = await adapter.getSchema();
+
+    res.json({
+      success: true,
+      dataSource: adapter.getDataSourceType(),
+      fields: fields
+    });
+  } catch (error) {
+    console.error('Error fetching table fields:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+dataRouter.get('/:customerId/tables/:tableId/records', async (req, res) => {
+  try {
+    const { customerId, tableId } = req.params;
+    const { limit, offset, filter, sort } = req.query;
+
+    const adapter = await AdapterFactory.getAdapter(customerId, tableId);
+
+    const options = {
+      limit: limit ? parseInt(limit) : 100,
+      offset: offset ? parseInt(offset) : 0
+    };
+
+    if (filter) {
+      try {
+        options.filter = JSON.parse(filter);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid filter format' });
+      }
+    }
+
+    if (sort) {
+      options.sort = sort;
+    }
+
+    const geojson = await adapter.fetchRecords(options);
+
+    res.json({
+      success: true,
+      dataSource: adapter.getDataSourceType(),
+      records: geojson.features || []
+    });
+  } catch (error) {
+    console.error('Error fetching records:', error);
+    res.status(500).json({ error: error.message });
+  }
+});

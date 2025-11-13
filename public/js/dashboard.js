@@ -77,7 +77,20 @@ async function checkOnboardingStatus(session) {
 function displayUserInfo(session) {
     const displayName = `${session.firstName} ${session.lastName} (${session.role})`;
     document.getElementById('userDisplay').textContent = displayName;
-    
+
+    const welcomeMsg = document.getElementById('welcomeMessage');
+    if (welcomeMsg) {
+        const hour = new Date().getHours();
+        let greeting = 'Good evening';
+        if (hour < 12) greeting = 'Good morning';
+        else if (hour < 18) greeting = 'Good afternoon';
+
+        welcomeMsg.textContent = `${greeting}, ${session.firstName}!`;
+    }
+
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
     // Update hero section user info
     const heroDisplay = document.getElementById('userDisplayHero');
     if (heroDisplay) {
@@ -171,6 +184,21 @@ function showError(message) {
             alertDiv.remove();
         }
     }, 8000);
+}
+
+function updateDateTime() {
+    const now = new Date();
+
+    const dateEl = document.getElementById('currentDate');
+    if (dateEl) {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateEl.textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    const timeEl = document.getElementById('currentTime');
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
 }
 
 // Make functions globally available
