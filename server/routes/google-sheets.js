@@ -5,6 +5,67 @@ import { getEncryptionService } from '../utils/encryption.js';
 
 export const googleSheetsRouter = express.Router();
 
+googleSheetsRouter.get('/get-token/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const { data: config, error } = await supabase
+      .from('customer_google_sheets_config')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error || !config) {
+      return res.status(404).json({ error: 'Google Sheets configuration not found' });
+    }
+
+    const encryptionService = getEncryptionService();
+    const accessToken = encryptionService.decrypt(config.oauth_access_token);
+
+    res.json({
+      success: true,
+      accessToken: accessToken
+    });
+  } catch (error) {
+    console.error('Error getting access token:', error);
+    res.status(500).json({ error: 'Failed to get access token' });
+  }
+});
+
+googleSheetsRouter.post('/save-selection/:customerId', async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { spreadsheetId, sheetName } = req.body;
+
+    if (!spreadsheetId || !sheetName) {
+      return res.status(400).json({ error: 'spreadsheetId and sheetName are required' });
+    }
+
+    const { error } = await supabase
+      .from('customer_google_sheets_config')
+      .update({
+        spreadsheet_id: spreadsheetId,
+        sheet_name: sheetName
+      })
+      .eq('customer_id', customerId)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error saving sheet selection:', error);
+      return res.status(500).json({ error: 'Failed to save selection' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Sheet selection saved successfully'
+    });
+  } catch (error) {
+    console.error('Error saving sheet selection:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 async function getAuthorizedClient(customerId) {
   const { data: config, error } = await supabase
     .from('customer_google_sheets_config')
