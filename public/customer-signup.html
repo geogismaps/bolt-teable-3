@@ -291,6 +291,7 @@
             signupBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating account...';
 
             try {
+                console.log('Attempting signup to:', window.location.origin + '/api/auth/customer/signup');
                 const response = await fetch('/api/auth/customer/signup', {
                     method: 'POST',
                     headers: {
@@ -305,6 +306,7 @@
                         lastName: 'Admin'
                     })
                 });
+                console.log('Response status:', response.status);
 
                 const data = await response.json();
 
@@ -333,7 +335,12 @@
                 }
             } catch (error) {
                 console.error('Signup error:', error);
-                showError('Network error. Please check your connection and try again.');
+                console.error('Error details:', {
+                    message: error.message,
+                    type: error.name,
+                    stack: error.stack
+                });
+                showError(`Network error: ${error.message}. Server may be unavailable.`);
                 signupBtn.disabled = false;
                 signupBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Create Account';
             }
