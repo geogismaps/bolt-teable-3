@@ -69,6 +69,11 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
 app.use(tenantMiddleware);
 
 app.use('/api/auth/google', googleOAuthRouter);
@@ -104,7 +109,7 @@ app.use((err, req, res, next) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Multi-tenant GIS Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`✅ Google OAuth: ${config.googleOAuthEnabled ? 'ENABLED' : 'DISABLED'}`);
