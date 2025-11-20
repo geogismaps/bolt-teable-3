@@ -155,12 +155,18 @@ googleOAuthRouter.get('/callback', async (req, res) => {
       return res.status(500).send('Failed to save OAuth tokens');
     }
 
+    // Update customer data_source
+    await supabase
+      .from('customers')
+      .update({ data_source: 'google_sheets' })
+      .eq('id', stateRecord.customer_id);
+
     await supabase
       .from('google_oauth_state')
       .delete()
       .eq('state_token', state);
 
-    res.redirect(`/super-admin.html?oauth=success&email=${encodeURIComponent(userInfo.data.email)}&customer=${stateRecord.customer_id}`);
+    res.redirect(`/google-sheets-picker.html?oauth=success&customer=${stateRecord.customer_id}&email=${encodeURIComponent(userInfo.data.email)}`);
   } catch (error) {
     console.error('Error in OAuth callback:', error);
     res.status(500).send(`OAuth callback failed: ${error.message}`);

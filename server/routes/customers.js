@@ -217,6 +217,12 @@ customerRouter.post('/:id/teable-config', async (req, res) => {
 
     if (error) throw error;
 
+    // Update customer data_source
+    await supabase
+      .from('customers')
+      .update({ data_source: 'teable' })
+      .eq('id', id);
+
     await logCustomerActivity(
       id,
       req.body.adminEmail || 'system',
@@ -228,6 +234,44 @@ customerRouter.post('/:id/teable-config', async (req, res) => {
   } catch (error) {
     console.error('Error saving Teable config:', error);
     res.status(500).json({ error: 'Failed to save Teable config' });
+  }
+});
+
+customerRouter.post('/:id/test-teable', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { baseUrl, spaceId, baseId, accessToken } = req.body;
+
+    if (!baseUrl || !spaceId || !baseId || !accessToken) {
+      return res.status(400).json({ error: 'All Teable config fields are required' });
+    }
+
+    // Test connection by making a simple API call to Teable
+    const testUrl = `${baseUrl}/api/base/${baseId}/table`;
+
+    const testResponse = await fetch(testUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!testResponse.ok) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to connect to Teable. Please check your credentials.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Connection successful'
+    });
+  } catch (error) {
+    console.error('Error testing Teable connection:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to test connection. Please verify your Teable configuration.'
+    });
   }
 });
 
