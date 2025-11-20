@@ -1,4 +1,18 @@
-[dotenv@17.2.3] injecting env (6) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (7) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
 🚀 Multi-tenant GIS Server running on port 3000
-📍 Environment: development
+📍 Environment: production
+✅ Google OAuth: ENABLED
+   Redirect URI: https://mapz.in/api/auth/google/callback
+Error creating onboarding status: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.customer_usage_metrics'",
+  message: "Could not find the table 'public.customer_onboarding_status' in the schema cache"
+}
+Error creating onboarding status: {
+  code: '42501',
+  details: null,
+  hint: null,
+  message: 'new row violates row-level security policy for table "customer_onboarding_status"'
+}
