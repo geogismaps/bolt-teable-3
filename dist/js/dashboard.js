@@ -12,10 +12,13 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeDashboard() {
     try {
         const session = window.teableAuth.getCurrentSession();
-        
+
         // Display user info
         displayUserInfo(session);
-        
+
+        // Check onboarding status
+        await checkOnboardingStatus(session);
+
         // Show admin features if user is admin or creator
         if (session.isAdmin || session.role === 'creator') {
             document.getElementById('quickActions').style.display = 'block';
@@ -37,17 +40,57 @@ async function initializeDashboard() {
 
         // Load dashboard data
         await loadDashboardStats();
-        
+
     } catch (error) {
         console.error('Dashboard initialization failed:', error);
         showError('Failed to load dashboard: ' + error.message);
     }
 }
 
+async function checkOnboardingStatus(session) {
+    try {
+        const customerSession = localStorage.getItem('customer_session');
+        if (!customerSession) return;
+
+        const customerData = JSON.parse(customerSession);
+        if (!customerData.customerId) return;
+
+        const response = await fetch(`${window.location.origin}/api/onboarding/status/${customerData.customerId}`);
+        const data = await response.json();
+
+        if (data.success && data.status && !data.status.is_complete) {
+            const banner = document.getElementById('onboardingBanner');
+            const progressBar = document.getElementById('onboardingProgress');
+
+            const stepsCompleted = Object.keys(data.status.steps_completed || {}).length;
+            const totalSteps = 3;
+            const progressPercent = (stepsCompleted / totalSteps) * 100;
+
+            progressBar.style.width = `${progressPercent}%`;
+            banner.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error checking onboarding status:', error);
+    }
+}
+
 function displayUserInfo(session) {
     const displayName = `${session.firstName} ${session.lastName} (${session.role})`;
     document.getElementById('userDisplay').textContent = displayName;
-    
+
+    const welcomeMsg = document.getElementById('welcomeMessage');
+    if (welcomeMsg) {
+        const hour = new Date().getHours();
+        let greeting = 'Good evening';
+        if (hour < 12) greeting = 'Good morning';
+        else if (hour < 18) greeting = 'Good afternoon';
+
+        welcomeMsg.textContent = `${greeting}, ${session.firstName}!`;
+    }
+
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
     // Update hero section user info
     const heroDisplay = document.getElementById('userDisplayHero');
     if (heroDisplay) {
@@ -141,6 +184,21 @@ function showError(message) {
             alertDiv.remove();
         }
     }, 8000);
+}
+
+function updateDateTime() {
+    const now = new Date();
+
+    const dateEl = document.getElementById('currentDate');
+    if (dateEl) {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateEl.textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    const timeEl = document.getElementById('currentTime');
+    if (timeEl) {
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
 }
 
 // Make functions globally available
