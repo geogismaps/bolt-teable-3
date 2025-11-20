@@ -82,12 +82,14 @@ customerAuthRouter.post('/signup', async (req, res) => {
 
     const userFirstName = firstName || adminEmail.split('@')[0].charAt(0).toUpperCase() + adminEmail.split('@')[0].slice(1);
     const userLastName = lastName || 'Admin';
+    const passwordHash = hashPassword(adminPassword);
 
     const { data: user, error: userError } = await supabase
       .from('customer_users')
       .insert({
         customer_id: customer.id,
         email: adminEmail.toLowerCase(),
+        password_hash: passwordHash,
         first_name: userFirstName,
         last_name: userLastName,
         role: 'owner',
@@ -133,6 +135,7 @@ customerAuthRouter.post('/signup', async (req, res) => {
       role: user.role,
       customerName: customer.name,
       subdomain: customer.subdomain,
+      dataSource: customer.data_source,
       sessionToken: crypto.randomBytes(32).toString('hex'),
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     };
@@ -204,6 +207,12 @@ customerAuthRouter.post('/login', async (req, res) => {
 
     if (!customer) {
       return res.status(404).json({ error: 'Customer account not found' });
+    }
+
+    // Verify password
+    const passwordHash = hashPassword(password);
+    if (user.password_hash !== passwordHash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     if (customer.status === 'suspended' || customer.status === 'inactive') {
