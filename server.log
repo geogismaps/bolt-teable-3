@@ -1,8 +1,10 @@
-[dotenv@17.2.3] injecting env (8) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (8) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
 🚀 Multi-tenant GIS Server running on port 5000
-📍 Environment: production
+📍 Environment: development
 ✅ Google OAuth: ENABLED
    Redirect URI: https://mapz.in/api/auth/google/callback
 GET /api/health
-GET /dashboard.html
+POST /api/auth/customer/login
+GET /customer-login.html
+GET /data-source-setup.html

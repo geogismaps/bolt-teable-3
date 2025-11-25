@@ -6,37 +6,25 @@ let selectedSource = null;
 let session = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
     const sessionStr = localStorage.getItem('customer_session');
-
-    // For testing: create a mock session if none exists
     if (!sessionStr) {
-        console.log('No session found, creating mock session for testing');
-        session = {
-            customerId: 'test-customer-id',
-            userId: 'test-user-id',
-            email: 'test@example.com',
-            role: 'owner',
-            sessionToken: 'test-token',
-            dataSource: null
-        };
-        showMessage('Testing mode: Using mock session', 'warning');
-    } else {
-        session = JSON.parse(sessionStr);
+        window.location.href = '/customer-login.html';
+        return;
+    }
 
-        // Check if data source already configured
-        if (session.dataSource) {
-            showMessage('Data source already configured', 'success');
-            setTimeout(() => {
-                window.location.href = '/dashboard.html';
-            }, 2000);
-        }
+    session = JSON.parse(sessionStr);
 
-        // Check if user is owner
-        if (session.role !== 'owner') {
-            showMessage('Only account owners can configure data sources', 'error');
-            document.querySelectorAll('button').forEach(btn => btn.disabled = true);
-        }
+    if (session.dataSource) {
+        showMessage('Data source already configured', 'success');
+        setTimeout(() => {
+            window.location.href = '/dashboard.html';
+        }, 2000);
+        return;
+    }
+
+    if (session.role !== 'owner') {
+        showMessage('Only account owners can configure data sources', 'error');
+        document.querySelectorAll('button').forEach(btn => btn.disabled = true);
     }
 });
 
