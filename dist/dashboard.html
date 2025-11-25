@@ -166,6 +166,65 @@
             color: #991b1b;
             border: 1px solid #fca5a5;
         }
+
+        .tables-list {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            display: none;
+            margin-top: 30px;
+        }
+
+        .tables-list.active {
+            display: block;
+        }
+
+        .tables-list h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+        }
+
+        .table-item {
+            background: #f8f9fa;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-item h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .table-item p {
+            font-size: 14px;
+            color: #64748b;
+            margin: 5px 0 0 0;
+        }
+
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
     </style>
 </head>
 <body>
@@ -240,12 +299,21 @@
                 </div>
 
                 <button type="submit" class="btn-primary">
-                    <i class="fas fa-check me-2"></i>Connect & View Map
+                    <i class="fas fa-check me-2"></i>Validate & Load Tables
                 </button>
             </form>
         </div>
+
+        <div id="tablesList" class="tables-list">
+            <h2>Available Tables</h2>
+            <div id="tablesContainer"></div>
+            <button class="btn-primary" onclick="proceedToUsers()">
+                <i class="fas fa-arrow-right me-2"></i>Proceed to Users & Permissions
+            </button>
+        </div>
     </div>
 
+    <script src="js/teable-api.js"></script>
     <script>
         let selectedSource = null;
 
@@ -269,7 +337,7 @@
             }
         }
 
-        document.getElementById('teableForm').addEventListener('submit', function(e) {
+        document.getElementById('teableForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const config = {
@@ -280,16 +348,35 @@
                 accessToken: document.getElementById('teableToken').value
             };
 
-            localStorage.setItem('gis_data_source', JSON.stringify(config));
+            showAlert('alertContainer', 'Validating connection...', 'success');
 
-            showAlert('alertContainer', 'Configuration saved! Redirecting to map...', 'success');
+            try {
+                // Validate and load tables
+                const teableAPI = new window.TeableAPI(config.baseUrl, config.accessToken);
+                teableAPI.init(config);
 
-            setTimeout(() => {
-                window.location.href = '/map.html';
-            }, 1000);
+                const tablesData = await teableAPI.getTables();
+                const tables = tablesData.tables || tablesData || [];
+
+                if (tables.length === 0) {
+                    showAlert('alertContainer', 'No tables found in this base', 'danger');
+                    return;
+                }
+
+                // Save config
+                localStorage.setItem('gis_data_source', JSON.stringify(config));
+
+                // Display tables
+                displayTables(tables);
+
+                showAlert('alertContainer', `Successfully loaded ${tables.length} tables!`, 'success');
+            } catch (error) {
+                console.error('Validation error:', error);
+                showAlert('alertContainer', `Connection failed: ${error.message}`, 'danger');
+            }
         });
 
-        document.getElementById('googleSheetsForm').addEventListener('submit', function(e) {
+        document.getElementById('googleSheetsForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const config = {
@@ -298,13 +385,22 @@
                 sheetName: document.getElementById('sheetName').value
             };
 
+            showAlert('alertContainer2', 'Validating Google Sheets...', 'success');
+
+            // For Google Sheets, we'll create a mock table entry
+            const tables = [{
+                id: 'sheet',
+                name: config.sheetName || 'Sheet1',
+                description: `Google Sheet: ${config.spreadsheetId}`
+            }];
+
+            // Save config
             localStorage.setItem('gis_data_source', JSON.stringify(config));
 
-            showAlert('alertContainer2', 'Configuration saved! Redirecting to map...', 'success');
+            // Display tables
+            displayTables(tables);
 
-            setTimeout(() => {
-                window.location.href = '/map.html';
-            }, 1000);
+            showAlert('alertContainer2', 'Google Sheets configured successfully!', 'success');
         });
 
         function showAlert(containerId, message, type) {
@@ -314,6 +410,35 @@
                     ${message}
                 </div>
             `;
+        }
+
+        function displayTables(tables) {
+            const container = document.getElementById('tablesContainer');
+            const tablesList = document.getElementById('tablesList');
+
+            container.innerHTML = '';
+
+            tables.forEach(table => {
+                const tableItem = document.createElement('div');
+                tableItem.className = 'table-item';
+                tableItem.innerHTML = `
+                    <div>
+                        <h3>${table.name}</h3>
+                        ${table.description ? `<p>${table.description}</p>` : ''}
+                    </div>
+                `;
+                container.appendChild(tableItem);
+            });
+
+            // Save tables to localStorage
+            localStorage.setItem('gis_tables', JSON.stringify(tables));
+
+            // Show tables list
+            tablesList.classList.add('active');
+        }
+
+        function proceedToUsers() {
+            window.location.href = '/users.html';
         }
 
         window.addEventListener('DOMContentLoaded', function() {

@@ -14,6 +14,8 @@ let geoJSONData = null;
 let fieldPermissionsCache = {};
 let currentBasemapType = 'openstreetmap';
 let satelliteZoomWarningShown = false;
+let permissionsManager = null;
+let supabaseClient = null;
 
 // Base map configurations
 const baseMaps = {
@@ -161,28 +163,65 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function initializeMap() {
     try {
-        // Ensure we have a valid session
-        currentUser = window.teableAuth.getCurrentSession();
-        if (!currentUser) {
-            console.error('No authenticated user found');
-            window.location.href = 'login.html';
+        // Initialize Supabase
+        if (window.supabase) {
+            supabaseClient = window.supabase.createClient(
+                'https://prnfolxusxppqwukwasx.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBybmZvbHh1c3hwcHF3dWt3YXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjM5OTUsImV4cCI6MjA3NTY5OTk5NX0.UZnV78aeMorSE5RNfJ3cG_kZ1hQadQkj_RMxqypKyqY'
+            );
+        }
+
+        // Load available users
+        await loadUsers();
+
+        // Initialize permissions manager
+        permissionsManager = new window.PermissionsManager();
+        const permissionsInitialized = await permissionsManager.init(
+            'https://prnfolxusxppqwukwasx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBybmZvbHh1c3hwcHF3dWt3YXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjM5OTUsImV4cCI6MjA3NTY5OTk5NX0.UZnV78aeMorSE5RNfJ3cG_kZ1hQadQkj_RMxqypKyqY'
+        );
+
+        if (permissionsInitialized) {
+            console.log('Permissions loaded successfully');
+        } else {
+            console.warn('Could not load user permissions - using default permissions');
+        }
+
+        // Get data source configuration
+        const dataSourceConfig = localStorage.getItem('gis_data_source');
+        if (!dataSourceConfig) {
+            console.error('No data source configured');
+            window.location.href = '/dashboard.html';
             return;
         }
 
-        document.getElementById('userDisplay').textContent = 
-            `${currentUser.firstName} ${currentUser.lastName} (${currentUser.role})`;
+        const config = JSON.parse(dataSourceConfig);
+        console.log('Loading data from source:', config.source);
 
-        // Initialize API if needed and ensure it's properly configured
-        if (currentUser.userType === 'space_owner') {
-            const clientConfig = window.teableAuth.clientConfig;
-            if (!clientConfig) {
-                console.error('No client configuration found');
-                return;
+        // Initialize API based on data source
+        if (config.source === 'teable') {
+            const clientConfig = {
+                baseUrl: config.baseUrl,
+                spaceId: config.spaceId,
+                baseId: config.baseId,
+                accessToken: config.accessToken
+            };
+
+            if (!window.TeableAPI) {
+                console.error('TeableAPI class not found');
+                throw new Error('TeableAPI not loaded');
             }
+
+            window.teableAPI = new window.TeableAPI(clientConfig.baseUrl, clientConfig.accessToken);
             window.teableAPI.init(clientConfig);
-            
-            // Wait for API to be ready
+
             await new Promise(resolve => setTimeout(resolve, 200));
+        } else if (config.source === 'googlesheets') {
+            window.googleSheetsConfig = {
+                spreadsheetId: config.spreadsheetId,
+                sheetName: config.sheetName
+            };
+            console.log('Google Sheets config set:', window.googleSheetsConfig);
         }
 
         // Initialize customer-specific basemaps
@@ -9052,4 +9091,71 @@ function showRegularPopup(feature, recordData, currentLayer) {
         console.log(`Popups disabled for layer "${currentLayer.name}" - not showing popup`);
         showInfo(`Popups are disabled for layer "${currentLayer.name}"`);
     }
+}
+
+// User Management Functions
+async function loadUsers() {
+    if (!supabaseClient) return;
+
+    try {
+        const customerId = localStorage.getItem('gis_customer_id') || 'default-customer';
+        const { data, error } = await supabaseClient
+            .from('customer_users')
+            .select('*')
+            .eq('customer_id', customerId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const userSelector = document.getElementById('userSelector');
+        if (!userSelector) return;
+
+        userSelector.innerHTML = '<option value="">Select a user...</option>';
+
+        (data || []).forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.email;
+            option.textContent = `${user.first_name} ${user.last_name} (${user.role})`;
+            userSelector.appendChild(option);
+        });
+
+        // Select current user if set
+        const currentUserEmail = localStorage.getItem('gis_current_user_email');
+        if (currentUserEmail) {
+            userSelector.value = currentUserEmail;
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+async function switchUser() {
+    const userSelector = document.getElementById('userSelector');
+    const selectedEmail = userSelector.value;
+
+    if (!selectedEmail) {
+        localStorage.removeItem('gis_current_user_email');
+        return;
+    }
+
+    localStorage.setItem('gis_current_user_email', selectedEmail);
+
+    // Reinitialize permissions
+    if (permissionsManager) {
+        permissionsManager = new window.PermissionsManager();
+        await permissionsManager.init(
+            'https://prnfolxusxppqwukwasx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBybmZvbHh1c3hwcHF3dWt3YXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjM5OTUsImV4cCI6MjA3NTY5OTk5NX0.UZnV78aeMorSE5RNfJ3cG_kZ1hQadQkj_RMxqypKyqY'
+        );
+    }
+
+    // Update display
+    const userDisplayEl = document.getElementById('userDisplay');
+    if (userDisplayEl) {
+        userDisplayEl.textContent = `User: ${selectedEmail}`;
+    }
+
+    // Reload the page to apply new permissions
+    showInfo('User switched! Reloading to apply permissions...');
+    setTimeout(() => window.location.reload(), 1000);
 }
