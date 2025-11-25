@@ -12,249 +12,41 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             padding: 40px 20px;
         }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
-
-        .header h1 {
-            font-size: 42px;
-            font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            font-size: 18px;
-            color: #64748b;
-        }
-
-        .section {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-            margin-bottom: 30px;
-        }
-
-        .section h2 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 30px;
-        }
-
-        .user-list {
-            margin-bottom: 30px;
-        }
-
-        .user-item {
-            background: #f8f9fa;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .user-item h3 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1e293b;
-            margin: 0;
-        }
-
-        .user-item p {
-            font-size: 14px;
-            color: #64748b;
-            margin: 5px 0 0 0;
-        }
-
-        .btn-primary {
-            background: #3b82f6;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .btn-primary:hover {
-            background: #2563eb;
-        }
-
-        .btn-secondary {
-            background: #64748b;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .btn-secondary:hover {
-            background: #475569;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 8px;
-        }
-
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #3b82f6;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 800px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            font-size: 24px;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #64748b;
-        }
-
-        .table-permissions {
-            margin-bottom: 30px;
-        }
-
-        .table-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .table-card h3 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1e293b;
-            margin-bottom: 15px;
-        }
-
-        .field-permission {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .field-permission:last-child {
-            border-bottom: none;
-        }
-
-        .field-name {
-            font-weight: 500;
-            color: #1e293b;
-        }
-
-        .permission-select {
-            width: 150px;
-            padding: 6px 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .alert {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
-        }
-
-        .alert-danger {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 50px; }
+        .header h1 { font-size: 42px; font-weight: 700; color: #1e293b; margin-bottom: 10px; }
+        .header p { font-size: 18px; color: #64748b; }
+        .section { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 30px; }
+        .section h2 { font-size: 24px; font-weight: 600; color: #1e293b; margin-bottom: 30px; }
+        .user-list { margin-bottom: 30px; }
+        .user-item { background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .user-item h3 { font-size: 18px; font-weight: 600; color: #1e293b; margin: 0; }
+        .user-item p { font-size: 14px; color: #64748b; margin: 5px 0 0 0; }
+        .btn-primary { background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #64748b; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-danger { background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-left: 10px; }
+        .btn-danger:hover { background: #dc2626; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 16px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #3b82f6; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 20px; padding: 40px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .modal-header h2 { margin: 0; font-size: 24px; }
+        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b; }
+        .table-card { background: #f8f9fa; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .table-card h3 { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 15px; }
+        .field-permission { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+        .field-permission:last-child { border-bottom: none; }
+        .field-name { font-weight: 500; color: #1e293b; }
+        .permission-select { width: 150px; padding: 6px 12px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 14px; }
+        .alert { padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
     </style>
 </head>
 <body>
@@ -273,7 +65,7 @@
             </button>
 
             <div class="user-list" id="userList">
-                <p style="color: #64748b; text-align: center; margin-top: 30px;">No users added yet</p>
+                <p style="color: #64748b; text-align: center; margin-top: 30px;">Loading users...</p>
             </div>
 
             <button class="btn-primary" onclick="proceedToMap()" style="width: 100%;">
@@ -288,18 +80,19 @@
                 <h2>Add New User</h2>
                 <button class="close-btn" onclick="closeModal()">&times;</button>
             </div>
-
             <form id="addUserForm">
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" id="userEmail" required>
                 </div>
-
                 <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" id="userName" required>
+                    <label>First Name</label>
+                    <input type="text" id="userFirstName" required>
                 </div>
-
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" id="userLastName" required>
+                </div>
                 <div class="form-group">
                     <label>Role</label>
                     <select id="userRole" required>
@@ -308,10 +101,7 @@
                         <option value="admin">Admin</option>
                     </select>
                 </div>
-
-                <button type="submit" class="btn-primary" style="width: 100%;">
-                    Save User
-                </button>
+                <button type="submit" class="btn-primary" style="width: 100%;">Save User</button>
             </form>
         </div>
     </div>
@@ -322,20 +112,41 @@
                 <h2>Configure Permissions</h2>
                 <button class="close-btn" onclick="closeModal()">&times;</button>
             </div>
-
             <div id="permissionsContainer"></div>
-
-            <button class="btn-primary" onclick="savePermissions()" style="width: 100%;">
-                Save Permissions
-            </button>
+            <button class="btn-primary" onclick="savePermissions()" style="width: 100%;">Save Permissions</button>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/teable-api.js"></script>
     <script>
-        let users = JSON.parse(localStorage.getItem('gis_users') || '[]');
+        const supabase = window.supabase.createClient(
+            'https://prnfolxusxppqwukwasx.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBybmZvbHh1c3hwcHF3dWt3YXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjM5OTUsImV4cCI6MjA3NTY5OTk5NX0.UZnV78aeMorSE5RNfJ3cG_kZ1hQadQkj_RMxqypKyqY'
+        );
+
+        let users = [];
         let tables = JSON.parse(localStorage.getItem('gis_tables') || '[]');
         let currentEditingUser = null;
+        let currentCustomerId = localStorage.getItem('gis_customer_id') || 'default-customer';
+
+        async function loadUsers() {
+            try {
+                const { data, error } = await supabase
+                    .from('customer_users')
+                    .select('*')
+                    .eq('customer_id', currentCustomerId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                users = data || [];
+                renderUsers();
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showAlert('Failed to load users: ' + error.message, 'danger');
+            }
+        }
 
         function showAddUserModal() {
             document.getElementById('addUserModal').classList.add('active');
@@ -349,42 +160,35 @@
 
         function showAlert(message, type) {
             const container = document.getElementById('alertContainer');
-            container.innerHTML = `
-                <div class="alert alert-${type}">
-                    ${message}
-                </div>
-            `;
-            setTimeout(() => {
-                container.innerHTML = '';
-            }, 3000);
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => { container.innerHTML = ''; }, 3000);
         }
 
-        document.getElementById('addUserForm').addEventListener('submit', function(e) {
+        document.getElementById('addUserForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const user = {
-                id: Date.now().toString(),
-                email: document.getElementById('userEmail').value,
-                name: document.getElementById('userName').value,
-                role: document.getElementById('userRole').value,
-                permissions: {}
-            };
+            try {
+                const { data, error } = await supabase
+                    .from('customer_users')
+                    .insert([{
+                        customer_id: currentCustomerId,
+                        email: document.getElementById('userEmail').value,
+                        first_name: document.getElementById('userFirstName').value,
+                        last_name: document.getElementById('userLastName').value,
+                        role: document.getElementById('userRole').value
+                    }])
+                    .select()
+                    .single();
 
-            // Initialize permissions for all tables
-            tables.forEach(table => {
-                user.permissions[table.id] = {
-                    canView: true,
-                    canEdit: user.role === 'editor' || user.role === 'admin',
-                    fields: {}
-                };
-            });
+                if (error) throw error;
 
-            users.push(user);
-            localStorage.setItem('gis_users', JSON.stringify(users));
-
-            closeModal();
-            renderUsers();
-            showAlert('User added successfully!', 'success');
+                closeModal();
+                await loadUsers();
+                showAlert('User added successfully!', 'success');
+            } catch (error) {
+                console.error('Error adding user:', error);
+                showAlert('Failed to add user: ' + error.message, 'danger');
+            }
         });
 
         function renderUsers() {
@@ -396,13 +200,12 @@
             }
 
             container.innerHTML = '';
-
             users.forEach(user => {
                 const userItem = document.createElement('div');
                 userItem.className = 'user-item';
                 userItem.innerHTML = `
                     <div>
-                        <h3>${user.name}</h3>
+                        <h3>${user.first_name} ${user.last_name}</h3>
                         <p>${user.email} - ${user.role}</p>
                     </div>
                     <div>
@@ -423,9 +226,23 @@
             if (!currentEditingUser) return;
 
             const container = document.getElementById('permissionsContainer');
-            container.innerHTML = '';
+            container.innerHTML = '<p style="text-align: center;">Loading permissions...</p>';
 
             const dataSourceConfig = JSON.parse(localStorage.getItem('gis_data_source'));
+
+            // Load existing permissions
+            const { data: existingPerms } = await supabase
+                .from('user_field_permissions')
+                .select('*')
+                .eq('user_id', userId);
+
+            const permissionsMap = {};
+            (existingPerms || []).forEach(perm => {
+                if (!permissionsMap[perm.table_id]) permissionsMap[perm.table_id] = {};
+                permissionsMap[perm.table_id][perm.field_id] = perm.permission;
+            });
+
+            container.innerHTML = '';
 
             for (const table of tables) {
                 const tableCard = document.createElement('div');
@@ -442,7 +259,6 @@
                         const fieldsData = await teableAPI.getFields(table.id);
                         fields = fieldsData.fields || fieldsData || [];
                     } else if (dataSourceConfig.source === 'googlesheets') {
-                        // Mock fields for Google Sheets
                         fields = [
                             { id: 'col_a', name: 'Column A' },
                             { id: 'col_b', name: 'Column B' },
@@ -452,7 +268,7 @@
 
                     fieldsHTML = '';
                     fields.forEach(field => {
-                        const currentPerm = currentEditingUser.permissions[table.id]?.fields[field.id] || 'view';
+                        const currentPerm = permissionsMap[table.id]?.[field.id] || 'view';
                         fieldsHTML += `
                             <div class="field-permission">
                                 <span class="field-name">${field.name}</span>
@@ -469,48 +285,66 @@
                     fieldsHTML = '<p style="color: #ef4444;">Error loading fields</p>';
                 }
 
-                tableCard.innerHTML = `
-                    <h3>${table.name}</h3>
-                    ${fieldsHTML}
-                `;
-
+                tableCard.innerHTML = `<h3>${table.name}</h3>${fieldsHTML}`;
                 container.appendChild(tableCard);
             }
 
             document.getElementById('permissionsModal').classList.add('active');
         }
 
-        function savePermissions() {
+        async function savePermissions() {
             if (!currentEditingUser) return;
 
-            const selects = document.querySelectorAll('.permission-select');
-            selects.forEach(select => {
-                const tableId = select.dataset.table;
-                const fieldId = select.dataset.field;
-                const permission = select.value;
+            try {
+                const selects = document.querySelectorAll('.permission-select');
+                const permissions = [];
 
-                if (!currentEditingUser.permissions[tableId]) {
-                    currentEditingUser.permissions[tableId] = { fields: {} };
-                }
-                if (!currentEditingUser.permissions[tableId].fields) {
-                    currentEditingUser.permissions[tableId].fields = {};
-                }
+                selects.forEach(select => {
+                    permissions.push({
+                        user_id: currentEditingUser.id,
+                        table_id: select.dataset.table,
+                        field_id: select.dataset.field,
+                        permission: select.value
+                    });
+                });
 
-                currentEditingUser.permissions[tableId].fields[fieldId] = permission;
-            });
+                // Delete existing permissions for this user
+                await supabase
+                    .from('user_field_permissions')
+                    .delete()
+                    .eq('user_id', currentEditingUser.id);
 
-            localStorage.setItem('gis_users', JSON.stringify(users));
+                // Insert new permissions
+                const { error } = await supabase
+                    .from('user_field_permissions')
+                    .insert(permissions);
 
-            closeModal();
-            showAlert('Permissions saved successfully!', 'success');
+                if (error) throw error;
+
+                closeModal();
+                showAlert('Permissions saved successfully!', 'success');
+            } catch (error) {
+                console.error('Error saving permissions:', error);
+                showAlert('Failed to save permissions: ' + error.message, 'danger');
+            }
         }
 
-        function deleteUser(userId) {
+        async function deleteUser(userId) {
             if (confirm('Are you sure you want to delete this user?')) {
-                users = users.filter(u => u.id !== userId);
-                localStorage.setItem('gis_users', JSON.stringify(users));
-                renderUsers();
-                showAlert('User deleted successfully!', 'success');
+                try {
+                    const { error } = await supabase
+                        .from('customer_users')
+                        .delete()
+                        .eq('id', userId);
+
+                    if (error) throw error;
+
+                    await loadUsers();
+                    showAlert('User deleted successfully!', 'success');
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    showAlert('Failed to delete user: ' + error.message, 'danger');
+                }
             }
         }
 
@@ -519,9 +353,14 @@
         }
 
         window.addEventListener('DOMContentLoaded', function() {
-            renderUsers();
+            if (!currentCustomerId) {
+                const newCustomerId = 'customer-' + Date.now();
+                localStorage.setItem('gis_customer_id', newCustomerId);
+                currentCustomerId = newCustomerId;
+            }
 
-            // Check if tables are loaded
+            loadUsers();
+
             if (tables.length === 0) {
                 showAlert('No tables found. Please go back to dashboard.', 'danger');
             }
