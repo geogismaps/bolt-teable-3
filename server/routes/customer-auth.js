@@ -4,6 +4,8 @@ import { supabase, logCustomerActivity } from '../config/supabase.js';
 
 export const customerAuthRouter = express.Router();
 
+console.log('✅ Customer auth router loaded');
+
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + 'teable_salt_2024').digest('hex');
 }

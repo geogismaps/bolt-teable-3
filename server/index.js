@@ -86,6 +86,16 @@ app.use('/api/customers', customerRouter);
 app.use('/api/html-editor', htmlEditorRouter);
 app.use('/api/data', dataRouter);
 
+console.log('📋 Registered API routes:');
+console.log('   - /api/auth/google');
+console.log('   - /api/google-sheets');
+console.log('   - /api/auth/customer');
+console.log('   - /api/onboarding');
+console.log('   - /api/auth');
+console.log('   - /api/customers');
+console.log('   - /api/html-editor');
+console.log('   - /api/data');
+
 app.use(serveCustomerHTML);
 
 app.use(express.static(path.join(__dirname, '../public')));
@@ -98,6 +108,19 @@ app.get('/api/health', (req, res) => {
       googleOAuth: config.googleOAuthEnabled
     }
   });
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.log(`❌ 404 Not Found: ${req.method} ${req.path}`);
+    return res.status(404).json({
+      error: 'Not found',
+      path: req.path,
+      method: req.method,
+      message: 'The requested API endpoint does not exist'
+    });
+  }
+  next();
 });
 
 app.use((err, req, res, next) => {
