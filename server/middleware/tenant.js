@@ -14,11 +14,19 @@ export async function tenantMiddleware(req, res, next) {
 
     if (parts.length > 2) {
       const subdomain = parts[0];
-      customer = await getCustomerBySubdomain(subdomain);
+      try {
+        customer = await getCustomerBySubdomain(subdomain);
+      } catch (subdomainError) {
+        console.error('Error fetching customer by subdomain:', subdomainError);
+      }
     }
 
     if (!customer) {
-      customer = await getCustomerByDomain(host);
+      try {
+        customer = await getCustomerByDomain(host);
+      } catch (domainError) {
+        console.error('Error fetching customer by domain:', domainError);
+      }
     }
 
     if (customer) {

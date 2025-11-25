@@ -101,7 +101,12 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
+  console.error('=== Global error handler ===');
+  console.error('Error:', err);
+  console.error('Stack:', err.stack);
+  console.error('Request:', req.method, req.path);
+  console.error('========================');
+
   if (!res.headersSent) {
     res.status(500).json({
       error: 'Internal server error',
