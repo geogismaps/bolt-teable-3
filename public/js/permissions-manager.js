@@ -20,11 +20,28 @@ class PermissionsManager {
 
         // Get or create current user session
         const userEmail = localStorage.getItem('gis_current_user_email');
-        const customerId = localStorage.getItem('gis_customer_id');
+        let customerId = localStorage.getItem('gis_customer_id');
 
-        if (!userEmail || !customerId) {
-            console.warn('No user session found');
+        if (!userEmail) {
+            console.warn('No user email found');
             return false;
+        }
+
+        // Ensure we have a valid UUID customer ID
+        if (!customerId || customerId === 'default-customer') {
+            const { data: existingCustomers } = await this.supabase
+                .from('customers')
+                .select('id')
+                .limit(1)
+                .maybeSingle();
+
+            if (existingCustomers) {
+                customerId = existingCustomers.id;
+                localStorage.setItem('gis_customer_id', customerId);
+            } else {
+                console.warn('No customer found');
+                return false;
+            }
         }
 
         // Load user from database

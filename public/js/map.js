@@ -9094,11 +9094,55 @@ function showRegularPopup(feature, recordData, currentLayer) {
 }
 
 // User Management Functions
+async function ensureCustomerId() {
+    let customerId = localStorage.getItem('gis_customer_id');
+
+    if (!customerId || customerId === 'default-customer') {
+        try {
+            // Try to find existing customers
+            const { data: existingCustomers } = await supabaseClient
+                .from('customers')
+                .select('id')
+                .limit(1)
+                .maybeSingle();
+
+            if (existingCustomers) {
+                customerId = existingCustomers.id;
+                localStorage.setItem('gis_customer_id', customerId);
+            } else {
+                // Create a new customer
+                const { data: newCustomer } = await supabaseClient
+                    .from('customers')
+                    .insert([{
+                        name: 'Test Customer',
+                        subdomain: 'test-' + Date.now()
+                    }])
+                    .select()
+                    .single();
+
+                if (newCustomer) {
+                    customerId = newCustomer.id;
+                    localStorage.setItem('gis_customer_id', customerId);
+                }
+            }
+        } catch (error) {
+            console.error('Error ensuring customer ID:', error);
+        }
+    }
+
+    return customerId;
+}
+
 async function loadUsers() {
     if (!supabaseClient) return;
 
     try {
-        const customerId = localStorage.getItem('gis_customer_id') || 'default-customer';
+        const customerId = await ensureCustomerId();
+        if (!customerId) {
+            console.error('No valid customer ID');
+            return;
+        }
+
         const { data, error } = await supabaseClient
             .from('customer_users')
             .select('*')

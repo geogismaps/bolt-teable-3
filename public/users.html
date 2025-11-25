@@ -352,14 +352,49 @@
             window.location.href = '/map.html';
         }
 
-        window.addEventListener('DOMContentLoaded', function() {
-            if (!currentCustomerId) {
-                const newCustomerId = 'customer-' + Date.now();
-                localStorage.setItem('gis_customer_id', newCustomerId);
-                currentCustomerId = newCustomerId;
-            }
+        async function initializeCustomer() {
+            if (!currentCustomerId || currentCustomerId === 'default-customer') {
+                // Try to find existing customers
+                const { data: existingCustomers, error } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .limit(1)
+                    .maybeSingle();
 
-            loadUsers();
+                if (existingCustomers) {
+                    currentCustomerId = existingCustomers.id;
+                    localStorage.setItem('gis_customer_id', currentCustomerId);
+                    console.log('Using existing customer:', currentCustomerId);
+                } else {
+                    // Create a new customer
+                    const { data: newCustomer, error: createError } = await supabase
+                        .from('customers')
+                        .insert([{
+                            name: 'Test Customer',
+                            subdomain: 'test-' + Date.now()
+                        }])
+                        .select()
+                        .single();
+
+                    if (newCustomer) {
+                        currentCustomerId = newCustomer.id;
+                        localStorage.setItem('gis_customer_id', currentCustomerId);
+                        console.log('Created new customer:', currentCustomerId);
+                    } else {
+                        console.error('Failed to create customer:', createError);
+                        showAlert('Failed to initialize customer. Please try again.', 'danger');
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        window.addEventListener('DOMContentLoaded', async function() {
+            const initialized = await initializeCustomer();
+            if (!initialized) return;
+
+            await loadUsers();
 
             if (tables.length === 0) {
                 showAlert('No tables found. Please go back to dashboard.', 'danger');
