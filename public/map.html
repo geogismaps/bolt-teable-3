@@ -823,6 +823,9 @@
                     <i class="fas fa-database me-2"></i>Teable GIS System
                 </a>
                 <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    <select id="userSelector" class="form-select form-select-sm me-3" style="width: 250px;" onchange="switchUser()">
+                        <option value="">Loading users...</option>
+                    </select>
                     <span class="nav-text text-white me-3" id="userDisplay"></span>
                     <button class="btn btn-outline-light btn-sm" onclick="logout()">
                         <i class="fas fa-sign-out-alt me-1"></i>Logout
@@ -1821,6 +1824,8 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://unpkg.com/pannellum/build/pannellum.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/permissions-manager.js"></script>
     <script src="js/data-adapter.js"></script>
     <script src="js/data-source-indicator.js"></script>
     <script src="js/teable-api.js"></script>
