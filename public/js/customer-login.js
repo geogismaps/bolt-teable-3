@@ -51,7 +51,26 @@ async function handleLogin(event) {
             })
         });
 
-        const data = await response.json();
+        let data;
+        const contentType = response.headers.get('content-type');
+
+        if (contentType && contentType.includes('application/json')) {
+            const text = await response.text();
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error('JSON parse error:', e, 'Response text:', text);
+                    throw new Error('Invalid response from server');
+                }
+            } else {
+                throw new Error('Empty response from server');
+            }
+        } else {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            throw new Error('Server returned invalid response format');
+        }
 
         if (response.status === 300) {
             showAlert(data.message || 'Multiple accounts found. Please contact support.', 'warning');
