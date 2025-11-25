@@ -156,13 +156,7 @@ function updateBasemapSelector(showDroneImagery) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication first
-    if (!window.teableAuth.requireAuth()) return;
-
-    // Wait for authentication to be fully ready before initializing map
-    setTimeout(() => {
-        initializeMap();
-    }, 100);
+    initializeMap();
 });
 
 async function initializeMap() {
