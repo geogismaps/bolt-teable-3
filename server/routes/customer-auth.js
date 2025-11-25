@@ -155,11 +155,18 @@ customerAuthRouter.post('/signup', async (req, res) => {
 
 customerAuthRouter.post('/login', async (req, res) => {
   try {
+    console.log('=== Customer Login Request ===');
+    console.log('Body:', req.body);
+    console.log('Headers:', req.headers);
+
     const { email, password, subdomain } = req.body;
 
     if (!email || !password) {
+      console.log('Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
+
+    console.log('Querying database for user:', email);
 
     let query = supabase
       .from('customer_users')
@@ -185,7 +192,15 @@ customerAuthRouter.post('/login', async (req, res) => {
 
     const { data: users, error } = await query;
 
-    if (error || !users || users.length === 0) {
+    console.log('Query result - users:', users ? users.length : 0, 'error:', error);
+
+    if (error) {
+      console.error('Database query error:', error);
+      return res.status(500).json({ error: 'Database error', details: error.message });
+    }
+
+    if (!users || users.length === 0) {
+      console.log('No users found');
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -247,6 +262,9 @@ customerAuthRouter.post('/login', async (req, res) => {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     };
 
+    console.log('Login successful for user:', user.email);
+    console.log('Sending response...');
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -254,8 +272,14 @@ customerAuthRouter.post('/login', async (req, res) => {
       customer
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('=== Login Error ===');
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
+    console.error('==================');
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Login failed', details: error.message });
+    }
   }
 });
 

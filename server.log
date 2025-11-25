@@ -1,7 +1,21 @@
-[dotenv@17.2.3] injecting env (8) from .env -- tip: ⚙️  enable debug logging with { debug: true }
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[dotenv@17.2.3] injecting env (8) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
 🚀 Multi-tenant GIS Server running on port 5000
 📍 Environment: development
 ✅ Google OAuth: ENABLED
    Redirect URI: https://mapz.in/api/auth/google/callback
 POST /api/auth/customer/login
+=== Customer Login Request ===
+Body: { email: 'demo@example.com', password: 'demo123' }
+Headers: {
+  host: 'localhost:5000',
+  'user-agent': 'curl/8.14.1',
+  accept: '*/*',
+  'content-type': 'application/json',
+  'content-length': '49'
+}
+Querying database for user: demo@example.com
+Query result - users: 1 error: null
+Login successful for user: demo@example.com
+Sending response...
+GET /api/health
