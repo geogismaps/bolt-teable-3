@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - GIS System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .signup-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 48px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .signup-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .signup-header i {
+            font-size: 56px;
+            color: #667eea;
+            margin-bottom: 16px;
+        }
+
+        .signup-header h1 {
+            margin: 0 0 8px 0;
+            font-size: 32px;
+            color: #1e293b;
+            font-weight: 700;
+        }
+
+        .signup-header p {
+            margin: 0;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .subdomain-preview {
+            background: #f8f9fa;
+            border: 2px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        .subdomain-preview strong {
+            color: #667eea;
+            font-size: 16px;
+        }
+
+        .password-strength {
+            height: 4px;
+            border-radius: 2px;
+            background: #e2e8f0;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0;
+            transition: all 0.3s;
+        }
+
+        .password-strength-bar.weak {
+            width: 33%;
+            background: #ef4444;
+        }
+
+        .password-strength-bar.medium {
+            width: 66%;
+            background: #f59e0b;
+        }
+
+        .password-strength-bar.strong {
+            width: 100%;
+            background: #10b981;
+        }
+
+        .btn-signup {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 24px;
+        }
+
+        .btn-signup:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(102,126,234,0.4);
+        }
+
+        .btn-signup:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+        }
+
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-text {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-container">
+        <div class="signup-header">
+            <i class="fas fa-rocket"></i>
+            <h1>Create Your Account</h1>
+            <p>Get started in 30 seconds</p>
+        </div>
+
+        <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+
+        <form id="signupForm">
+            <div class="mb-4">
+                <label class="form-label" for="companyName">
+                    Company Name <span class="text-danger">*</span>
+                </label>
+                <input type="text" class="form-control" id="companyName" required
+                       placeholder="e.g., Acme Corporation" oninput="generateSubdomain()">
+                <div class="form-text">Your organization or business name</div>
+                <div class="subdomain-preview" id="subdomainPreview" style="display: none;">
+                    Your site: <strong id="generatedSubdomain"></strong>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="email">
+                    Email Address <span class="text-danger">*</span>
+                </label>
+                <input type="email" class="form-control" id="email" required
+                       placeholder="you@company.com">
+                <div class="form-text">You'll use this to sign in</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="password">
+                    Password <span class="text-danger">*</span>
+                </label>
+                <input type="password" class="form-control" id="password" required
+                       placeholder="Create a strong password" oninput="checkPasswordStrength()">
+                <div class="password-strength">
+                    <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                </div>
+                <div class="form-text">At least 8 characters</div>
+            </div>
+
+            <button type="submit" class="btn-signup" id="signupBtn">
+                <i class="fas fa-rocket me-2"></i>Create Account
+            </button>
+        </form>
+
+        <div class="login-link">
+            Already have an account? <a href="login.html">Sign In</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let generatedSubdomain = '';
+
+        function sanitizeForSubdomain(text) {
+            return text
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '')
+                .substring(0, 30);
+        }
+
+        function generateSubdomain() {
+            const companyName = document.getElementById('companyName').value;
+            if (companyName.trim()) {
+                generatedSubdomain = sanitizeForSubdomain(companyName);
+                document.getElementById('generatedSubdomain').textContent =
+                    `${generatedSubdomain}.mapz.in`;
+                document.getElementById('subdomainPreview').style.display = 'block';
+            } else {
+                document.getElementById('subdomainPreview').style.display = 'none';
+            }
+        }
+
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const strengthBar = document.getElementById('passwordStrengthBar');
+
+            strengthBar.className = 'password-strength-bar';
+
+            if (password.length < 6) {
+                strengthBar.classList.add('weak');
+            } else if (password.length < 10) {
+                strengthBar.classList.add('medium');
+            } else {
+                strengthBar.classList.add('strong');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const companyName = document.getElementById('companyName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!companyName || !email || !password) {
+                showError('Please fill in all fields');
+                return;
+            }
+
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters long');
+                return;
+            }
+
+            const signupBtn = document.getElementById('signupBtn');
+            signupBtn.disabled = true;
+            signupBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating account...';
+
+            try {
+                console.log('Attempting signup to:', window.location.origin + '/api/auth/customer/signup');
+                const response = await fetch('/api/auth/customer/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        organizationName: companyName,
+                        subdomain: generatedSubdomain,
+                        adminEmail: email,
+                        adminPassword: password,
+                        firstName: email.split('@')[0],
+                        lastName: 'Admin'
+                    })
+                });
+                console.log('Response status:', response.status);
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Store session
+                    localStorage.setItem('customer_session', JSON.stringify(data.session));
+
+                    // Show success and redirect
+                    signupBtn.innerHTML = '<i class="fas fa-check me-2"></i>Success! Redirecting...';
+                    signupBtn.style.background = '#10b981';
+
+                    setTimeout(() => {
+                        window.location.href = '/data-source-setup.html';
+                    }, 1000);
+                } else {
+                    if (response.status === 409 && data.suggestedSubdomain) {
+                        generatedSubdomain = data.suggestedSubdomain;
+                        showError(`Subdomain taken. Try: ${data.suggestedSubdomain}.mapz.in`);
+                        document.getElementById('generatedSubdomain').textContent =
+                            `${data.suggestedSubdomain}.mapz.in`;
+                    } else {
+                        showError(data.error || 'Signup failed. Please try again.');
+                    }
+                    signupBtn.disabled = false;
+                    signupBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Create Account';
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    type: error.name,
+                    stack: error.stack
+                });
+                showError(`Network error: ${error.message}. Server may be unavailable.`);
+                signupBtn.disabled = false;
+                signupBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Create Account';
+            }
+        });
+    </script>
+</body>
+</html>
